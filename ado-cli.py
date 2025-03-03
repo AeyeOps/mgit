@@ -278,6 +278,45 @@ class AzDevOpsManager:
             "Logging in to Azure DevOps with PAT to organization: %s",
             organization,
         )
+        
+        # Try using environment variable method first
+        # This is more reliable for non-interactive auth
+        os.environ["AZURE_DEVOPS_EXT_PAT"] = pat
+        
+        # Configure the default organization
+        proc = subprocess.run(
+            [
+                "az",
+                "devops",
+                "configure",
+                "--defaults",
+                f"organization={organization}",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        
+        # Test if we can access Azure DevOps resources with PAT
+        test_proc = subprocess.run(
+            [
+                "az",
+                "devops",
+                "project",
+                "list",
+                "--only-show-errors",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        
+        if test_proc.returncode == 0 and test_proc.stdout.strip():
+            logger.info(
+                "Logged in to Azure DevOps successfully using environment PAT."
+            )
+            return
+            
+        # If environment variable method fails, try interactive login
+        logger.info("Trying explicit login method as fallback...")
         proc = subprocess.run(
             [
                 "az",
@@ -291,15 +330,21 @@ class AzDevOpsManager:
             text=True,
             capture_output=True,
         )
+        
         if proc.returncode != 0:
             logger.error(
                 "Failed to login to Azure DevOps. Output: %s",
                 proc.stderr.strip(),
             )
+            logger.error(
+                "You may need to manually set the PAT in your environment:"
+                "\n  export AZURE_DEVOPS_EXT_PAT='your-pat-token'"
+                "\n  Or add it to your .env file"
+            )
             raise typer.Exit(code=1)
         else:
             logger.info(
-                "Logged in to Azure DevOps successfully."
+                "Logged in to Azure DevOps successfully using explicit login."
             )
             logger.debug("Output: %s", proc.stdout.strip())
 
