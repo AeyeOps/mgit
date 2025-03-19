@@ -146,14 +146,34 @@ def embed_pat_in_url(repo_url: str, pat: str) -> str:
 # -----------------------------------------------------------------------------
 class AzDevOpsManager:
     def __init__(self):
+        # Get organization URL from environment
         self.ado_org = os.getenv(
             "AZURE_DEVOPS_ORG_URL",
             DEFAULT_VALUES["AZURE_DEVOPS_ORG_URL"],
         )
-        self.ado_pat = os.getenv(
-            "AZURE_DEVOPS_EXT_PAT",
-            DEFAULT_VALUES["AZURE_DEVOPS_EXT_PAT"],
-        )
+        
+        # Ensure the URL is properly formatted
+        if self.ado_org and not self.ado_org.startswith(("http://", "https://")):
+            self.ado_org = f"https://{self.ado_org}"
+        
+        # Get PAT from environment - handle various formats and credential locations
+        # First try standard environment variable
+        self.ado_pat = os.getenv("AZURE_DEVOPS_EXT_PAT")
+        
+        # If not found, try alternative environment variables that might be used
+        if not self.ado_pat or self.ado_pat == DEFAULT_VALUES["AZURE_DEVOPS_EXT_PAT"]:
+            # Try common alternatives
+            for env_var in ["AZURE_DEVOPS_PAT", "ADO_PAT", "AZURE_PAT"]:
+                if os.getenv(env_var):
+                    self.ado_pat = os.getenv(env_var)
+                    logger.debug(f"Using PAT from {env_var} environment variable")
+                    # Set the standard environment variable for consistency
+                    os.environ["AZURE_DEVOPS_EXT_PAT"] = self.ado_pat
+                    break
+        
+        # If still not found, use default
+        if not self.ado_pat:
+            self.ado_pat = DEFAULT_VALUES["AZURE_DEVOPS_EXT_PAT"]
 
     def check_az_cli_installed(self):
         logger.debug(
@@ -231,45 +251,121 @@ class AzDevOpsManager:
     def is_logged_into_az_devops(
         self, organization: str
     ) -> bool:
+        """
+        Check if the user is logged into Azure DevOps by attempting to list projects.
+        
+        This method verifies authentication by configuring the organization and 
+        trying to list projects. It will return True if the authentication works,
+        False otherwise.
+        """
         logger.debug(
             "Checking if logged in to Azure DevOps organization: %s",
             organization,
         )
-        # Configure the default organization
-        proc = subprocess.run(
-            [
-                "az",
-                "devops",
-                "configure",
-                "--defaults",
-                f"organization={organization}",
-            ],
-            capture_output=True,
-            text=True,
-        )
-        logger.debug(
-            "Configuration Output: %s", proc.stdout
-        )
+        
+        # Ensure the organization URL is properly formatted
+        if organization and not organization.startswith(("http://", "https://")):
+            organization = f"https://{organization}"
+        
+        # Save current environment variable if it exists
+        original_pat = os.environ.get("AZURE_DEVOPS_EXT_PAT")
+        
+        # Make sure the current PAT is set in the environment
+        if self.ado_pat and self.ado_pat != DEFAULT_VALUES["AZURE_DEVOPS_EXT_PAT"]:
+            os.environ["AZURE_DEVOPS_EXT_PAT"] = self.ado_pat
+        
+        try:
+            # Configure the default organization
+            try:
+                proc = subprocess.run(
+                    [
+                        "az",
+                        "devops",
+                        "configure",
+                        "--defaults",
+                        f"organization={organization}",
+                    ],
+                    capture_output=True,
+                    text=False,  # Use binary mode to avoid encoding issues
+                    check=False,
+                )
+                # Safely decode the output
+                stdout = proc.stdout.decode('utf-8', errors='replace') if proc.stdout else ""
+                stderr = proc.stderr.decode('utf-8', errors='replace') if proc.stderr else ""
+                # Update the process object
+                proc.stdout = stdout
+                proc.stderr = stderr
+            except Exception as e:
+                logger.debug(f"Error configuring organization: {str(e)}")
+                return False
+            
+            if proc.returncode != 0:
+                logger.debug(
+                    "Failed to configure default organization: %s", 
+                    proc.stderr.strip()
+                )
+                return False
+                
+            logger.debug("Organization configured: %s", organization)
 
-        proc = subprocess.run(
-            [
-                "az",
-                "devops",
-                "project",
-                "list",
-                "--only-show-errors",
-            ],
-            capture_output=True,
-            text=True,
-        )
-        if proc.returncode == 0 and proc.stdout.strip():
-            logger.debug(
-                "Already logged in to %s", organization
-            )
-            logger.debug("Output: %s", proc.stdout.strip())
-            return True
-        logger.debug("Not logged in to %s", organization)
-        return False
+            # Try to list projects to verify authentication
+            try:
+                proc = subprocess.run(
+                    [
+                        "az",
+                        "devops",
+                        "project",
+                        "list",
+                        "--only-show-errors",
+                    ],
+                    capture_output=True,
+                    text=False,  # Use binary mode to avoid encoding issues
+                    check=False,
+                    env=os.environ,
+                )
+                # Safely decode the output
+                stdout = proc.stdout.decode('utf-8', errors='replace') if proc.stdout else ""
+                stderr = proc.stderr.decode('utf-8', errors='replace') if proc.stderr else ""
+                # Update the process object
+                proc.stdout = stdout
+                proc.stderr = stderr
+            except Exception as e:
+                logger.debug(f"Error listing projects: {str(e)}")
+                return False
+            
+            if proc.returncode == 0 and proc.stdout.strip():
+                logger.debug("Already logged in to %s", organization)
+                logger.debug("Projects found: %s", proc.stdout.strip())
+                return True
+                
+            # Check if error is auth-related
+            if proc.returncode != 0:
+                error_msg = proc.stderr.strip().lower()
+                if ("authentication" in error_msg or 
+                    "authorize" in error_msg or 
+                    "permission" in error_msg or
+                    "credentials" in error_msg or
+                    "unauthorized" in error_msg):
+                    logger.debug(
+                        "Authentication error detected: %s", 
+                        proc.stderr.strip()
+                    )
+                    return False
+                    
+            logger.debug("Not logged in to %s", organization)
+            return False
+            
+        except Exception as e:
+            logger.debug(f"Error checking login status: {str(e)}")
+            return False
+            
+        finally:
+            # Restore original PAT environment variable if it existed
+            if original_pat is not None:
+                os.environ["AZURE_DEVOPS_EXT_PAT"] = original_pat
+            elif "AZURE_DEVOPS_EXT_PAT" in os.environ and original_pat is None:
+                # If there wasn't an original PAT, remove the one we set
+                pass
 
     def login_to_az_devops(
         self, organization: str, pat: str
@@ -279,106 +375,267 @@ class AzDevOpsManager:
             organization,
         )
         
-        # Try using environment variable method first
-        # This is more reliable for non-interactive auth
-        os.environ["AZURE_DEVOPS_EXT_PAT"] = pat
+        # Save current environment variable if it exists
+        original_pat = os.environ.get("AZURE_DEVOPS_EXT_PAT")
         
-        # Configure the default organization
-        proc = subprocess.run(
-            [
-                "az",
-                "devops",
-                "configure",
-                "--defaults",
-                f"organization={organization}",
-            ],
-            capture_output=True,
-            text=True,
-        )
-        
-        # Test if we can access Azure DevOps resources with PAT
-        test_proc = subprocess.run(
-            [
-                "az",
-                "devops",
-                "project",
-                "list",
-                "--only-show-errors",
-            ],
-            capture_output=True,
-            text=True,
-        )
-        
-        if test_proc.returncode == 0 and test_proc.stdout.strip():
-            logger.info(
-                "Logged in to Azure DevOps successfully using environment PAT."
-            )
-            return
+        try:
+            # Set environment variable method - most reliable method for authentication
+            os.environ["AZURE_DEVOPS_EXT_PAT"] = pat
             
-        # If environment variable method fails, try interactive login
-        logger.info("Trying explicit login method as fallback...")
-        proc = subprocess.run(
-            [
-                "az",
-                "devops",
-                "login",
-                "--organization",
-                organization,
-                "--verbose",
-            ],
-            input=pat,
-            text=True,
-            capture_output=True,
-        )
-        
-        if proc.returncode != 0:
-            logger.error(
-                "Failed to login to Azure DevOps. Output: %s",
-                proc.stderr.strip(),
+            # Configure the default organization
+            logger.debug("Configuring default organization: %s", organization)
+            proc = subprocess.run(
+                [
+                    "az",
+                    "devops",
+                    "configure",
+                    "--defaults",
+                    f"organization={organization}",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
             )
+            
+            if proc.returncode != 0:
+                logger.warning(
+                    "Warning: Could not set default organization. Error: %s",
+                    proc.stderr.strip(),
+                )
+            
+            # Test if we can access Azure DevOps resources with PAT
+            logger.debug("Testing authentication by listing projects")
+            try:
+                test_proc = subprocess.run(
+                    [
+                        "az",
+                        "devops",
+                        "project",
+                        "list",
+                        "--only-show-errors",
+                    ],
+                    capture_output=True,
+                    text=False,  # Use binary mode to avoid encoding issues
+                    check=False,
+                    env=os.environ,
+                )
+                # Safely decode the output
+                stdout = test_proc.stdout.decode('utf-8', errors='replace') if test_proc.stdout else ""
+                stderr = test_proc.stderr.decode('utf-8', errors='replace') if test_proc.stderr else ""
+                # Create a surrogate object with the decoded text
+                test_proc.stdout = stdout
+                test_proc.stderr = stderr
+            except Exception as e:
+                logger.error(f"Error executing project list command: {str(e)}")
+                test_proc = type('obj', (object,), {
+                    'returncode': 1, 
+                    'stdout': "", 
+                    'stderr': f"Command execution error: {str(e)}"
+                })
+            
+            if test_proc.returncode == 0 and test_proc.stdout.strip():
+                logger.info(
+                    "Logged in to Azure DevOps successfully using environment PAT."
+                )
+                return
+                
+            # If environment variable method fails, try explicit login
+            logger.info("Environment variable login failed. Trying explicit login method...")
+            
+            # Use a different approach for the explicit login
+            # First, check the explicit credential storage method
+            logger.debug("Attempting to store credentials explicitly")
+            try:
+                with open('/dev/null', 'w') as devnull:
+                    pat_bytes = pat.encode('utf-8') if isinstance(pat, str) else pat
+                    cred_proc = subprocess.run(
+                        [
+                            "az",
+                            "devops",
+                            "login",
+                            "--organization",
+                            organization,
+                        ],
+                        input=pat_bytes,
+                        text=False,  # Use binary mode to avoid encoding issues
+                        stdout=devnull,
+                        stderr=subprocess.PIPE,
+                        check=False,
+                    )
+                    # Safely decode the output
+                    stderr = cred_proc.stderr.decode('utf-8', errors='replace') if cred_proc.stderr else ""
+                    # Update the process object
+                    cred_proc.stderr = stderr
+            except Exception as e:
+                logger.error(f"Error during explicit login: {str(e)}")
+                cred_proc = type('obj', (object,), {
+                    'returncode': 1, 
+                    'stderr': f"Login command error: {str(e)}"
+                })
+            
+            # Test again after explicit login
+            logger.debug("Testing authentication after explicit login")
+            try:
+                test_proc = subprocess.run(
+                    [
+                        "az",
+                        "devops",
+                        "project",
+                        "list",
+                        "--only-show-errors",
+                    ],
+                    capture_output=True,
+                    text=False,  # Use binary mode to avoid encoding issues
+                    check=False,
+                    env=os.environ,
+                )
+                # Safely decode the output
+                stdout = test_proc.stdout.decode('utf-8', errors='replace') if test_proc.stdout else ""
+                stderr = test_proc.stderr.decode('utf-8', errors='replace') if test_proc.stderr else ""
+                # Create a surrogate object with the decoded text
+                test_proc.stdout = stdout
+                test_proc.stderr = stderr
+            except Exception as e:
+                logger.error(f"Error checking authentication after explicit login: {str(e)}")
+                test_proc = type('obj', (object,), {
+                    'returncode': 1, 
+                    'stdout': "", 
+                    'stderr': f"Command execution error: {str(e)}"
+                })
+            
+            if test_proc.returncode == 0 and test_proc.stdout.strip():
+                logger.info(
+                    "Logged in to Azure DevOps successfully using explicit login."
+                )
+                logger.debug("Auth test output: %s", test_proc.stdout.strip())
+                return
+            
+            # Last resort - try token via basic auth in headers
+            logger.info("Trying token via custom header method...")
+            try:
+                header_proc = subprocess.run(
+                    [
+                        "az",
+                        "devops",
+                        "project",
+                        "list",
+                        "--org",
+                        organization,
+                        "--only-show-errors",
+                        "--detect",
+                        "false",
+                    ],
+                    capture_output=True,
+                    text=False,  # Use binary mode to avoid encoding issues
+                    check=False,
+                    env=os.environ,
+                )
+                # Safely decode the output
+                stdout = header_proc.stdout.decode('utf-8', errors='replace') if header_proc.stdout else ""
+                stderr = header_proc.stderr.decode('utf-8', errors='replace') if header_proc.stderr else ""
+                # Create a surrogate object with the decoded text
+                header_proc.stdout = stdout
+                header_proc.stderr = stderr
+            except Exception as e:
+                logger.error(f"Error during custom header authentication: {str(e)}")
+                header_proc = type('obj', (object,), {
+                    'returncode': 1, 
+                    'stdout': "", 
+                    'stderr': f"Header auth error: {str(e)}"
+                })
+            
+            if header_proc.returncode == 0 and header_proc.stdout.strip():
+                logger.info(
+                    "Logged in to Azure DevOps successfully using header auth."
+                )
+                return
+            
+            # If we get here, all login attempts failed
+            error_details = (
+                f"Env auth error: {test_proc.stderr.strip()}\n"
+                f"Explicit auth error: {cred_proc.stderr.strip() if 'cred_proc' in locals() else 'Not attempted'}\n"
+                f"Header auth error: {header_proc.stderr.strip() if 'header_proc' in locals() else 'Not attempted'}"
+            )
+            
             logger.error(
-                "You may need to manually set the PAT in your environment:"
+                "Failed to login to Azure DevOps using all available methods."
+            )
+            logger.debug("Login errors: %s", error_details)
+            logger.error(
+                "Please ensure your PAT is valid and has the correct permissions."
+                "\n  Common issues:"
+                "\n  - PAT is expired"
+                "\n  - PAT lacks required scopes (needs 'Code (read)' at minimum)"
+                "\n  - Organization URL is incorrect"
+                "\n\nYou can manually set the PAT in your environment:"
                 "\n  export AZURE_DEVOPS_EXT_PAT='your-pat-token'"
                 "\n  Or add it to your .env file"
             )
             raise typer.Exit(code=1)
-        else:
-            logger.info(
-                "Logged in to Azure DevOps successfully using explicit login."
-            )
-            logger.debug("Output: %s", proc.stdout.strip())
+            
+        except Exception as e:
+            logger.error(f"Unexpected error during login: {str(e)}")
+            raise typer.Exit(code=1)
+            
+        finally:
+            # Restore original PAT environment variable if it existed
+            if original_pat is not None:
+                os.environ["AZURE_DEVOPS_EXT_PAT"] = original_pat
+            elif "AZURE_DEVOPS_EXT_PAT" in os.environ:
+                # If there was no original, but we set one, keep it set to the new value
+                pass
 
     def configure_az_devops(
         self, organization: str, project: str
     ):
+        """
+        Configure Azure DevOps defaults for the organization and project.
+        
+        This method sets the default organization and project for subsequent
+        az devops commands.
+        """
         logger.debug(
             "Setting AZ DevOps defaults: org=%s, project=%s",
             organization,
             project,
         )
-        proc = subprocess.run(
-            [
-                "az",
-                "devops",
-                "configure",
-                "--defaults",
-                f"organization={organization}",
-                f"project={project}",
-            ],
-            capture_output=True,
-            text=True,
-        )
-        if proc.returncode != 0:
-            logger.error(
-                "Failed to configure Azure DevOps defaults. Output: %s",
-                proc.stderr.strip(),
+        
+        # Ensure the organization URL is properly formatted
+        if organization and not organization.startswith(("http://", "https://")):
+            organization = f"https://{organization}"
+            
+        try:
+            proc = subprocess.run(
+                [
+                    "az",
+                    "devops",
+                    "configure",
+                    "--defaults",
+                    f"organization={organization}",
+                    f"project={project}",
+                ],
+                capture_output=True,
+                text=False,  # Use binary mode to avoid encoding issues
+                check=False,
             )
+            # Safely decode the output
+            stdout = proc.stdout.decode('utf-8', errors='replace') if proc.stdout else ""
+            stderr = proc.stderr.decode('utf-8', errors='replace') if proc.stderr else ""
+            
+            if proc.returncode != 0:
+                logger.error(
+                    "Failed to configure Azure DevOps defaults. Output: %s",
+                    stderr.strip(),
+                )
+                raise typer.Exit(code=1)
+            else:
+                logger.debug(
+                    "Azure DevOps defaults configured successfully."
+                )
+                logger.debug("Output: %s", stdout.strip())
+        except Exception as e:
+            logger.error(f"Error configuring Azure DevOps: {str(e)}")
             raise typer.Exit(code=1)
-        else:
-            logger.debug(
-                "Azure DevOps defaults configured successfully."
-            )
-            logger.debug("Output: %s", proc.stdout.strip())
 
 
 # -----------------------------------------------------------------------------
@@ -504,19 +761,34 @@ def clone_all(
     logger.debug(
         "Fetching repository list from Azure DevOps..."
     )
-    proc = subprocess.run(
-        [
-            "az",
-            "repos",
-            "list",
-            "--query",
-            "[].{Name:name, Url:remoteUrl}",
-            "-o",
-            "json",
-        ],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        proc = subprocess.run(
+            [
+                "az",
+                "repos",
+                "list",
+                "--org",
+                ado.ado_org,  # Explicitly set the org here to avoid redirection issues
+                "--project",
+                project,       # Explicitly set the project here
+                "--query",
+                "[].{Name:name, Url:remoteUrl}",
+                "-o",
+                "json",
+            ],
+            capture_output=True,
+            text=False,  # Use binary mode to avoid encoding issues
+            check=False,
+        )
+        # Safely decode the output
+        stdout = proc.stdout.decode('utf-8', errors='replace') if proc.stdout else ""
+        stderr = proc.stderr.decode('utf-8', errors='replace') if proc.stderr else ""
+        # Update the process object
+        proc.stdout = stdout
+        proc.stderr = stderr
+    except Exception as e:
+        logger.error(f"Error fetching repository list: {str(e)}")
+        raise typer.Exit(code=1)
     if proc.returncode != 0:
         logger.error(
             "Failed to list repos. Error: %s",
@@ -695,19 +967,34 @@ def pull_all(
     logger.debug(
         "Fetching repository list from Azure DevOps..."
     )
-    proc = subprocess.run(
-        [
-            "az",
-            "repos",
-            "list",
-            "--query",
-            "[].{Name:name, Url:remoteUrl}",
-            "-o",
-            "json",
-        ],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        proc = subprocess.run(
+            [
+                "az",
+                "repos",
+                "list",
+                "--org",
+                ado.ado_org,  # Explicitly set the org here to avoid redirection issues
+                "--project",
+                project,       # Explicitly set the project here
+                "--query",
+                "[].{Name:name, Url:remoteUrl}",
+                "-o",
+                "json",
+            ],
+            capture_output=True,
+            text=False,  # Use binary mode to avoid encoding issues
+            check=False,
+        )
+        # Safely decode the output
+        stdout = proc.stdout.decode('utf-8', errors='replace') if proc.stdout else ""
+        stderr = proc.stderr.decode('utf-8', errors='replace') if proc.stderr else ""
+        # Update the process object
+        proc.stdout = stdout
+        proc.stderr = stderr
+    except Exception as e:
+        logger.error(f"Error fetching repository list: {str(e)}")
+        raise typer.Exit(code=1)
     if proc.returncode != 0:
         logger.error(
             "Failed to list repos. Error: %s",
@@ -787,6 +1074,93 @@ def gen_env():
     console.print(
         f"Created {new_file} with collected environment variables."
     )
+
+
+# -----------------------------------------------------------------------------
+# login Command
+# -----------------------------------------------------------------------------
+@app.command(help="Login to Azure DevOps and validate credentials.")
+def login(
+    organization: str = typer.Option(
+        None, "--org", "-o", help="Azure DevOps organization URL."
+    ),
+    pat: str = typer.Option(
+        None, "--pat", "-p", help="Personal Access Token for authentication."
+    ),
+    store: bool = typer.Option(
+        True, 
+        "--store/--no-store", 
+        help="Store credentials in .env file for future use."
+    )
+):
+    """
+    Login to Azure DevOps using a Personal Access Token (PAT).
+    
+    If organization or PAT are not provided, they will be read from 
+    environment variables or prompted for interactively.
+    """
+    ado = AzDevOpsManager()
+    
+    # Check Azure CLI and extensions first
+    ado.check_az_cli_installed()
+    ado.ensure_ado_ext_installed()
+    
+    # If org not provided, use from environment or prompt
+    if not organization:
+        organization = ado.ado_org
+        if organization == DEFAULT_VALUES["AZURE_DEVOPS_ORG_URL"]:
+            organization = typer.prompt(
+                "Enter Azure DevOps organization URL", 
+                default=DEFAULT_VALUES["AZURE_DEVOPS_ORG_URL"]
+            )
+    
+    # Ensure URL format is correct
+    if not organization.startswith(("http://", "https://")):
+        organization = f"https://{organization}"
+    
+    # If PAT not provided, use from environment or prompt securely
+    if not pat:
+        pat = ado.ado_pat
+        if pat == DEFAULT_VALUES["AZURE_DEVOPS_EXT_PAT"]:
+            pat = typer.prompt(
+                "Enter Personal Access Token (PAT)", 
+                hide_input=True
+            )
+    
+    # Try to login with provided credentials
+    try:
+        ado.login_to_az_devops(organization, pat)
+        console.print("[green]✓[/green] Successfully logged in to Azure DevOps!")
+        
+        # Store credentials if requested
+        if store:
+            store_credentials(organization, pat)
+    
+    except typer.Exit:
+        console.print("[red]✗[/red] Failed to login. Please check your credentials and try again.")
+        raise typer.Exit(code=1)
+
+
+def store_credentials(organization: str, pat: str):
+    """Store credentials in .env file for future use."""
+    env_file = Path(".env")
+    
+    # Read existing .env if available
+    env_vars = {}
+    if env_file.exists():
+        env_vars = dotenv_values(dotenv_path=str(env_file))
+    
+    # Update with new values
+    env_vars["AZURE_DEVOPS_ORG_URL"] = organization
+    env_vars["AZURE_DEVOPS_EXT_PAT"] = pat
+    
+    # Write back to .env
+    with env_file.open("w", encoding="utf-8") as f:
+        for k, v in env_vars.items():
+            f.write(f"{k}={v}\n")
+    
+    console.print(f"[green]✓[/green] Credentials stored in {env_file}")
+    os.chmod(env_file, 0o600)  # Set secure permissions
 
 
 def main():
