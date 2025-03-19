@@ -1,8 +1,8 @@
-# Comprehensive Analysis of the Azure DevOps CLI Codebase
+# Azure DevOps CLI Tool
 
 ## Overview
 
-The provided codebase is a command-line interface (CLI) tool designed to interact with Azure DevOps services. It facilitates operations such as cloning all repositories from a project, pulling updates for all repositories, and generating environment configuration files. The tool is built using Python and leverages several libraries to achieve its functionality, including `typer` for CLI command handling, `asyncio` for asynchronous operations, and `subprocess` for executing shell commands.
+This command-line interface (CLI) tool is designed to interact with Azure DevOps services. It facilitates operations such as logging in to Azure DevOps, cloning all repositories from a project, pulling updates for all repositories, and generating environment configuration files. The tool is built using Python and leverages several libraries including `typer` for CLI command handling, `asyncio` for asynchronous operations, and `subprocess` for executing shell commands.
 
 ## Code Structure
 
@@ -98,44 +98,49 @@ class GitManager:
 
 The CLI tool is built using `typer`, which simplifies the creation of command-line interfaces. The tool provides several commands, each corresponding to a specific operation.
 
+### login Command
+
+This command allows users to authenticate with Azure DevOps using a Personal Access Token (PAT). It provides interactive prompts if credentials are not provided, and can store them securely for future use.
+
+```bash
+# Login with prompts for organization URL and PAT
+python ado-cli.py login
+
+# Login with explicitly provided credentials
+python ado-cli.py login --org https://dev.azure.com/your-org --pat your-pat-token
+
+# Login without storing credentials
+python ado-cli.py login --no-store
+```
+
 ### clone_all Command
 
 This command clones all repositories from a specified Azure DevOps project into a local directory. It supports various update modes, allowing users to skip, pull, or force clone repositories.
 
-```python
-@app.command()
-def clone_all(
-    project: str = typer.Argument(
-        ..., help="Azure DevOps project name."
-    ),
-    ...
-):
-    ...
+```bash
+# Clone all repos from a project
+python ado-cli.py clone-all project-name ./repos
+
+# Clone with 8 concurrent operations and force mode (overwrite existing repos)
+python ado-cli.py clone-all project-name ./repos -c 8 -u force
 ```
 
 ### pull_all Command
 
 The `pull_all` command updates all repositories in a specified directory by pulling the latest changes from Azure DevOps.
 
-```python
-@app.command()
-def pull_all(
-    project: str = typer.Argument(
-        ..., help="Azure DevOps project name."
-    ),
-    ...
-):
-    ...
+```bash
+# Pull latest changes for all repos
+python ado-cli.py pull-all project-name ./repos
 ```
 
 ### gen_env Command
 
 This command generates an environment file with the necessary configuration variables, using existing values if available.
 
-```python
-@app.command(help="Generate an environment file.")
-def gen_env():
-    ...
+```bash
+# Generate environment file
+python ado-cli.py gen-env
 ```
 
 ## Flow Diagram
@@ -149,20 +154,50 @@ graph TD;
     C --> D[Initialize AzDevOpsManager]
     D --> E[Initialize GitManager]
     E --> F{Execute Command}
-    F --> |clone_all| G[Check Azure CLI]
-    F --> |pull_all| H[Check Azure CLI]
+    F --> |login| G1[Check Azure CLI]
+    F --> |clone_all| G2[Check Azure CLI]
+    F --> |pull_all| G3[Check Azure CLI]
     F --> |gen_env| I[Generate .env File]
-    G --> J[Login to Azure DevOps]
-    H --> J
-    J --> K[Configure Azure DevOps]
-    K --> L[Clone or Pull Repositories]
-    L --> M[Log Results]
-    M --> N[End]
+    G1 --> J1[Login to Azure DevOps]
+    G2 --> J2[Login to Azure DevOps]
+    G3 --> J3[Login to Azure DevOps]
+    J1 --> K1[Store Credentials if Requested]
+    J2 --> K2[Configure Azure DevOps]
+    J3 --> K3[Configure Azure DevOps]
+    K2 --> L1[Clone Repositories]
+    K3 --> L2[Pull Repositories]
+    L1 --> M1[Log Results]
+    L2 --> M2[Log Results]
+    K1 --> N1[End]
+    M1 --> N2[End]
+    M2 --> N3[End]
+    I --> N4[End]
 ```
+
+## Authentication
+
+The tool supports multiple authentication methods for Azure DevOps:
+
+1. **Environment Variables**: Set `AZURE_DEVOPS_ORG_URL` and `AZURE_DEVOPS_EXT_PAT` in your environment
+2. **Login Command**: Use the interactive `login` command to authenticate and optionally store credentials
+3. **Dotenv File**: Create a `.env` file in the project directory with your credentials
+
+The login process is resilient, with multiple fallback mechanisms:
+- Environment variable-based authentication (most reliable)
+- Explicit credential storage using Azure CLI
+- Basic auth via request headers
+
+## Security
+
+The tool takes security seriously:
+- PATs are never exposed in logs or console output
+- Credential files have restricted permissions (0600)
+- Support for multiple authentication methods to suit different security requirements
+- Self-cleanup of sensitive information in memory
 
 ## Conclusion
 
-The Azure DevOps CLI tool is a well-structured application that leverages modern Python libraries to provide a robust interface for managing Azure DevOps repositories. It efficiently handles environment configuration, logging, and asynchronous operations, making it a valuable tool for developers and DevOps engineers. The use of `typer` for command handling and `asyncio` for concurrent operations demonstrates a modern approach to building CLI applications in Python.
+The Azure DevOps CLI tool is a well-structured application that leverages modern Python libraries to provide a robust interface for managing Azure DevOps repositories. It efficiently handles authentication, environment configuration, logging, and asynchronous operations, making it a valuable tool for developers and DevOps engineers. The use of `typer` for command handling and `asyncio` for concurrent operations demonstrates a modern approach to building CLI applications in Python.
 # Improvements Addendum
 
 In this section, we will outline potential improvements to the Azure DevOps CLI codebase. These improvements are prioritized based on their impact on usability, maintainability, and performance. Each improvement is explained in a way that is accessible to both software developers and subject matter experts.
