@@ -1,36 +1,70 @@
 #!/usr/bin/env python3
 
-import os
 import asyncio
 import json
-import subprocess
 import logging
+import os
 import shutil
+import subprocess
+import sys
+from enum import Enum
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse, urlunparse
 
-import typer
-from enum import Enum
+from dotenv import dotenv_values, load_dotenv
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress
-from dotenv import load_dotenv, dotenv_values
+import typer
 
+# Default values used if environment variables and config file don't provide values
 DEFAULT_VALUES = {
     "AZURE_DEVOPS_ORG_URL": "https://www.visualstudio.com",
-    "AZURE_DEVOPS_EXT_PAT": "<your-pat-token>",
     "LOG_FILENAME": "ado-cli.log",
     "LOG_LEVEL": "DEBUG",
     "CON_LEVEL": "INFO",
+    "DEFAULT_CONCURRENCY": "4",
+    "DEFAULT_UPDATE_MODE": "skip",
 }
 
+# Configuration loading order:
+# 1. Environment variables (highest priority)
+# 2. Global config file in ~/.config/ado-cli/config
+# 3. Default values (lowest priority)
+
+# First load environment variables
 load_dotenv(
     dotenv_path=None,
     verbose=True,
     override=True,
 )
+
+# Load global config file if environment variables are not set
+CONFIG_DIR = Path.home() / ".config" / "ado-cli"
+CONFIG_FILE = CONFIG_DIR / "config"
+
+def get_config_value(key: str, default_value: str = None) -> str:
+    """
+    Get a configuration value with the following priority:
+    1. Environment variable
+    2. Global config file
+    3. Default value
+    """
+    # First check environment
+    env_value = os.environ.get(key)
+    if env_value:
+        return env_value
+        
+    # Then check config file
+    if CONFIG_FILE.exists():
+        config_values = dotenv_values(dotenv_path=str(CONFIG_FILE))
+        if key in config_values and config_values[key]:
+            return config_values[key]
+            
+    # Finally use default
+    return default_value or DEFAULT_VALUES.get(key, "")
 
 # -----------------------------------------------------------------------------
 # Logging Setup
@@ -84,35 +118,59 @@ class AdoCliFormatter(logging.Formatter):
 
 
 file_handler = RotatingFileHandler(
-    os.getenv(
-        "LOG_FILENAME", DEFAULT_VALUES["LOG_FILENAME"]
-    ),
+    get_config_value("LOG_FILENAME"),
     maxBytes=5_000_000,
     backupCount=3,
 )
 
 file_handler.setFormatter(AdoCliFormatter())
 
-console_handler = RichHandler(
-    rich_tracebacks=True, markup=True
+class ConsoleFriendlyRichHandler(RichHandler):
+    """Enhanced Rich handler that formats long messages better for console display."""
+    
+    def emit(self, record):
+        # Format repository URLs in a more readable way
+        if record.levelname == "INFO" and "Cloning repository:" in str(record.msg):
+            # Extract repository name from URL
+            msg = str(record.msg)
+            if "_git/" in msg:
+                try:
+                    # Extract repo name from URL pattern
+                    repo_name = msg.split("_git/")[1].split(" into")[0]
+                    # Format message to be more concise
+                    shortened_url = f"Cloning: [bold blue]{repo_name}[/bold blue]"
+                    record.msg = shortened_url
+                except Exception:
+                    # If parsing fails, keep original message
+                    pass
+                    
+        # Call the parent class's emit method
+        super().emit(record)
+
+console_handler = ConsoleFriendlyRichHandler(
+    rich_tracebacks=True, 
+    markup=True,
+    show_path=False,  # Hide the file path in log messages
+    show_time=False,  # Hide timestamp (already in the formatter)
 )
 console_handler.setLevel(
-    os.getenv("CON_LEVEL", DEFAULT_VALUES["CON_LEVEL"])
+    get_config_value("CON_LEVEL")
 )
 
 logger = logging.getLogger(__name__)
 logger.setLevel(
-    os.getenv("LOG_LEVEL", DEFAULT_VALUES["LOG_LEVEL"])
+    get_config_value("LOG_LEVEL")
 )
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
 console = Console()
 app = typer.Typer(
-    name=__name__,
-    help="ado-cli v0.0.1 - CLI to provide project-level git"
-    "functionality with Azure DevOps.",
+    name="ado-cli",
+    help="Azure DevOps CLI Tool v0.1.0 - A utility for managing Azure DevOps "
+    "repositories and providing project-level git functionality.",
     add_completion=False,
+    no_args_is_help=True,
 )
 
 
@@ -146,34 +204,30 @@ def embed_pat_in_url(repo_url: str, pat: str) -> str:
 # -----------------------------------------------------------------------------
 class AzDevOpsManager:
     def __init__(self):
-        # Get organization URL from environment
-        self.ado_org = os.getenv(
-            "AZURE_DEVOPS_ORG_URL",
-            DEFAULT_VALUES["AZURE_DEVOPS_ORG_URL"],
-        )
+        # Get organization URL from config
+        self.ado_org = get_config_value("AZURE_DEVOPS_ORG_URL")
         
         # Ensure the URL is properly formatted
         if self.ado_org and not self.ado_org.startswith(("http://", "https://")):
             self.ado_org = f"https://{self.ado_org}"
         
-        # Get PAT from environment - handle various formats and credential locations
+        # Get PAT - handle various formats and credential locations
         # First try standard environment variable
-        self.ado_pat = os.getenv("AZURE_DEVOPS_EXT_PAT")
+        self.ado_pat = get_config_value("AZURE_DEVOPS_EXT_PAT")
         
         # If not found, try alternative environment variables that might be used
-        if not self.ado_pat or self.ado_pat == DEFAULT_VALUES["AZURE_DEVOPS_EXT_PAT"]:
+        if not self.ado_pat:
             # Try common alternatives
             for env_var in ["AZURE_DEVOPS_PAT", "ADO_PAT", "AZURE_PAT"]:
-                if os.getenv(env_var):
-                    self.ado_pat = os.getenv(env_var)
+                env_value = os.getenv(env_var)
+                if env_value:
+                    self.ado_pat = env_value
                     logger.debug(f"Using PAT from {env_var} environment variable")
                     # Set the standard environment variable for consistency
                     os.environ["AZURE_DEVOPS_EXT_PAT"] = self.ado_pat
                     break
         
-        # If still not found, use default
-        if not self.ado_pat:
-            self.ado_pat = DEFAULT_VALUES["AZURE_DEVOPS_EXT_PAT"]
+        # No default for PAT - it must be provided
 
     def check_az_cli_installed(self):
         logger.debug(
@@ -271,7 +325,7 @@ class AzDevOpsManager:
         original_pat = os.environ.get("AZURE_DEVOPS_EXT_PAT")
         
         # Make sure the current PAT is set in the environment
-        if self.ado_pat and self.ado_pat != DEFAULT_VALUES["AZURE_DEVOPS_EXT_PAT"]:
+        if self.ado_pat:
             os.environ["AZURE_DEVOPS_EXT_PAT"] = self.ado_pat
         
         try:
@@ -569,7 +623,7 @@ class AzDevOpsManager:
                 "\n  - Organization URL is incorrect"
                 "\n\nYou can manually set the PAT in your environment:"
                 "\n  export AZURE_DEVOPS_EXT_PAT='your-pat-token'"
-                "\n  Or add it to your .env file"
+                "\n  Or add it to your .env file or global config at ~/.config/ado-cli/config"
             )
             raise typer.Exit(code=1)
             
@@ -661,7 +715,9 @@ class GitManager:
         """
         Use 'git pull' for the existing repo in repo_dir.
         """
-        logger.info(f"Pulling repository in: {repo_dir}")
+        # Extract repo name from path for nicer logging
+        repo_name = repo_dir.name
+        logger.info(f"Pulling: [bold green]{repo_name}[/bold green]")
         cmd = [self.GIT_EXECUTABLE, "pull"]
         await self._run_subprocess(cmd, cwd=repo_dir)
 
@@ -708,13 +764,13 @@ def clone_all(
         f"{DEFAULT_VALUES['AZURE_DEVOPS_ORG_URL']} if not provided).",
     ),
     concurrency: int = typer.Option(
-        4,
+        int(get_config_value("DEFAULT_CONCURRENCY", "4")),
         "--concurrency",
         "-c",
         help="Number of concurrent clone operations.",
     ),
     update_mode: UpdateMode = typer.Option(
-        UpdateMode.skip,
+        get_config_value("DEFAULT_UPDATE_MODE", "skip"),
         "--update-mode",
         "-u",
         help=(
@@ -730,7 +786,7 @@ def clone_all(
     """
 
     if not url:
-        url = DEFAULT_VALUES["AZURE_DEVOPS_ORG_URL"]
+        url = get_config_value("AZURE_DEVOPS_ORG_URL")
 
     ado = AzDevOpsManager()
     git_manager = GitManager()
@@ -738,7 +794,8 @@ def clone_all(
     if not ado.ado_org or not ado.ado_pat:
         logger.error(
             "AZURE_DEVOPS_ORG_URL or AZURE_DEVOPS_EXT_PAT "
-            "are not set. Check your .env file."
+            "are not set in environment or config file. "
+            "Use 'ado-cli config --org URL' and ensure your PAT is set."
         )
         raise typer.Exit(code=1)
 
@@ -947,7 +1004,7 @@ def pull_all(
     if not ado.ado_org or not ado.ado_pat:
         logger.error(
             "AZURE_DEVOPS_ORG_URL or AZURE_DEVOPS_EXT_PAT "
-            "are not set. Check your .env file."
+            "are not set in environment or config file."
         )
         raise typer.Exit(code=1)
 
@@ -1049,31 +1106,64 @@ def pull_all(
 
 
 # -----------------------------------------------------------------------------
-# gen_env Command
+# generate_env Command
 # -----------------------------------------------------------------------------
-@app.command(help="Generate an environment file.")
-def gen_env():
-    env_keys = DEFAULT_VALUES
-    existing = {}
-    base_env_file = Path(".env")
-    if base_env_file.exists():
-        existing = dotenv_values(
-            dotenv_path=str(base_env_file)
-        )
+@app.command(help="Generate a sample environment file with configuration options.")
+def generate_env():
+    """
+    Generate a detailed sample environment file with all configuration options.
+    
+    This command creates a .env.sample file with example values and detailed
+    comments explaining each configuration option. Users can copy this file
+    to .env to set local environment variables.
+    """
+    env_content = """# Azure DevOps CLI Configuration Sample
+# Copy this file to .env to configure environment variables
+# Or use ~/.config/ado-cli/config for global settings
 
+# Azure DevOps organization URL (required)
+AZURE_DEVOPS_ORG_URL=https://www.visualstudio.com
+
+# Personal Access Token for authentication (required)
+# Can also be set in ~/.config/ado-cli/config
+AZURE_DEVOPS_EXT_PAT=<YOUR_PERSONAL_ACCESS_TOKEN>
+
+# Log file name (default: ado-cli.log)
+LOG_FILENAME=ado-cli.log
+
+# Logging level for file logs (DEBUG, INFO, WARNING, ERROR)
+LOG_LEVEL=DEBUG
+
+# Logging level for console output (DEBUG, INFO, WARNING, ERROR)
+CON_LEVEL=INFO
+
+# Default concurrency for repository operations (default: 4)
+# Higher values speed up cloning multiple repositories but increase resource usage
+DEFAULT_CONCURRENCY=4
+
+# Default update mode when repositories already exist:
+# - skip: Don't touch existing repositories
+# - pull: Try to git pull if it's a valid git repository
+# - force: Remove existing folder and clone fresh
+DEFAULT_UPDATE_MODE=skip
+"""
+    
     counter = 0
-    new_file = Path(".env")
+    new_file = Path(".env.sample")
     while new_file.exists():
         counter += 1
-        new_file = Path(f".env{counter}")
+        new_file = Path(f".env.sample{counter}")
 
     with new_file.open("w", encoding="utf-8") as wf:
-        for k, v in env_keys.items():
-            wf.write(f"{k}={existing.get(k, v)}\n")
+        wf.write(env_content)
 
-    console.print(
-        f"Created {new_file} with collected environment variables."
-    )
+    console.print(f"[green]✓[/green] Created {new_file} with detailed configuration options.")
+
+# For backward compatibility
+@app.command(hidden=True)
+def gen_env():
+    """Alias for generate_env command (deprecated)."""
+    generate_env()
 
 
 # -----------------------------------------------------------------------------
@@ -1090,7 +1180,7 @@ def login(
     store: bool = typer.Option(
         True, 
         "--store/--no-store", 
-        help="Store credentials in .env file for future use."
+        help="Store credentials in config file for future use."
     )
 ):
     """
@@ -1121,7 +1211,7 @@ def login(
     # If PAT not provided, use from environment or prompt securely
     if not pat:
         pat = ado.ado_pat
-        if pat == DEFAULT_VALUES["AZURE_DEVOPS_EXT_PAT"]:
+        if not pat:
             pat = typer.prompt(
                 "Enter Personal Access Token (PAT)", 
                 hide_input=True
@@ -1142,29 +1232,111 @@ def login(
 
 
 def store_credentials(organization: str, pat: str):
-    """Store credentials in .env file for future use."""
-    env_file = Path(".env")
+    """Store credentials in global config file for future use."""
+    # Create config directory if it doesn't exist
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     
-    # Read existing .env if available
-    env_vars = {}
-    if env_file.exists():
-        env_vars = dotenv_values(dotenv_path=str(env_file))
+    # Read existing config if available
+    config_values = {}
+    if CONFIG_FILE.exists():
+        config_values = dotenv_values(dotenv_path=str(CONFIG_FILE))
     
     # Update with new values
-    env_vars["AZURE_DEVOPS_ORG_URL"] = organization
-    env_vars["AZURE_DEVOPS_EXT_PAT"] = pat
+    config_values["AZURE_DEVOPS_ORG_URL"] = organization
+    config_values["AZURE_DEVOPS_EXT_PAT"] = pat
     
-    # Write back to .env
-    with env_file.open("w", encoding="utf-8") as f:
-        for k, v in env_vars.items():
+    # Write back to config file
+    with CONFIG_FILE.open("w", encoding="utf-8") as f:
+        for k, v in config_values.items():
             f.write(f"{k}={v}\n")
     
-    console.print(f"[green]✓[/green] Credentials stored in {env_file}")
-    os.chmod(env_file, 0o600)  # Set secure permissions
+    console.print(f"[green]✓[/green] Credentials stored in {CONFIG_FILE}")
+    os.chmod(CONFIG_FILE, 0o600)  # Set secure permissions
+
+
+# -----------------------------------------------------------------------------
+# config Command
+# -----------------------------------------------------------------------------
+@app.command(help="Set or view global configuration settings for ado-cli.")
+def config(
+    show: bool = typer.Option(
+        False, "--show", help="Show current configuration settings."
+    ),
+    organization: Optional[str] = typer.Option(
+        None, "--org", help="Default Azure DevOps organization URL."
+    ),
+    concurrency: Optional[int] = typer.Option(
+        None, "--concurrency", help="Default concurrency for clone operations."
+    ),
+    update_mode: Optional[UpdateMode] = typer.Option(
+        None, "--update-mode", help="Default update mode (skip, pull, force)."
+    ),
+):
+    """
+    Configure global settings for ado-cli.
+    
+    This command allows you to set default values for common parameters
+    that will be used across all invocations of ado-cli.
+    """
+    # Create config directory if it doesn't exist
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Read existing config if available
+    config_values: Dict[str, Any] = {}
+    if CONFIG_FILE.exists():
+        config_values = dotenv_values(dotenv_path=str(CONFIG_FILE))
+    
+    # If show option is specified, display current config and exit
+    if show:
+        console.print("[bold]Current global configuration:[/bold]")
+        if config_values:
+            for key, value in config_values.items():
+                # Mask the PAT token when displaying
+                if key == "AZURE_DEVOPS_EXT_PAT":
+                    masked_value = value[:4] + "*" * (len(value) - 8) + value[-4:] if len(value) > 8 else "*" * len(value)
+                    console.print(f"  {key}={masked_value}")
+                else:
+                    console.print(f"  {key}={value}")
+        else:
+            console.print("  No global configuration set.")
+        return
+    
+    # Update config values with provided options
+    if organization:
+        # Ensure URL format is correct
+        if not organization.startswith(("http://", "https://")):
+            organization = f"https://{organization}"
+        config_values["AZURE_DEVOPS_ORG_URL"] = organization
+    
+    if concurrency is not None:
+        config_values["DEFAULT_CONCURRENCY"] = str(concurrency)
+    
+    if update_mode is not None:
+        config_values["DEFAULT_UPDATE_MODE"] = update_mode
+    
+    # Write updated config
+    with CONFIG_FILE.open("w", encoding="utf-8") as f:
+        for k, v in config_values.items():
+            f.write(f"{k}={v}\n")
+    
+    # Set secure permissions on config file
+    os.chmod(CONFIG_FILE, 0o600)
+    
+    console.print(f"[green]✓[/green] Configuration updated successfully in {CONFIG_FILE}")
+
+
+# The callback is no longer needed since we're using Typer's built-in help
 
 
 def main():
+    # Call the app directly - Typer will handle no args case with help
     app()
+
+
+# Needed for Windows-specific behavior (not called on Linux/Mac)
+def entrypoint():
+    """Entry point for the application when packaged."""
+    main()
 
 
 if __name__ == "__main__":
