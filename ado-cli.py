@@ -131,18 +131,35 @@ class ConsoleFriendlyRichHandler(RichHandler):
     
     def emit(self, record):
         # Format repository URLs in a more readable way
-        if record.levelname == "INFO" and "Cloning repository:" in str(record.msg):
-            # Extract repository name from URL
+        if record.levelname == "INFO":
             msg = str(record.msg)
-            if "_git/" in msg:
+            
+            # Handle repository cloning messages
+            if "Cloning repository:" in msg:
+                # Extract repository name from URL
+                if "_git/" in msg:
+                    try:
+                        # Extract repo name from URL pattern
+                        repo_name = msg.split("_git/")[1].split(" into")[0]
+                        # Truncate long repo names
+                        if len(repo_name) > 40:
+                            repo_name = repo_name[:37] + "..."
+                        # Format message to be more concise
+                        shortened_url = f"Cloning: [bold blue]{repo_name}[/bold blue]"
+                        record.msg = shortened_url
+                    except Exception:
+                        # If parsing fails, keep original message
+                        pass
+            
+            # Handle skipping disabled repositories message    
+            elif "Skipping disabled repository:" in msg:
                 try:
-                    # Extract repo name from URL pattern
-                    repo_name = msg.split("_git/")[1].split(" into")[0]
-                    # Format message to be more concise
-                    shortened_url = f"Cloning: [bold blue]{repo_name}[/bold blue]"
-                    record.msg = shortened_url
+                    repo_name = msg.split("Skipping disabled repository:")[1].strip()
+                    # Truncate long repo names
+                    if len(repo_name) > 40:
+                        repo_name = repo_name[:37] + "..."
+                    record.msg = f"Skipping disabled: [bold yellow]{repo_name}[/bold yellow]"
                 except Exception:
-                    # If parsing fails, keep original message
                     pass
                     
         # Call the parent class's emit method
@@ -739,14 +756,29 @@ class GitManager:
         Optionally specify a directory name to clone into.
         Raises typer.Exit if the command fails.
         """
+        # Format the message for better display in the console
+        # Truncate long URLs to prevent log line truncation
+        display_url = repo_url
+        if len(display_url) > 60:
+            parsed = urlparse(display_url)
+            path_parts = parsed.path.split('/')
+            if len(path_parts) > 2:
+                # Show just the end of the path (organization/project/repo)
+                short_path = '/'.join(path_parts[-3:])
+                display_url = f"{parsed.scheme}://{parsed.netloc}/.../{short_path}"
+        
         if dir_name:
+            display_dir = dir_name
+            if len(display_dir) > 40:
+                display_dir = display_dir[:37] + "..."
+                
             logger.info(
-                f"Cloning repository: {repo_url} into {output_dir}/{dir_name}"
+                f"Cloning: [bold blue]{display_dir}[/bold blue]"
             )
             cmd = [self.GIT_EXECUTABLE, "clone", repo_url, dir_name]
         else:
             logger.info(
-                f"Cloning repository: {repo_url} into {output_dir}"
+                f"Cloning repository: {display_url} into {output_dir}"
             )
             cmd = [self.GIT_EXECUTABLE, "clone", repo_url]
             
@@ -758,7 +790,14 @@ class GitManager:
         """
         # Extract repo name from path for nicer logging
         repo_name = repo_dir.name
-        logger.info(f"Pulling: [bold green]{repo_name}[/bold green]")
+        
+        # Format the output with consistent width to prevent truncation
+        # Limit the repo name to 40 characters if it's longer
+        display_name = repo_name
+        if len(display_name) > 40:
+            display_name = display_name[:37] + "..."
+            
+        logger.info(f"Pulling: [bold green]{display_name}[/bold green]")
         cmd = [self.GIT_EXECUTABLE, "pull"]
         await self._run_subprocess(cmd, cwd=repo_dir)
 

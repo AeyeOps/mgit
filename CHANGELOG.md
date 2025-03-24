@@ -26,6 +26,7 @@ All notable changes to this project will be documented in this file, following [
   - Built and packaged as a standalone executable with PyInstaller
   - Added detection and reporting of disabled repositories
   - Fixed handling of repository names with spaces and special characters
+  - Enhanced log formatting for better display of long repository names
 
 ### Security
 - **Improved Credential Handling**
