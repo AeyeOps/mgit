@@ -19,7 +19,6 @@ Built with Python, it leverages asynchronous operations for speed and provides r
 ### Prerequisites
 
 - Python 3.7 or higher
-- Azure CLI with azure-devops extension (will be installed automatically if missing)
 - Git
 
 ### Installation Steps
@@ -59,6 +58,11 @@ The executable will be created in the `dist/` directory and can be run directly:
 ```
 
 ## Quick Start
+
+Get the current version:
+```bash
+python ado-cli.py --version
+```
 
 ### Authentication
 
@@ -158,6 +162,14 @@ Generate a sample environment file with configuration options.
 
 ```bash
 python ado-cli.py generate-env
+```
+
+### --version
+
+Show the application's version and exit.
+
+```bash
+python ado-cli.py --version
 ```
 
 ## Configuration
