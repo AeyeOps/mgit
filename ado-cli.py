@@ -829,7 +829,7 @@ def clone_all(
                 "--project",
                 project,       # Explicitly set the project here
                 "--query",
-                "[].{Name:name, Url:remoteUrl}",
+                "[].{Name:name, Url:remoteUrl, isDisabled:isDisabled}",
                 "-o",
                 "json",
             ],
@@ -883,9 +883,20 @@ def clone_all(
             )
 
             async def process_one_repo(
-                repo_name: str, repo_url: str
+                repo_name: str, repo_url: str, repo_data: dict
             ):
                 async with sem:
+                    # Check if repository is disabled
+                    if repo_data.get("isDisabled", False):
+                        logger.info(
+                            f"Skipping disabled repository: {repo_name}"
+                        )
+                        failures.append(
+                            (repo_name, "repository is disabled")
+                        )
+                        progress.advance(task_id, 1)
+                        return
+                    
                     repo_folder = target_path / repo_name
                     # Decide how to handle if folder already exists
                     if repo_folder.exists():
@@ -957,7 +968,7 @@ def clone_all(
 
             await asyncio.gather(
                 *(
-                    process_one_repo(r["Name"], r["Url"])
+                    process_one_repo(r["Name"], r["Url"], r)
                     for r in repos
                 )
             )
@@ -1035,7 +1046,7 @@ def pull_all(
                 "--project",
                 project,       # Explicitly set the project here
                 "--query",
-                "[].{Name:name, Url:remoteUrl}",
+                "[].{Name:name, Url:remoteUrl, isDisabled:isDisabled}",
                 "-o",
                 "json",
             ],
@@ -1073,6 +1084,17 @@ def pull_all(
             repo_name = repo.get("Name")
             if not repo_name:
                 continue
+                
+            # Check if repository is disabled
+            if repo.get("isDisabled", False):
+                logger.info(
+                    f"Skipping disabled repository: {repo_name}"
+                )
+                failures.append(
+                    (repo_name, "repository is disabled")
+                )
+                continue
+                
             repo_dir = target_path / repo_name
             if (
                 repo_dir.exists()
