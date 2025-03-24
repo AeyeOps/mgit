@@ -10,6 +10,7 @@ The Azure DevOps CLI Tool simplifies common repository management tasks by provi
 - Pull updates for multiple repositories simultaneously
 - Configure global settings for repeated operations
 - Manage authentication credentials securely
+- Automatically handle disabled repositories with clear reporting
 
 Built with Python, it leverages asynchronous operations for speed and provides rich console output for better visibility.
 

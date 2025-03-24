@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file, following [
   - Added automatic help display when running the CLI with no arguments
   - Improved CLI name and description for better clarity
   - Built and packaged as a standalone executable with PyInstaller
+  - Added detection and reporting of disabled repositories
 
 ### Security
 - **Improved Credential Handling**
