@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -11,7 +12,7 @@ from enum import Enum
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any, Dict, Optional
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse, unquote
 
 from dotenv import dotenv_values, load_dotenv
 from rich.console import Console
@@ -175,7 +176,7 @@ app = typer.Typer(
 
 
 # -----------------------------------------------------------------------------
-# Helper to insert PAT into the remote URL
+# Helper functions
 # -----------------------------------------------------------------------------
 def embed_pat_in_url(repo_url: str, pat: str) -> str:
     """
@@ -197,6 +198,38 @@ def embed_pat_in_url(repo_url: str, pat: str) -> str:
 
     new_parsed = parsed._replace(netloc=netloc)
     return urlunparse(new_parsed)
+
+def sanitize_repo_name(repo_url: str) -> str:
+    """
+    Extract and sanitize repository name from URL for use as a directory name.
+    Handles URL encoding, spaces, and special characters.
+    
+    Example:
+      Input: https://dev.azure.com/org/project/_git/Repo%20Name%20With%20Spaces
+      Output: Repo_Name_With_Spaces
+    """
+    # Extract repo name from URL
+    parsed = urlparse(repo_url)
+    path_parts = parsed.path.split('/')
+    # The repo name is typically the last part of the path after _git
+    repo_name = ""
+    for i, part in enumerate(path_parts):
+        if part == "_git" and i + 1 < len(path_parts):
+            repo_name = path_parts[i + 1]
+            break
+    
+    # If we couldn't find it after _git, use the last part of the path
+    if not repo_name and path_parts:
+        repo_name = path_parts[-1]
+    
+    # Decode URL encoding
+    repo_name = unquote(repo_name)
+    
+    # Replace spaces and special characters with underscores
+    # Keep alphanumeric, underscore, hyphen, and period
+    repo_name = re.sub(r'[^\w\-\.]', '_', repo_name)
+    
+    return repo_name
 
 
 # -----------------------------------------------------------------------------
@@ -699,16 +732,24 @@ class GitManager:
     GIT_EXECUTABLE = "git"
 
     async def git_clone(
-        self, repo_url: str, output_dir: Path
+        self, repo_url: str, output_dir: Path, dir_name: str = None
     ):
         """
         Use 'git clone' for the given repo_url, in output_dir.
+        Optionally specify a directory name to clone into.
         Raises typer.Exit if the command fails.
         """
-        logger.info(
-            f"Cloning repository: {repo_url} into {output_dir}"
-        )
-        cmd = [self.GIT_EXECUTABLE, "clone", repo_url]
+        if dir_name:
+            logger.info(
+                f"Cloning repository: {repo_url} into {output_dir}/{dir_name}"
+            )
+            cmd = [self.GIT_EXECUTABLE, "clone", repo_url, dir_name]
+        else:
+            logger.info(
+                f"Cloning repository: {repo_url} into {output_dir}"
+            )
+            cmd = [self.GIT_EXECUTABLE, "clone", repo_url]
+            
         await self._run_subprocess(cmd, cwd=output_dir)
 
     async def git_pull(self, repo_dir: Path):
@@ -897,13 +938,20 @@ def clone_all(
                         progress.advance(task_id, 1)
                         return
                     
-                    repo_folder = target_path / repo_name
+                    # Sanitize the repository name for filesystem use
+                    sanitized_name = sanitize_repo_name(repo_url)
+                    if sanitized_name != repo_name:
+                        logger.debug(
+                            f"Using sanitized name '{sanitized_name}' for repository '{repo_name}'"
+                        )
+                    
+                    repo_folder = target_path / sanitized_name
                     # Decide how to handle if folder already exists
                     if repo_folder.exists():
                         if update_mode == "skip":
                             # Mark as "skipped" for the summary if you want
                             logger.info(
-                                f"Skipping existing repo folder: {repo_name}"
+                                f"Skipping existing repo folder: {sanitized_name}"
                             )
                             progress.advance(task_id, 1)
                             return
@@ -936,7 +984,7 @@ def clone_all(
                             return
                         elif update_mode == "force":
                             logger.info(
-                                f"Removing existing folder: {repo_name}"
+                                f"Removing existing folder: {sanitized_name}"
                             )
                             try:
                                 shutil.rmtree(repo_folder)
@@ -956,8 +1004,10 @@ def clone_all(
                         repo_url, ado.ado_pat
                     )
                     try:
+                        # Modified to include a directory argument to git clone
+                        # This ensures the output directory has the sanitized name
                         await git_manager.git_clone(
-                            pat_url, target_path
+                            pat_url, target_path, sanitized_name
                         )
                     except typer.Exit:
                         failures.append(
@@ -1082,6 +1132,7 @@ def pull_all(
         failures = []
         for repo in repos:
             repo_name = repo.get("Name")
+            repo_url = repo.get("Url", "")
             if not repo_name:
                 continue
                 
@@ -1094,8 +1145,15 @@ def pull_all(
                     (repo_name, "repository is disabled")
                 )
                 continue
+            
+            # Sanitize the repository name for filesystem use
+            sanitized_name = sanitize_repo_name(repo_url)
+            if sanitized_name != repo_name:
+                logger.debug(
+                    f"Using sanitized name '{sanitized_name}' for repository '{repo_name}'"
+                )
                 
-            repo_dir = target_path / repo_name
+            repo_dir = target_path / sanitized_name
             if (
                 repo_dir.exists()
                 and (repo_dir / ".git").exists()
