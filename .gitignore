@@ -31,6 +31,9 @@ MANIFEST
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+# Keep the dist folder but ignore its contents
+dist/*
+!dist/.gitkeep
 
 # Installer logs
 pip-log.txt
@@ -55,8 +58,11 @@ cover/
 *.mo
 *.pot
 
-# Django stuff:
+# Log files
 *.log
+ado-cli.log
+
+# Django stuff:
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -129,6 +135,8 @@ celerybeat.pid
 
 # Environments
 .env
+# Don't ignore the sample environment file template
+!.env.sample
 .venv
 env/
 venv/
