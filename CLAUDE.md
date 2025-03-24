@@ -31,6 +31,15 @@ python -m pytest tests/test_file.py::test_function -v
 python -m pytest tests/ -v --cov=. --cov-report=term
 ```
 
+## Project Structure
+- **ado-cli.py**: Main application entry point
+- **requirements.txt**: Dependencies list
+- **ARCHITECTURE.md**: Technical design and future improvements
+- **README.md**: User documentation and examples
+- **CLAUDE.md**: Guidelines for agentic coding agents
+- **dist/**: Built executable files
+- **build/**: Temporary build files
+
 ## Code Style Guidelines
 - **Imports**: Group in order of stdlib → third-party → local modules
 - **Formatting**: Black (4-space indents, 88 char line length)
@@ -52,4 +61,14 @@ python -m pytest tests/ -v --cov=. --cov-report=term
 - Validate inputs before performing operations
 - Provide meaningful progress indicators for long-running operations
 - Add retry logic for network operations
-- Create custom exceptions for different error scenarios
+- Ensure proper exception handling and user-friendly error messages
+- Follow the hierarchical configuration system (env vars → global config → defaults)
+- Maintain backward compatibility with existing commands
+- Adhere to the established authentication flow and security practices
+
+## Key Components
+- **AzDevOpsManager**: Handles Azure DevOps API interactions and authentication
+- **GitManager**: Manages Git operations (clone, pull) with async support
+- **Configuration**: Hierarchical system using env vars, config files, and defaults
+- **Logging**: Rich console output with sanitized credentials
+- **CLI Commands**: Typer-based command structure with help documentation
