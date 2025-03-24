@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file, following [common-changelog.org](https://common-changelog.org/) guidelines.
 
+## [0.1.0] - 2025-03-23
+
+### Added
+- **Global Configuration System**
+  - Added support for centralized configuration in `~/.config/ado-cli/config`
+  - Added hierarchical configuration lookup: environment → global config → defaults
+  - New `config` command to view and manage global settings
+  - Added secure storage of credentials with proper permissions
+
+### Changed
+- **Configuration Management**
+  - Improved configuration handling with better defaults and documentation
+  - Enhanced credential management for better security
+  - Added support for default concurrency and update mode in global config
+  - Renamed `gen-env` command to `generate-env` with detailed documentation support
+  - Improved console output formatting for better readability
+
+### Enhanced
+- **User Experience**
+  - Added automatic help display when running the CLI with no arguments
+  - Improved CLI name and description for better clarity
+  - Built and packaged as a standalone executable with PyInstaller
+
+### Security
+- **Improved Credential Handling**
+  - Better masking of PAT tokens in display and logs
+  - Secure permissions (600) for the config file
+  - Improved error messaging for authentication issues
+
 ## [0.0.1] - 2025-02-03
 
 ### Added

@@ -94,9 +94,44 @@ class GitManager:
 - **git_pull**: Pulls the latest changes for an existing repository.
 - **_run_subprocess**: A helper method to execute shell commands asynchronously.
 
+## Building and Distribution
+
+### Building the Executable
+
+The tool can be packaged as a standalone executable using PyInstaller, which bundles all dependencies and makes it easy to distribute:
+
+```bash
+# First install PyInstaller if not already installed
+pip install pyinstaller
+
+# Create a single executable file
+pyinstaller --onefile ado-cli.py
+```
+
+The packaged executable will be created in the `dist/` directory and can be run without Python installed:
+
+```bash
+# Run the executable
+./dist/ado-cli
+
+# Show help
+./dist/ado-cli --help
+
+# Run commands
+./dist/ado-cli login --org https://dev.azure.com/your-org
+```
+
+### Distribution
+
+The executable can be distributed to users who don't have Python installed. Just copy the file from the `dist/` directory to the desired location, and ensure it has execution permissions:
+
+```bash
+chmod +x /path/to/ado-cli
+```
+
 ## CLI Commands
 
-The CLI tool is built using `typer`, which simplifies the creation of command-line interfaces. The tool provides several commands, each corresponding to a specific operation.
+The CLI tool is built using `typer`, which simplifies the creation of command-line interfaces. The tool provides several commands, each corresponding to a specific operation. Running the tool without any arguments will display the help screen with available commands and their descriptions.
 
 ### login Command
 
@@ -134,13 +169,25 @@ The `pull_all` command updates all repositories in a specified directory by pull
 python ado-cli.py pull-all project-name ./repos
 ```
 
-### gen_env Command
+### generate_env Command
 
-This command generates an environment file with the necessary configuration variables, using existing values if available.
+This command generates a sample environment file with detailed comments for all configuration options, using existing values if available.
 
 ```bash
-# Generate environment file
-python ado-cli.py gen-env
+# Generate detailed environment file
+python ado-cli.py generate-env
+```
+
+### config Command
+
+This command allows you to view or set global configuration settings for the tool.
+
+```bash
+# Show current global configuration
+python ado-cli.py config --show
+
+# Set default organization, concurrency and update mode
+python ado-cli.py config --org https://dev.azure.com/your-org --concurrency 8 --update-mode pull
 ```
 
 ## Flow Diagram
