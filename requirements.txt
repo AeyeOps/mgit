@@ -1,4 +1,4 @@
-azure-devops>=7.1.0
+azure-devops>=7.1.0b
 typer>=0.9.0
 python-dotenv>=1.0.0
 rich>=13.6.0
