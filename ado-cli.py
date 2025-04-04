@@ -55,6 +55,8 @@ load_dotenv(
 # Load global config file if environment variables are not set
 CONFIG_DIR = Path.home() / ".config" / "ado-cli"
 CONFIG_FILE = CONFIG_DIR / "config"
+# Ensure config directory exists before setting up file logging
+CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Fix type hint for default_value
 def get_config_value(key: str, default_value: Optional[str] = None) -> str:
@@ -129,8 +131,10 @@ class AdoCliFormatter(logging.Formatter):
         return super().format(record)
 
 
+# Use an absolute path within the config directory for the log file
+log_filename = CONFIG_DIR / get_config_value("LOG_FILENAME")
 file_handler = RotatingFileHandler(
-    get_config_value("LOG_FILENAME"),
+    log_filename, # Use the absolute path
     maxBytes=5_000_000,
     backupCount=3,
 )
