@@ -7,6 +7,8 @@
 -   The Memory Bank has been initialized.
 -   UI/UX enhancements implemented: Added detailed progress display for `clone-all`/`pull-all` showing individual repo status, and added interactive confirmation prompts for `clone-all --force` and `login --store`.
 -   Fixed a Mypy type hint error.
+-   Built a standalone executable using `pyinstaller` (now using `ado-cli.spec` for configuration).
+-   Installed the executable to `/opt/bin/ado-cli`.
 
 ## What Works (Based on Code Review & Recent Changes)
 
@@ -30,6 +32,7 @@
 -   **`login` Command:** Includes confirmation prompt via `rich.prompt` before overwriting existing stored credentials when using `--store`.
 -   **`config` Command:** Allows viewing and setting global defaults (org URL, concurrency, update mode).
 -   **`generate-env` Command:** Creates a `.env.sample` file.
+-   **Standalone Executable:** Built successfully using `pyinstaller ado-cli.spec` (which includes hidden imports for `azure-devops` SDK) and installed to `/opt/bin/ado-cli`.
 
 ## What's Left to Build / Improve (Based on ARCHITECTURE.md & Review)
 

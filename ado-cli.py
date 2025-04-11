@@ -28,7 +28,7 @@ from azure.devops.v7_1.git import GitClient, GitRepository
 from azure.devops.v7_1.core import CoreClient, TeamProjectReference
 from azure.devops.exceptions import ClientRequestError, AzureDevOpsAuthenticationError
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 # Default values used if environment variables and config file don't provide values
 DEFAULT_VALUES = {
@@ -200,7 +200,7 @@ logger.addHandler(console_handler)
 console = Console()
 app = typer.Typer(
     name="ado-cli",
-    help=f"Azure DevOps CLI Tool v{__version__} - A utility for managing Azure DevOps "
+    help=f"Azure DevOps CLI Tool v{__version__} - A utility for managing Azure DevOps " # Updated version will be picked up here automatically
     "repositories and providing project-level git functionality.",
     add_completion=False,
     no_args_is_help=True,
@@ -208,7 +208,7 @@ app = typer.Typer(
 
 def version_callback(value: bool):
     if value:
-        print(f"ado-cli version: {__version__}")
+        print(f"ado-cli version: {__version__}") # Updated version will be picked up here automatically
         raise typer.Exit()
 
 @app.callback()

@@ -6,11 +6,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Functionality to build a standalone executable using `pyinstaller`.
-- Enhanced progress display using `rich.progress` for `clone-all` and `pull-all`, showing individual repository status.
-- Interactive confirmation prompts using `rich.prompt.Confirm` for potentially destructive actions (`clone-all --force`, `login --store`).
-
 ### Changed
 - Updated `requirements.txt` to use stable `azure-devops>=7.1.0` after resolving merge conflict.
 
@@ -22,10 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Resolved `PermissionError` in the bundled executable by changing the log file path to `~/.config/ado-cli/ado-cli.log`.
-- Corrected a Mypy type hint error related to `subprocess.CalledProcessError`.
 
 ### Security
 - Nothing yet.
+
+## [0.2.1] - 2025-04-11
+
+### Added
+- Functionality to build a standalone executable using `pyinstaller`.
+- Enhanced progress display using `rich.progress` for `clone-all` and `pull-all`, showing individual repository status.
+- Interactive confirmation prompts using `rich.prompt.Confirm` for potentially destructive actions (`clone-all --force`, `login --store`).
+
+### Fixed
+- Corrected a Mypy type hint error related to `subprocess.CalledProcessError`.
 
 ## [0.2.0] - 2025-04-03
 
