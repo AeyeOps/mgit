@@ -18,9 +18,10 @@ The tool follows a modular architecture centered around manager classes and a CL
 -   **Asynchronous I/O:** Employs `asyncio` for Git operations to improve performance when dealing with multiple repositories. Subprocesses are used for executing `git` commands.
 -   **Hierarchical Configuration:** Prioritizes environment variables, then a global config file, then hardcoded defaults, offering flexibility.
 -   **Modular Design:** Separates concerns into distinct classes (`AzDevOpsManager`, `GitManager`) for better organization and testability.
--   **Rich CLI Output:** Uses `rich` for formatted console logs, enhanced progress bars (overall + individual repo status), and interactive confirmation prompts (`rich.prompt.Confirm`), enhancing user experience and safety.
+-   **Rich CLI Output:** Uses `rich` for formatted console logs, enhanced progress bars (`rich.progress` with dynamic task updates for individual repo status), and interactive confirmation prompts (`rich.prompt.Confirm`), enhancing user experience and safety.
 -   **Type Hinting:** Uses Python type hints for better code clarity and maintainability.
 -   **Dependency Management:** Uses `requirements.txt` for managing Python dependencies.
+-   **Executable Bundling:** Uses `pyinstaller` with a `.spec` file (`ado-cli.spec`) to create a standalone executable. The `.spec` file includes necessary `hiddenimports` (e.g., `azure.devops`, `msrest`, `dotenv`) to ensure required packages are bundled correctly.
 -   **Error Handling:** Uses standard Python exceptions and logs errors. `subprocess.CalledProcessError` is caught for Git command failures. Basic SDK exceptions like `AzureDevOpsAuthenticationError` and `ClientRequestError` are handled. Added check for `None` return code in `_run_subprocess` to satisfy Mypy.
 
 ## Component Relationships & Flow
