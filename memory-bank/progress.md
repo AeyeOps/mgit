@@ -7,10 +7,11 @@
 -   The Memory Bank has been initialized.
 -   UI/UX enhancements implemented: Added detailed progress display for `clone-all`/`pull-all` showing individual repo status, and added interactive confirmation prompts for `clone-all --force` and `login --store`.
 -   Fixed a Mypy type hint error.
--   Built a standalone executable using `pyinstaller` (now using `ado-cli.spec` for configuration).
+-   Fixed the standalone executable build by adding `hiddenimports` (`azure.devops`, `msrest`, `dotenv`) to `ado-cli.spec`.
+-   Built a standalone executable using `pyinstaller ado-cli.spec`.
 -   Installed the executable to `/opt/bin/ado-cli`.
 
-## What Works (Based on Code Review & Recent Changes)
+## What Works (Based on Code Review & Recent Changes/Fixes)
 
 -   **CLI Structure:** Commands (`clone-all`, `pull-all`, `login`, `config`, `generate-env`, `--version`) are defined using Typer.
 -   **Configuration:** Hierarchical loading from environment variables, global config (`~/.config/ado-cli/config`), and defaults seems functional.
@@ -23,25 +24,25 @@
     -   Handles disabled repositories.
     -   Embeds PAT in clone URLs.
     -   Sanitizes repository names for directory creation.
-    -   Includes enhanced progress bar via `rich` showing overall progress and individual repo status.
+    -   Includes enhanced progress bar via `rich` showing overall progress and dynamically updated individual repo status (cloning/pulling/skipped/error).
     -   Includes confirmation prompt via `rich.prompt` before removing existing directories in `force` mode.
 -   **`pull-all` Command:**
     -   Identifies local repositories corresponding to the project's repositories (using sanitized names).
     -   Uses `asyncio` and `GitManager` to perform concurrent pulls.
-    -   Includes enhanced progress bar via `rich` showing overall progress and individual repo status.
+    -   Includes enhanced progress bar via `rich` showing overall progress and dynamically updated individual repo status (pulling/up-to-date/error).
 -   **`login` Command:** Includes confirmation prompt via `rich.prompt` before overwriting existing stored credentials when using `--store`.
--   **`config` Command:** Allows viewing and setting global defaults (org URL, concurrency, update mode).
+-   **`config` Command:** Allows viewing (`--show`) and setting global defaults (org URL, concurrency, update mode).
 -   **`generate-env` Command:** Creates a `.env.sample` file.
--   **Standalone Executable:** Built successfully using `pyinstaller ado-cli.spec` (which includes hidden imports for `azure-devops` SDK) and installed to `/opt/bin/ado-cli`.
+-   **Standalone Executable:** Built successfully using `pyinstaller ado-cli.spec` (which now includes necessary hidden imports like `azure.devops`, `msrest`, `dotenv`). Verified basic functionality (`--version`, `config --show`). Installed to `/opt/bin/ado-cli`.
 
 ## What's Left to Build / Improve (Based on ARCHITECTURE.md & Review)
 
 -   **Enhanced Error Handling:** Implement more specific custom exceptions and potentially recovery mechanisms.
 -   **Configuration Profiles:** Add support for managing multiple configuration sets (e.g., for different orgs or users).
 -   **Testing Suite:** No automated tests (unit, integration, E2E) currently exist. `pytest` is mentioned as a potential tool.
--   **UI Enhancements:** Implemented confirmation prompts and detailed progress display. Further refinements could be explored.
+-   **UI Enhancements:** Implemented confirmation prompts and detailed progress display. Testing of these new elements is the next step. Further refinements could be explored.
 -   **Async Optimizations:** Potential task queue implementation for finer control over concurrency.
--   **Refinement of Existing Commands:** Further testing (especially of the new UI elements) and potential edge case handling for `clone-all` and `pull-all`.
+-   **Refinement of Existing Commands:** Testing of the new UI elements and potential edge case handling for `clone-all` and `pull-all`.
 
 ## Known Issues (Initial Assessment)
 
