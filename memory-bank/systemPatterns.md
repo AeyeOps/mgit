@@ -1,10 +1,10 @@
-# System Patterns: Azure DevOps CLI Tool (ado-cli)
+# System Patterns: mgit (mgit)
 
 ## Core Architecture
 
 The tool follows a modular architecture centered around manager classes and a CLI framework:
 
-1.  **Configuration Loading:** Uses `python-dotenv` to load settings from environment variables and a global config file (`~/.config/ado-cli/config`), providing a hierarchical configuration system. Default values are defined within the script.
+1.  **Configuration Loading:** Uses `python-dotenv` to load settings from environment variables and a global config file (`~/.config/mgit/config`), providing a hierarchical configuration system. Default values are defined within the script.
 2.  **Logging:** Implements Python's `logging` module with `rich` for enhanced console output (colors, formatting) and a `RotatingFileHandler` for file logging. A custom formatter (`AdoCliFormatter`) sanitizes sensitive PATs from logs.
 3.  **Azure DevOps Interaction (`AzDevOpsManager`):** Encapsulates interactions with the Azure DevOps REST API using the `azure-devops` Python SDK. Handles authentication (via PAT), connection initialization, and fetching project/repository data.
 4.  **Git Operations (`GitManager`):** Manages local Git commands (`clone`, `pull`) using asynchronous subprocess execution (`asyncio.create_subprocess_exec`) for concurrency.
@@ -21,7 +21,7 @@ The tool follows a modular architecture centered around manager classes and a CL
 -   **Rich CLI Output:** Uses `rich` for formatted console logs, enhanced progress bars (`rich.progress` with dynamic task updates for individual repo status), and interactive confirmation prompts (`rich.prompt.Confirm`), enhancing user experience and safety.
 -   **Type Hinting:** Uses Python type hints for better code clarity and maintainability.
 -   **Dependency Management:** Uses `requirements.txt` for managing Python dependencies.
--   **Executable Bundling:** Uses `pyinstaller` with a `.spec` file (`ado-cli.spec`) to create a standalone executable. The `.spec` file includes necessary `hiddenimports` (e.g., `azure.devops`, `msrest`, `dotenv`) to ensure required packages are bundled correctly.
+-   **Executable Bundling:** Uses `pyinstaller` with a `.spec` file (`mgit.spec`) to create a standalone executable. The `.spec` file includes necessary `hiddenimports` (e.g., `azure.devops`, `msrest`, `dotenv`) to ensure required packages are bundled correctly.
 -   **Error Handling:** Uses standard Python exceptions and logs errors. `subprocess.CalledProcessError` is caught for Git command failures. Basic SDK exceptions like `AzureDevOpsAuthenticationError` and `ClientRequestError` are handled. Added check for `None` return code in `_run_subprocess` to satisfy Mypy.
 
 ## Component Relationships & Flow

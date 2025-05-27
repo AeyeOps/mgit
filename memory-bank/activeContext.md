@@ -1,4 +1,4 @@
-# Active Context: Azure DevOps CLI Tool (ado-cli) - Initialization
+# Active Context: mgit (mgit) - Initialization
 
 ## Current Focus
 
@@ -7,7 +7,7 @@
 
 ## Recent Changes
 
--   Confirmed `ado-cli.py` uses Azure DevOps SDK exclusively.
+-   Confirmed `mgit.py` uses Azure DevOps SDK exclusively.
 -   Modified `clone_all` and `pull_all` to display individual repository status updates within the `rich.progress` context.
 -   Added `rich.prompt.Confirm` for user confirmation before potentially destructive actions (`clone-all --force` directory removal, `login --store` credential overwrite).
 -   Fixed a Mypy type hint error related to `subprocess.CalledProcessError`.
@@ -21,7 +21,7 @@
 ## Active Decisions & Considerations
 
 -   The Memory Bank structure is being established according to the standard defined in the custom instructions.
--   The content for the initial Memory Bank files is derived directly from the provided source code and documentation (`README.md`, `ARCHITECTURE.md`, `ado-cli.py`, `requirements.txt`).
+-   The content for the initial Memory Bank files is derived directly from the provided source code and documentation (`README.md`, `ARCHITECTURE.md`, `mgit.py`, `requirements.txt`).
 
 ## Important Patterns & Preferences (Observed)
 

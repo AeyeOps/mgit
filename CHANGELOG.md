@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Renamed project from `ado-cli` to `mgit` to reflect multi-platform git support
+- Updated all references throughout codebase to use new `mgit` name
 - Updated `requirements.txt` to use stable `azure-devops>=7.1.0` after resolving merge conflict.
 
 ### Deprecated
@@ -16,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Obsolete `pathlib` dependency from `requirements.txt` to resolve `pyinstaller` conflict.
 
 ### Fixed
-- Resolved `PermissionError` in the bundled executable by changing the log file path to `~/.config/ado-cli/ado-cli.log`.
+- Resolved `PermissionError` in the bundled executable by changing the log file path to `~/.config/mgit/mgit.log`.
 
 ### Security
 - Nothing yet.

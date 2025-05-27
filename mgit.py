@@ -33,7 +33,7 @@ __version__ = "0.2.1"
 # Default values used if environment variables and config file don't provide values
 DEFAULT_VALUES = {
     "AZURE_DEVOPS_ORG_URL": "https://www.visualstudio.com",
-    "LOG_FILENAME": "ado-cli.log",
+    "LOG_FILENAME": "mgit.log",
     "LOG_LEVEL": "DEBUG",
     "CON_LEVEL": "INFO",
     "DEFAULT_CONCURRENCY": "4",
@@ -42,7 +42,7 @@ DEFAULT_VALUES = {
 
 # Configuration loading order:
 # 1. Environment variables (highest priority)
-# 2. Global config file in ~/.config/ado-cli/config
+# 2. Global config file in ~/.config/mgit/config
 # 3. Default values (lowest priority)
 
 # First load environment variables
@@ -53,7 +53,7 @@ load_dotenv(
 )
 
 # Load global config file if environment variables are not set
-CONFIG_DIR = Path.home() / ".config" / "ado-cli"
+CONFIG_DIR = Path.home() / ".config" / "mgit"
 CONFIG_FILE = CONFIG_DIR / "config"
 # Ensure config directory exists before setting up file logging
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -85,7 +85,7 @@ def get_config_value(key: str, default_value: Optional[str] = None) -> str:
 # -----------------------------------------------------------------------------
 
 
-class AdoCliFormatter(logging.Formatter):
+class MgitFormatter(logging.Formatter):
     """Formatter that removes PAT from the URL in logs."""
 
     def __init__(
@@ -139,7 +139,7 @@ file_handler = RotatingFileHandler(
     backupCount=3,
 )
 
-file_handler.setFormatter(AdoCliFormatter())
+file_handler.setFormatter(MgitFormatter())
 
 class ConsoleFriendlyRichHandler(RichHandler):
     """Enhanced Rich handler that formats long messages better for console display."""
@@ -199,16 +199,16 @@ logger.addHandler(console_handler)
 
 console = Console()
 app = typer.Typer(
-    name="ado-cli",
-    help=f"Azure DevOps CLI Tool v{__version__} - A utility for managing Azure DevOps " # Updated version will be picked up here automatically
-    "repositories and providing project-level git functionality.",
+    name="mgit",
+    help=f"Multi-Git CLI Tool v{__version__} - A utility for managing repositories across " # Updated version will be picked up here automatically
+    "multiple git platforms (Azure DevOps, GitHub, BitBucket) with bulk operations.",
     add_completion=False,
     no_args_is_help=True,
 )
 
 def version_callback(value: bool):
     if value:
-        print(f"ado-cli version: {__version__}") # Updated version will be picked up here automatically
+        print(f"mgit version: {__version__}") # Updated version will be picked up here automatically
         raise typer.Exit()
 
 @app.callback()
@@ -219,7 +219,7 @@ def main_options(
     )
 ):
     """
-    Azure DevOps CLI Tool - Manage ADO repos easily.
+    Multi-Git CLI Tool - Manage repos across multiple git platforms easily.
     """
     pass
 

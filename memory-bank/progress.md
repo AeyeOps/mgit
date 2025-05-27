@@ -1,20 +1,20 @@
-# Progress: Azure DevOps CLI Tool (ado-cli) - Initialization
+# Progress: mgit (mgit) - Initialization
 
 ## Current Status
 
--   The project exists with a core set of features implemented in `ado-cli.py`.
+-   The project exists with a core set of features implemented in `mgit.py`.
 -   Documentation (`README.md`, `ARCHITECTURE.md`) provides a good overview of functionality and design.
 -   The Memory Bank has been initialized.
 -   UI/UX enhancements implemented: Added detailed progress display for `clone-all`/`pull-all` showing individual repo status, and added interactive confirmation prompts for `clone-all --force` and `login --store`.
 -   Fixed a Mypy type hint error.
--   Fixed the standalone executable build by adding `hiddenimports` (`azure.devops`, `msrest`, `dotenv`) to `ado-cli.spec`.
--   Built a standalone executable using `pyinstaller ado-cli.spec`.
--   Installed the executable to `/opt/bin/ado-cli`.
+-   Fixed the standalone executable build by adding `hiddenimports` (`azure.devops`, `msrest`, `dotenv`) to `mgit.spec`.
+-   Built a standalone executable using `pyinstaller mgit.spec`.
+-   Installed the executable to `/opt/bin/mgit`.
 
 ## What Works (Based on Code Review & Recent Changes/Fixes)
 
 -   **CLI Structure:** Commands (`clone-all`, `pull-all`, `login`, `config`, `generate-env`, `--version`) are defined using Typer.
--   **Configuration:** Hierarchical loading from environment variables, global config (`~/.config/ado-cli/config`), and defaults seems functional.
+-   **Configuration:** Hierarchical loading from environment variables, global config (`~/.config/mgit/config`), and defaults seems functional.
 -   **Authentication:** PAT-based authentication via the Azure DevOps SDK is implemented. The `login` command allows testing and optionally storing credentials.
 -   **Logging:** Setup with `rich` for console and `RotatingFileHandler` for files, including PAT sanitization, is in place.
 -   **`clone-all` Command:**
@@ -33,7 +33,7 @@
 -   **`login` Command:** Includes confirmation prompt via `rich.prompt` before overwriting existing stored credentials when using `--store`.
 -   **`config` Command:** Allows viewing (`--show`) and setting global defaults (org URL, concurrency, update mode).
 -   **`generate-env` Command:** Creates a `.env.sample` file.
--   **Standalone Executable:** Built successfully using `pyinstaller ado-cli.spec` (which now includes necessary hidden imports like `azure.devops`, `msrest`, `dotenv`). Verified basic functionality (`--version`, `config --show`). Installed to `/opt/bin/ado-cli`.
+-   **Standalone Executable:** Built successfully using `pyinstaller mgit.spec` (which now includes necessary hidden imports like `azure.devops`, `msrest`, `dotenv`). Verified basic functionality (`--version`, `config --show`). Installed to `/opt/bin/mgit`.
 
 ## What's Left to Build / Improve (Based on ARCHITECTURE.md & Review)
 

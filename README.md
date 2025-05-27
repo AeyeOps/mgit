@@ -1,10 +1,10 @@
-# Azure DevOps CLI Tool
+# mgit - Multi-Git CLI Tool
 
-A powerful command-line tool for managing Azure DevOps repositories with ease. Clone entire projects, update multiple repositories, and automate your DevOps workflows.
+A powerful command-line tool for managing repositories across multiple git platforms (Azure DevOps, GitHub, BitBucket Cloud). Clone entire projects, update multiple repositories, and automate your git workflows across different platforms.
 
 ## Overview
 
-The Azure DevOps CLI Tool simplifies common repository management tasks by providing an intuitive command-line interface. It was created to solve the challenge of managing multiple repositories across Azure DevOps projects, allowing developers and DevOps engineers to:
+The mgit simplifies common repository management tasks by providing an intuitive command-line interface. It was created to solve the challenge of managing multiple repositories across Azure DevOps projects, allowing developers and DevOps engineers to:
 
 - Clone all repositories from a project with a single command
 - Pull updates for multiple repositories simultaneously
@@ -25,8 +25,8 @@ Built with Python, it leverages asynchronous operations for speed and provides r
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/ado-git.git
-   cd ado-git
+   git clone https://github.com/yourusername/mgit.git
+   cd mgit
    ```
 
 2. Install dependencies:
@@ -36,7 +36,7 @@ Built with Python, it leverages asynchronous operations for speed and provides r
 
 3. Run the tool:
    ```bash
-   python ado-cli.py
+   python mgit.py
    ```
 
 ### Building a Standalone Executable
@@ -48,20 +48,20 @@ For convenience, you can build a standalone executable that can be distributed w
 pip install pyinstaller
 
 # Create a single executable file
-pyinstaller --onefile ado-cli.py
+pyinstaller --onefile mgit.py
 ```
 
 The executable will be created in the `dist/` directory and can be run directly:
 
 ```bash
-./dist/ado-cli
+./dist/mgit
 ```
 
 ## Quick Start
 
 Get the current version:
 ```bash
-python ado-cli.py --version
+python mgit.py --version
 ```
 
 ### Authentication
@@ -70,10 +70,10 @@ First, authenticate with Azure DevOps:
 
 ```bash
 # Interactive login with prompts
-python ado-cli.py login
+python mgit.py login
 
 # Or specify credentials directly
-python ado-cli.py login --org https://dev.azure.com/your-org --pat your-pat
+python mgit.py login --org https://dev.azure.com/your-org --pat your-pat
 ```
 
 ### Clone All Repositories
@@ -81,14 +81,14 @@ python ado-cli.py login --org https://dev.azure.com/your-org --pat your-pat
 Clone all repositories from a project:
 
 ```bash
-python ado-cli.py clone-all my-project ./repos
+python mgit.py clone-all my-project ./repos
 ```
 
 With custom options:
 
 ```bash
 # Clone with 8 concurrent operations and force mode (overwrite existing repos)
-python ado-cli.py clone-all my-project ./repos -c 8 -u force
+python mgit.py clone-all my-project ./repos -c 8 -u force
 ```
 
 ### Update All Repositories
@@ -96,7 +96,7 @@ python ado-cli.py clone-all my-project ./repos -c 8 -u force
 Pull the latest changes for all repositories:
 
 ```bash
-python ado-cli.py pull-all my-project ./repos
+python mgit.py pull-all my-project ./repos
 ```
 
 ### Global Configuration
@@ -105,10 +105,10 @@ View or set global configuration:
 
 ```bash
 # Show current settings
-python ado-cli.py config --show
+python mgit.py config --show
 
 # Set default values
-python ado-cli.py config --org https://dev.azure.com/your-org --concurrency 16 --update-mode pull
+python mgit.py config --org https://dev.azure.com/your-org --concurrency 16 --update-mode pull
 ```
 
 ## Commands Reference
@@ -116,7 +116,7 @@ python ado-cli.py config --org https://dev.azure.com/your-org --concurrency 16 -
 Run without arguments to see available commands:
 
 ```bash
-python ado-cli.py
+python mgit.py
 ```
 
 ### login
@@ -124,7 +124,7 @@ python ado-cli.py
 Authenticate with Azure DevOps using a Personal Access Token (PAT).
 
 ```bash
-python ado-cli.py login [--org URL] [--pat TOKEN] [--no-store]
+python mgit.py login [--org URL] [--pat TOKEN] [--no-store]
 ```
 
 ### clone-all
@@ -132,7 +132,7 @@ python ado-cli.py login [--org URL] [--pat TOKEN] [--no-store]
 Clone all repositories from an Azure DevOps project.
 
 ```bash
-python ado-cli.py clone-all PROJECT DESTINATION [--concurrency N] [--update-mode MODE]
+python mgit.py clone-all PROJECT DESTINATION [--concurrency N] [--update-mode MODE]
 ```
 
 Update modes:
@@ -145,7 +145,7 @@ Update modes:
 Pull updates for all repositories in a directory.
 
 ```bash
-python ado-cli.py pull-all PROJECT REPOSITORY_PATH
+python mgit.py pull-all PROJECT REPOSITORY_PATH
 ```
 
 ### config
@@ -153,7 +153,7 @@ python ado-cli.py pull-all PROJECT REPOSITORY_PATH
 View or set global configuration settings.
 
 ```bash
-python ado-cli.py config [--show] [--org URL] [--concurrency N] [--update-mode MODE]
+python mgit.py config [--show] [--org URL] [--concurrency N] [--update-mode MODE]
 ```
 
 ### generate-env
@@ -161,7 +161,7 @@ python ado-cli.py config [--show] [--org URL] [--concurrency N] [--update-mode M
 Generate a sample environment file with configuration options.
 
 ```bash
-python ado-cli.py generate-env
+python mgit.py generate-env
 ```
 
 ### --version
@@ -169,7 +169,7 @@ python ado-cli.py generate-env
 Show the application's version and exit.
 
 ```bash
-python ado-cli.py --version
+python mgit.py --version
 ```
 
 ## Configuration
@@ -177,7 +177,7 @@ python ado-cli.py --version
 The tool uses a hierarchical configuration system:
 
 1. **Environment variables** (highest priority)
-2. **Global config** in `~/.config/ado-cli/config` (second priority)
+2. **Global config** in `~/.config/mgit/config` (second priority)
 3. **Default values** in code (lowest priority)
 
 Key configuration options:

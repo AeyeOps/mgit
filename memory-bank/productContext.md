@@ -1,4 +1,4 @@
-# Product Context: Azure DevOps CLI Tool (ado-cli)
+# Product Context: mgit (mgit)
 
 ## Problem Solved
 
@@ -6,11 +6,11 @@ Managing a large number of Git repositories within Azure DevOps projects can be 
 
 ## How It Works
 
-The `ado-cli` tool provides a command-line interface that interacts with the Azure DevOps API (via the Python SDK) and local Git installations. Users authenticate using an Azure DevOps Personal Access Token (PAT). Key functionalities include:
+The `mgit` tool provides a command-line interface that interacts with the Azure DevOps API (via the Python SDK) and local Git installations. Users authenticate using an Azure DevOps Personal Access Token (PAT). Key functionalities include:
 
 -   **`clone-all`:** Fetches the list of repositories for a specified project from Azure DevOps and clones each one into a target directory. It handles existing directories based on user-defined modes (`skip`, `pull`, `force`) and skips disabled repositories.
 -   **`pull-all`:** Iterates through local directories (expected to be Git repositories cloned previously, likely using `clone-all`) and performs a `git pull` operation for each, updating them to the latest version from the remote.
--   **`login`:** Validates Azure DevOps credentials (organization URL and PAT) and optionally stores them securely in a global configuration file (`~/.config/ado-cli/config`) for future use.
+-   **`login`:** Validates Azure DevOps credentials (organization URL and PAT) and optionally stores them securely in a global configuration file (`~/.config/mgit/config`) for future use.
 -   **`config`:** Allows viewing and setting global configuration defaults (like organization URL, concurrency level, update mode) to avoid specifying them repeatedly.
 -   **`generate-env`:** Creates a sample `.env` file to guide users on setting up environment variables for configuration.
 

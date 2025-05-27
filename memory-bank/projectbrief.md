@@ -1,4 +1,4 @@
-# Project Brief: Azure DevOps CLI Tool (ado-cli)
+# Project Brief: mgit (mgit)
 
 ## Core Purpose
 
