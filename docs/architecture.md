@@ -1,4 +1,4 @@
-# Azure DevOps CLI Tool Architecture
+# mgit Architecture
 
 This document provides the technical architecture and implementation details of the Azure DevOps CLI tool.
 
@@ -22,7 +22,7 @@ The code begins by loading environment variables using the `dotenv` library. The
 DEFAULT_VALUES = {
     "AZURE_DEVOPS_ORG_URL": "https://www.visualstudio.com",
     "AZURE_DEVOPS_EXT_PAT": "<your-pat-token>",
-    "LOG_FILENAME": "ado-cli.log",
+    "LOG_FILENAME": "mgit.log",
     "LOG_LEVEL": "DEBUG",
     "CON_LEVEL": "INFO",
 }
@@ -36,10 +36,10 @@ load_dotenv(
 
 ## Logging Setup
 
-Logging is a critical aspect of this CLI tool, providing insights into its operations and aiding in debugging. The code uses Python's `logging` module, enhanced with `RichHandler` from the `rich` library for better console output. A custom formatter, `AdoCliFormatter`, is implemented to sanitize logs by removing sensitive information such as PATs from URLs.
+Logging is a critical aspect of this CLI tool, providing insights into its operations and aiding in debugging. The code uses Python's `logging` module, enhanced with `RichHandler` from the `rich` library for better console output. A custom formatter, `MgitFormatter`, is implemented to sanitize logs by removing sensitive information such as PATs from URLs.
 
 ```python
-class AdoCliFormatter(logging.Formatter):
+class MgitFormatter(logging.Formatter):
     """Formatter that removes PAT from the URL in logs."""
     ...
 ```

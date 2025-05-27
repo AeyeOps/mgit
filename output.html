@@ -77,10 +77,10 @@
   </style>
 </head>
 <body>
-<h1 id="azure-devops-cli-tool">Azure DevOps CLI Tool</h1>
+<h1 id="azure-devops-cli-tool">mgit - Multi-Git CLI Tool</h1>
 <p>A powerful command-line tool for managing Azure DevOps repositories with ease. Clone entire projects, update multiple repositories, and automate your DevOps workflows.</p>
 <h2 id="overview">Overview</h2>
-<p>The Azure DevOps CLI Tool simplifies common repository management tasks by providing an intuitive command-line interface. It was created to solve the challenge of managing multiple repositories across Azure DevOps projects, allowing developers and DevOps engineers to:</p>
+<p>The mgit - Multi-Git CLI Tool simplifies common repository management tasks by providing an intuitive command-line interface. It was created to solve the challenge of managing multiple repositories across Azure DevOps projects, allowing developers and DevOps engineers to:</p>
 <ul>
 <li>Clone all repositories from a project with a single command</li>
 <li>Pull updates for multiple repositories simultaneously</li>
@@ -98,12 +98,12 @@
 <h3 id="installation-steps">Installation Steps</h3>
 <ol type="1">
 <li><p>Clone this repository:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="fu">git</span> clone https://github.com/yourusername/ado-git.git</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="bu">cd</span> ado-git</span></code></pre></div></li>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="fu">git</span> clone https://github.com/yourusername/mgit.git</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="bu">cd</span> mgit</span></code></pre></div></li>
 <li><p>Install dependencies:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="ex">pip</span> install -r requirements.txt</span></code></pre></div></li>
 <li><p>Run the tool:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py</span></code></pre></div></li>
+<div class="sourceCode" id="cb3"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="ex">python</span> mgit.py</span></code></pre></div></li>
 </ol>
 <h3 id="building-a-standalone-executable">Building a Standalone Executable</h3>
 <p>For convenience, you can build a standalone executable that can be distributed without requiring Python:</p>
@@ -111,62 +111,62 @@
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a><span class="ex">pip</span> install pyinstaller</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a></span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a><span class="co"># Create a single executable file</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a><span class="ex">pyinstaller</span> --onefile ado-cli.py</span></code></pre></div>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a><span class="ex">pyinstaller</span> --onefile mgit.py</span></code></pre></div>
 <p>The executable will be created in the <code>dist/</code> directory and can be run directly:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="ex">./dist/ado-cli</span></span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="ex">./dist/mgit</span></span></code></pre></div>
 <h2 id="quick-start">Quick Start</h2>
 <p>Get the current version:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py --version</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true"></a><span class="ex">python</span> mgit.py --version</span></code></pre></div>
 <h3 id="authentication">Authentication</h3>
 <p>First, authenticate with Azure DevOps:</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true"></a><span class="co"># Interactive login with prompts</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py login</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true"></a><span class="ex">python</span> mgit.py login</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true"></a></span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true"></a><span class="co"># Or specify credentials directly</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py login --org https://dev.azure.com/your-org --pat your-pat</span></code></pre></div>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true"></a><span class="ex">python</span> mgit.py login --org https://dev.azure.com/your-org --pat your-pat</span></code></pre></div>
 <h3 id="clone-all-repositories">Clone All Repositories</h3>
 <p>Clone all repositories from a project:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py clone-all my-project ./repos</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true"></a><span class="ex">python</span> mgit.py clone-all my-project ./repos</span></code></pre></div>
 <p>With custom options:</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true"></a><span class="co"># Clone with 8 concurrent operations and force mode (overwrite existing repos)</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py clone-all my-project ./repos -c 8 -u force</span></code></pre></div>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true"></a><span class="ex">python</span> mgit.py clone-all my-project ./repos -c 8 -u force</span></code></pre></div>
 <h3 id="update-all-repositories">Update All Repositories</h3>
 <p>Pull the latest changes for all repositories:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py pull-all my-project ./repos</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true"></a><span class="ex">python</span> mgit.py pull-all my-project ./repos</span></code></pre></div>
 <h3 id="global-configuration">Global Configuration</h3>
 <p>View or set global configuration:</p>
 <div class="sourceCode" id="cb11"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true"></a><span class="co"># Show current settings</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py config --show</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true"></a><span class="ex">python</span> mgit.py config --show</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true"></a></span>
 <span id="cb11-4"><a href="#cb11-4" aria-hidden="true"></a><span class="co"># Set default values</span></span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py config --org https://dev.azure.com/your-org --concurrency 16 --update-mode pull</span></code></pre></div>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true"></a><span class="ex">python</span> mgit.py config --org https://dev.azure.com/your-org --concurrency 16 --update-mode pull</span></code></pre></div>
 <h2 id="commands-reference">Commands Reference</h2>
 <p>Run without arguments to see available commands:</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true"></a><span class="ex">python</span> mgit.py</span></code></pre></div>
 <h3 id="login">login</h3>
 <p>Authenticate with Azure DevOps using a Personal Access Token (PAT).</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py login [--org URL] [--pat TOKEN] [--no-store]</span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true"></a><span class="ex">python</span> mgit.py login [--org URL] [--pat TOKEN] [--no-store]</span></code></pre></div>
 <h3 id="clone-all">clone-all</h3>
 <p>Clone all repositories from an Azure DevOps project.</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py clone-all PROJECT DESTINATION [--concurrency N] [--update-mode MODE]</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true"></a><span class="ex">python</span> mgit.py clone-all PROJECT DESTINATION [--concurrency N] [--update-mode MODE]</span></code></pre></div>
 <p>Update modes: - <code>skip</code>: Skip existing directories (default) - <code>pull</code>: Try to git pull if it’s a valid repository - <code>force</code>: Remove existing directories and clone fresh</p>
 <h3 id="pull-all">pull-all</h3>
 <p>Pull updates for all repositories in a directory.</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py pull-all PROJECT REPOSITORY_PATH</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true"></a><span class="ex">python</span> mgit.py pull-all PROJECT REPOSITORY_PATH</span></code></pre></div>
 <h3 id="config">config</h3>
 <p>View or set global configuration settings.</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py config [--show] [--org URL] [--concurrency N] [--update-mode MODE]</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true"></a><span class="ex">python</span> mgit.py config [--show] [--org URL] [--concurrency N] [--update-mode MODE]</span></code></pre></div>
 <h3 id="generate-env">generate-env</h3>
 <p>Generate a sample environment file with configuration options.</p>
-<div class="sourceCode" id="cb17"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py generate-env</span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true"></a><span class="ex">python</span> mgit.py generate-env</span></code></pre></div>
 <h3 id="version">–version</h3>
 <p>Show the application’s version and exit.</p>
-<div class="sourceCode" id="cb18"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true"></a><span class="ex">python</span> ado-cli.py --version</span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true"></a><span class="ex">python</span> mgit.py --version</span></code></pre></div>
 <h2 id="configuration">Configuration</h2>
 <p>The tool uses a hierarchical configuration system:</p>
 <ol type="1">
 <li><strong>Environment variables</strong> (highest priority)</li>
-<li><strong>Global config</strong> in <code>~/.config/ado-cli/config</code> (second priority)</li>
+<li><strong>Global config</strong> in <code>~/.config/mgit/config</code> (second priority)</li>
 <li><strong>Default values</strong> in code (lowest priority)</li>
 </ol>
 <p>Key configuration options:</p>

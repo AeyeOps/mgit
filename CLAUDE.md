@@ -1,4 +1,4 @@
-# CLAUDE.md - Azure DevOps CLI Tool Guide
+# CLAUDE.md - mgit (Multi-Git CLI Tool) Guide
 
 ## Build/Test/Lint Commands
 ```bash
@@ -6,25 +6,25 @@
 pip install -r requirements.txt
 
 # Run the tool
-python ado-cli.py [command] [arguments]
+python mgit.py [command] [arguments]
 
 # Display help (running without arguments shows help)
-python ado-cli.py
-python ado-cli.py --help
+python mgit.py
+python mgit.py --help
 
 # Common commands
-python ado-cli.py login --org https://dev.azure.com/your-org --pat your-pat
-python ado-cli.py clone-all [project-name] [destination-path] [-c concurrency] [-u update-mode]
-python ado-cli.py pull-all [project-name] [repositories-path]
-python ado-cli.py generate-env
-python ado-cli.py config --show
+python mgit.py login --org https://dev.azure.com/your-org --pat your-pat
+python mgit.py clone-all [project-name] [destination-path] [-c concurrency] [-u update-mode]
+python mgit.py pull-all [project-name] [repositories-path]
+python mgit.py generate-env
+python mgit.py config --show
 
 # Package the application (PyInstaller)
 pip install pyinstaller
-pyinstaller --onefile ado-cli.py
+pyinstaller --onefile mgit.py
 
 # Run the packaged executable
-./dist/ado-cli [command] [arguments]
+./dist/mgit [command] [arguments]
 
 # Run tests (when implemented)
 python -m pytest tests/test_file.py::test_function -v
@@ -32,7 +32,7 @@ python -m pytest tests/ -v --cov=. --cov-report=term
 ```
 
 ## Project Structure
-- **ado-cli.py**: Main application entry point
+- **mgit.py**: Main application entry point
 - **requirements.txt**: Dependencies list
 - **ARCHITECTURE.md**: Technical design and future improvements
 - **README.md**: User documentation and examples

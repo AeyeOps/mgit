@@ -60,7 +60,7 @@ cover/
 
 # Log files
 *.log
-ado-cli.log
+mgit.log
 
 # Django stuff:
 local_settings.py

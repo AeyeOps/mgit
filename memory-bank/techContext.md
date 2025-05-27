@@ -1,4 +1,4 @@
-# Tech Context: Azure DevOps CLI Tool (ado-cli)
+# Tech Context: mgit (mgit)
 
 ## Core Technology
 
@@ -16,7 +16,7 @@
 ## Development & Build Tools
 
 -   **Dependency Management:** `pip` and `requirements.txt`.
--   **Executable Bundling (`pyinstaller`):** Used to create a standalone executable. Build is configured via `ado-cli.spec` (includes hidden imports for `azure-devops` SDK). Version `>=6.0.0`.
+-   **Executable Bundling (`pyinstaller`):** Used to create a standalone executable. Build is configured via `mgit.spec` (includes hidden imports for `azure-devops` SDK). Version `>=6.0.0`.
 
 ## Runtime Environment
 
