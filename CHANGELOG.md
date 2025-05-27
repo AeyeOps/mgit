@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `login`: Authenticate with Azure DevOps.
   - `config`: Manage global configuration.
   - `generate-env`: Create a sample environment file.
-- Support for environment variables and global config file (`~/.config/ado-cli/config`).
+- Support for environment variables and global config file (`~/.config/mgit/config`).
 - Concurrent repository operations using `asyncio`.
 - Rich console output and logging with PAT masking.
 - Handling of existing repositories via `update-mode` (`skip`, `pull`, `force`).
