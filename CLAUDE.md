@@ -72,3 +72,33 @@ python -m pytest tests/ -v --cov=. --cov-report=term
 - **Configuration**: Hierarchical system using env vars, config files, and defaults
 - **Logging**: Rich console output with sanitized credentials
 - **CLI Commands**: Typer-based command structure with help documentation
+
+## Coding Memories
+- don't style your Mermaid
+- Before creating a visual, read @docs/kb/mermaid-syntax-reference.md
+
+## MAWEP Framework
+
+The Multi-Agent Workflow Execution Process (MAWEP) enables parallel development using AI agents:
+
+### Quick Start
+- To run MAWEP orchestration, see @docs/framework/prompts/example-usage.md
+- For complete orchestrator instructions: @docs/framework/prompts/orchestrator-prompt.md
+
+### Role-Specific Prompts
+- **Orchestrator**: @docs/framework/prompts/orchestrator-prompt.md - Coordinates parallel agents
+- **Development Agent**: @docs/framework/prompts/agent-prompt.md - Implements GitHub issues
+- **Architect Reviewer**: @docs/framework/prompts/architect-reviewer-prompt.md - Reviews PR integration
+- **Technical Reviewer**: @docs/framework/prompts/technical-reviewer-prompt.md - Code quality review
+- **Post-Mortem Analyst**: @docs/framework/prompts/post-mortem-analyst-prompt.md - Extracts learnings
+
+### MAWEP Architecture
+- System diagrams: @docs/framework/mawep-diagrams.md
+- Prompt engineering guide: @docs/framework/prompt-engineering-guide.md
+
+### Key MAWEP Concepts
+1. **Single Orchestrator**: One Claude instance manages everything
+2. **Task Tool Spawning**: Agents are spawned using Claude's Task tool
+3. **No Background Work**: Orchestrator must continuously invoke agents
+4. **State Tracking**: Simple YAML file tracks all agents and issues
+5. **Fail Fast**: No error recovery - immediate failure on issues
