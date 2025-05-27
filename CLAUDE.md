@@ -4,24 +4,25 @@
 ```bash
 # Install dependencies
 pip install -r requirements.txt
+pip install -e .  # Development installation for package structure
 
-# Run the tool
-python mgit.py [command] [arguments]
+# Run the tool (package structure - Sprint 2+)
+python -m mgit [command] [arguments]
 
 # Display help (running without arguments shows help)
-python mgit.py
-python mgit.py --help
+python -m mgit
+python -m mgit --help
 
 # Common commands
-python mgit.py login --org https://dev.azure.com/your-org --pat your-pat
-python mgit.py clone-all [project-name] [destination-path] [-c concurrency] [-u update-mode]
-python mgit.py pull-all [project-name] [repositories-path]
-python mgit.py generate-env
-python mgit.py config --show
+python -m mgit login --org https://dev.azure.com/your-org --pat your-pat
+python -m mgit clone-all [project-name] [destination-path] [-c concurrency] [-u update-mode]
+python -m mgit pull-all [project-name] [repositories-path]
+python -m mgit generate-env
+python -m mgit config --show
 
 # Package the application (PyInstaller)
 pip install pyinstaller
-pyinstaller --onefile mgit.py
+pyinstaller --onefile mgit/__main__.py
 
 # Run the packaged executable
 ./dist/mgit [command] [arguments]
@@ -29,10 +30,22 @@ pyinstaller --onefile mgit.py
 # Run tests (when implemented)
 python -m pytest tests/test_file.py::test_function -v
 python -m pytest tests/ -v --cov=. --cov-report=term
+
+# Quick test after module extraction
+python -m mgit --version  # Should display version
 ```
 
-## Project Structure
-- **mgit.py**: Main application entry point
+## Project Structure (Sprint 2+)
+- **mgit/**: Package directory
+  - **__init__.py**: Package initialization
+  - **__main__.py**: Entry point (temporary location for remaining code)
+  - **cli.py**: CLI setup and version callback (Sprint 2)
+  - **constants.py**: DEFAULT_VALUES and __version__ (Sprint 2)
+  - **logging.py**: MgitFormatter and ConsoleFriendlyRichHandler (Sprint 2)
+  - **config/**: Configuration module
+    - **manager.py**: get_config_value() function (Sprint 2 - CRITICAL PATH)
+  - **utils/**: Utility functions
+    - **helpers.py**: embed_pat_in_url(), sanitize_repo_name() (Sprint 2)
 - **requirements.txt**: Dependencies list
 - **ARCHITECTURE.md**: Technical design and future improvements
 - **README.md**: User documentation and examples
@@ -79,26 +92,52 @@ python -m pytest tests/ -v --cov=. --cov-report=term
 
 ## MAWEP Framework
 
-The Multi-Agent Workflow Execution Process (MAWEP) enables parallel development using AI agents:
+For complete MAWEP framework documentation, see: @~/.claude/docs/mawep/README.md
 
-### Quick Start
-- To run MAWEP orchestration, see @docs/framework/prompts/example-usage.md
-- For complete orchestrator instructions: @docs/framework/prompts/orchestrator-prompt.md
+### mgit-Specific MAWEP Implementation
 
-### Role-Specific Prompts
-- **Orchestrator**: @docs/framework/prompts/orchestrator-prompt.md - Coordinates parallel agents
-- **Development Agent**: @docs/framework/prompts/agent-prompt.md - Implements GitHub issues
-- **Architect Reviewer**: @docs/framework/prompts/architect-reviewer-prompt.md - Reviews PR integration
-- **Technical Reviewer**: @docs/framework/prompts/technical-reviewer-prompt.md - Code quality review
-- **Post-Mortem Analyst**: @docs/framework/prompts/post-mortem-analyst-prompt.md - Extracts learnings
+#### Project Structure
+- `mawep-workspace/` - Active MAWEP work directory
+  - `sprint-2-assignments.md` - Current sprint assignments
+  - `mawep-state.yaml` - Agent and issue tracking
+  - `worktrees/` - Agent working directories
+- `mawep-simulation/` - Planning and analysis docs
+  - `dependency-analysis.md` - Issue dependencies
+  - `orchestration-plan.md` - Execution strategy
 
-### MAWEP Architecture
-- System diagrams: @docs/framework/mawep-diagrams.md
-- Prompt engineering guide: @docs/framework/prompt-engineering-guide.md
+### Sprint 2: Module Extraction Guidelines
 
-### Key MAWEP Concepts
-1. **Single Orchestrator**: One Claude instance manages everything
-2. **Task Tool Spawning**: Agents are spawned using Claude's Task tool
-3. **No Background Work**: Orchestrator must continuously invoke agents
-4. **State Tracking**: Simple YAML file tracks all agents and issues
-5. **Fail Fast**: No error recovery - immediate failure on issues
+#### Import Hierarchy (Prevent Circular Imports)
+```
+constants.py → No imports from mgit modules
+utils/helpers.py → Can import from constants
+config/manager.py → Can import from constants, utils  
+logging.py → Can import from config, constants
+cli.py → Can import from constants
+__main__.py → Can import from all modules
+```
+
+#### Module Extraction Checklist
+- [ ] Copy code to new module location
+- [ ] Add necessary imports to new module
+- [ ] Add new module import to __main__.py (at TOP of section)
+- [ ] Remove extracted code from __main__.py
+- [ ] Run `python -m mgit --version` to test
+- [ ] Check for import errors
+
+#### Current Sprint Location
+Check `mawep-workspace/sprint-2-assignments.md` for current tasks
+
+#### Parallel Work Guidelines
+When multiple agents modify __main__.py:
+- Add imports at the TOP of their respective sections (stdlib/third-party/local)
+- Use explicit imports: `from mgit.logging import setup_logging, MgitFormatter`
+- Do NOT reorganize existing imports
+- Make minimal changes - only add your module's imports
+
+#### Testing Requirements
+Before creating PR:
+- [ ] `python -m mgit --version` shows version
+- [ ] `python -m mgit --help` displays help  
+- [ ] No ImportError when running
+- [ ] Original functionality preserved
