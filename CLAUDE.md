@@ -35,17 +35,17 @@ python -m pytest tests/ -v --cov=. --cov-report=term
 python -m mgit --version  # Should display version
 ```
 
-## Project Structure (Sprint 2+ COMPLETED)
+## Project Structure (Current)
 - **mgit/**: Package directory
   - **__init__.py**: Package initialization
-  - **__main__.py**: Entry point (746 lines - 28.7% reduction from Sprint 2 ✅)
-  - **cli.py**: CLI setup and version callback (Sprint 2 ✅)
-  - **constants.py**: DEFAULT_VALUES, __version__, CONFIG_DIR, CONFIG_FILE, UpdateMode (Sprint 2 ✅)
-  - **logging.py**: MgitFormatter, ConsoleFriendlyRichHandler, setup_logging() (Sprint 2 ✅)
+  - **__main__.py**: Entry point (remaining core functionality)
+  - **cli.py**: CLI setup and version callback
+  - **constants.py**: DEFAULT_VALUES, __version__, CONFIG_DIR, CONFIG_FILE, UpdateMode
+  - **logging.py**: MgitFormatter, ConsoleFriendlyRichHandler, setup_logging()
   - **config/**: Configuration module
-    - **manager.py**: get_config_value(), load_config_file(), save_config_file() (Sprint 2 ✅)
+    - **manager.py**: get_config_value(), load_config_file(), save_config_file()
   - **utils/**: Utility functions
-    - **helpers.py**: embed_pat_in_url(), sanitize_repo_name() (Sprint 2 ✅)
+    - **helpers.py**: embed_pat_in_url(), sanitize_repo_name()
 - **requirements.txt**: Dependencies list
 - **ARCHITECTURE.md**: Technical design and future improvements
 - **README.md**: User documentation and examples
@@ -197,169 +197,35 @@ Before creating PR:
 ❌ **DON'T** reorganize files when make small changes
 ❌ **DON'T** continue when blocked - report immediately
 
-## MAWEP Sprint Stages - Critical Process Framework
+## mgit-Specific MAWEP Lessons & Sprint 2 Outcomes
 
-### ⚠️ ORCHESTRATOR WARNING: Read This First ⚠️
-**The most common MAWEP failure is INCOMPLETE STAGE EXECUTION**. Agents will report "completed" but critical integration/verification steps get skipped. This section prevents those failures.
+### 🚨 Critical mgit MAWEP Discovery
+**Integration Reality for mgit**: Each pod worked in isolation in separate git worktrees. The integration stage required manually copying all pod work into a unified workspace and creating proper imports - this was NOT automatic.
 
-### Stage 1: Pre-Sprint Analysis 🔍
-**REQUIRED OUTPUTS:**
-- [ ] Dependency map showing which issues depend on others
-- [ ] Foundation requirements analysis (what must be built first)
-- [ ] File/code conflict assessment between parallel work
-- [ ] Pod capability matching (assign issues to appropriate pods)
-- [ ] Reality check: Is MAWEP actually needed vs sequential work?
+### mgit Sprint 2 Execution Pattern
+**Foundation-First Approach Proved Critical:**
+1. **Pod-5** (Constants) → Had to complete FIRST (dependency foundation)
+2. **Pod-2** (Config) → Depended on constants, completed SECOND  
+3. **Pod-3, Pod-4** (Utils, CLI) → Worked in parallel after foundation
+4. **Pod-1** (Logging) → Could work independently
+5. **Integration** → Manual merge of all pod work into pod-4 workspace
 
-**ORCHESTRATOR VERIFICATION:**
-```bash
-# Document your analysis - don't just think it
-echo "Dependencies: Issue A → Issue B → Issue C" > sprint-analysis.md
-echo "Foundation needed: [YES/NO]" >> sprint-analysis.md
-echo "Conflicts identified: [list]" >> sprint-analysis.md
-```
+**This dependency sequence prevented circular imports and ensured clean module hierarchy.**
 
-### Stage 2: Sprint Design & Orchestration 📋
-**REQUIRED OUTPUTS:**
-- [ ] Pod assignments documented
-- [ ] Execution sequence defined (dependency order)
-- [ ] Shared interfaces/constants planned
-- [ ] Integration strategy documented
-- [ ] Communication protocol established
+### Sprint 2 Success Metrics (Completed)
+- **5 modules extracted** using proper MAWEP orchestration
+- **301 lines removed** from __main__.py (28.7% reduction: 1,047 → 746 lines)  
+- **All tests passing** - `python -m mgit --version` and `--help` work perfectly
+- **Clean dependency hierarchy** established and verified
+- **Proper MAWEP integration** - all pod work successfully merged into unified codebase
 
-**ORCHESTRATOR VERIFICATION:**
-- Create sprint assignments file
-- Document execution order with rationale
-- Plan integration approach BEFORE starting
-
-### Stage 3: Parallel Execution ⚡
-**CRITICAL REALITIES:**
-- **Agents are ephemeral** - Task tool = single message exchange only
-- **No background processing** - Must continuously invoke agents every 30-60 seconds
-- **Active orchestration required** - You manage ALL coordination
-
-**EXECUTION PROTOCOL:**
-```bash
-# Phase 1: Foundation work (serial)
-invoke pod-foundation with Issue-X
-wait for completion + verification
-mark foundation complete
-
-# Phase 2: Dependent work (parallel)
-invoke pod-1 with Issue-A &
-invoke pod-2 with Issue-B &
-invoke pod-3 with Issue-C &
-monitor all progress
-```
-
-**⚠️ NEVER assume agents continue working between invocations**
-
-### Stage 4: Integration & Convergence 🔗
-**🚨 MOST CRITICAL STAGE - Where Most Failures Occur**
-
-**INTEGRATION REALITY:**
-- **Pods work in ISOLATION** - Each pod's work exists only in their worktree
-- **Integration is MANUAL** - Changes don't automatically merge
-- **Dependency order matters** - Must integrate in correct sequence
-
-**INTEGRATION PROTOCOL:**
-```bash
-# 1. Choose integration base (usually main branch or active pod)
-cd integration-workspace
-
-# 2. Merge in dependency order
-copy constants.py from pod-foundation
-copy config/manager.py from pod-config  
-copy utils/helpers.py from pod-utils
-# etc.
-
-# 3. Create unified imports in main files
-add imports for all extracted modules
-remove extracted code from main files
-
-# 4. VERIFY integration works
-python -m [tool] --version
-python -m [tool] --help
-```
-
-**INTEGRATION CHECKLIST:**
-- [ ] All pod changes copied to integration workspace
-- [ ] Import statements added for new modules
-- [ ] Extracted code removed from original files
-- [ ] No circular imports created
-- [ ] All dependencies resolve correctly
-
-### Stage 5: Validation & Quality Assurance ✅
-**🚨 CRITICAL: Never Trust Agent Reports Without Independent Verification**
-
-**VERIFICATION PROTOCOL:**
-```bash
-# Test basic functionality
-python -m [tool] --version     # Should show version
-python -m [tool] --help        # Should show all commands
-
-# Test core operations
-python -m [tool] [main-command] # Should work without import errors
-
-# Check code reduction
-wc -l original-file.py         # Before
-wc -l updated-file.py          # After
-# Calculate reduction percentage
-
-# Verify all modules can be imported
-python -c "from module import function; print('OK')"
-```
-
-**NEVER proceed to next sprint without completing this stage**
-
-### Stage 6: Sprint Closure & Documentation 📝
-**REQUIRED DELIVERABLES:**
-- [ ] Architecture documentation updated
-- [ ] Sprint metrics documented (lines reduced, modules created, etc.)
-- [ ] Lessons learned captured
-- [ ] Next sprint foundation prepared
-
-**CLOSURE VERIFICATION:**
-- Document what was actually achieved vs planned
-- Update project structure documentation
-- Verify all sprint goals met
-- Prepare foundation for next sprint
-
-### Common MAWEP Orchestrator Mistakes 🚫
-
-#### ❌ **Mistake #1: Trusting Agent Reports**
-**Problem:** Agents report "completed" but work isn't actually integrated
-**Solution:** Always verify independently with tests/commands
-
-#### ❌ **Mistake #2: Skipping Integration Stage**
-**Problem:** Assuming pod work automatically merges
-**Solution:** Explicit integration protocol with verification steps
-
-#### ❌ **Mistake #3: Rushing to Next Sprint**
-**Problem:** Moving forward with incomplete foundation
-**Solution:** Complete all 6 stages before proceeding
-
-#### ❌ **Mistake #4: Poor Dependency Analysis**
-**Problem:** Starting dependent work before foundation is ready
-**Solution:** Map dependencies clearly and enforce execution order
-
-#### ❌ **Mistake #5: Insufficient Verification**
-**Problem:** Integration breaks but not caught until later
-**Solution:** Test at each stage, not just at the end
-
-### MAWEP Success Indicators ✅
-- [ ] All 6 stages completed with documented verification
-- [ ] Independent testing confirms functionality preserved
-- [ ] Architecture improvements measurable (e.g., lines reduced)
-- [ ] Foundation ready for next sprint
-- [ ] Team understands what was accomplished
-
-### Emergency Recovery Protocol 🚨
-**If you discover a sprint is incomplete:**
-1. **STOP** - Don't proceed to next sprint
-2. **Assess** - Identify which stages were skipped
-3. **Recovery** - Go back and complete missing stages
-4. **Verify** - Test that recovery was successful
-5. **Document** - Update process to prevent recurrence
+### mgit MAWEP Integration Protocol (Learned)
+1. **Choose integration base** (used pod-4 worktree)
+2. **Copy modules in dependency order** (constants → config → utils → cli → logging)
+3. **Update __main__.py imports** (add all new module imports)
+4. **Remove extracted code** (delete duplicated code from __main__.py)
+5. **Test integration** (verify --version and --help commands work)
+6. **Measure success** (count line reduction, verify functionality preserved)
 
 ### Starting MAWEP Orchestration
 When ready to use MAWEP, reference the framework entry point above for complete instructions. Always get explicit user consent before starting multi-agent coordination.
