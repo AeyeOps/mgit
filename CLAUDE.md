@@ -90,20 +90,59 @@ python -m mgit --version  # Should display version
 - don't style your Mermaid
 - Before creating a visual, read @docs/kb/mermaid-syntax-reference.md
 
-## MAWEP Framework
+## MAWEP Framework (Multi-Agent Workflow Execution Process)
 
-For complete MAWEP framework documentation, see: @~/.claude/docs/mawep/README.md
+### ⚠️ Reality Check Protocol - READ FIRST ⚠️
+**CRITICAL**: Before proposing or implementing any multi-agent coordination, ALWAYS review:
+@~/.claude/reality-check-protocol.md
+
+This prevents over-engineering and capability oversell. Remember: Simple solutions that work beat elegant solutions that don't.
+
+### Complete MAWEP Framework - Single Entry Point
+**All MAWEP documentation with verified referential integrity:**
+@~/.claude/docs/prompt-packs/mawep/CLAUDE.md
+
+*This single reference brings in the complete MAWEP framework context via internal relative paths. The pack includes:*
+- *Core concepts and quick start guides*
+- *All role-based instructions (orchestrator, agents, reviewers)*  
+- *Framework architecture and patterns*
+- *Progressive disclosure from basic to advanced usage*
 
 ### mgit-Specific MAWEP Implementation
 
 #### Project Structure
 - `mawep-workspace/` - Active MAWEP work directory
   - `sprint-2-assignments.md` - Current sprint assignments
-  - `mawep-state.yaml` - Agent and issue tracking
-  - `worktrees/` - Agent working directories
+  - `mawep-state.yaml` - Pod and issue tracking (uses "pod" terminology)
+  - `worktrees/` - Pod working directories (persistent git worktrees)
 - `mawep-simulation/` - Planning and analysis docs
   - `dependency-analysis.md` - Issue dependencies
   - `orchestration-plan.md` - Execution strategy
+
+#### MAWEP Terminology for mgit
+- **Agent**: Ephemeral Task tool execution (single message exchange)
+- **Pod**: Persistent git worktree where multiple agents work over time on issues
+- **Orchestrator**: Manages pods and assigns agent invocations to them
+
+#### When to Use MAWEP
+✅ **Use MAWEP when:**
+- User provides 3+ related GitHub issues
+- User explicitly requests parallel development
+- Sprint work with independent issues (like Sprint 2 module extraction)
+- User mentions "multiple agents" or "concurrent work"
+
+❌ **Do NOT use MAWEP for:**
+- Single issues or simple tasks
+- Highly interdependent work requiring constant coordination
+- When simple sequential work is sufficient
+
+#### 🚨 Critical MAWEP Reality 🚨
+**THE TASK TOOL DOES NOT CREATE BACKGROUND WORKERS**
+- Task tool = Single message exchange only
+- Invoked agents STOP immediately after responding
+- Nothing happens between invocations
+- You MUST continuously invoke agents every 30-60 seconds
+- NEVER assume agents are "working in the background"
 
 ### Sprint 2: Module Extraction Guidelines
 
@@ -128,12 +167,14 @@ __main__.py → Can import from all modules
 #### Current Sprint Location
 Check `mawep-workspace/sprint-2-assignments.md` for current tasks
 
-#### Parallel Work Guidelines
-When multiple agents modify __main__.py:
+#### Parallel Work Guidelines (MAWEP Context)
+When multiple pods modify __main__.py:
+- Each pod works on different modules to minimize conflicts
 - Add imports at the TOP of their respective sections (stdlib/third-party/local)
 - Use explicit imports: `from mgit.logging import setup_logging, MgitFormatter`
 - Do NOT reorganize existing imports
 - Make minimal changes - only add your module's imports
+- Use coordination branch pattern for shared interfaces
 
 #### Testing Requirements
 Before creating PR:
@@ -141,3 +182,13 @@ Before creating PR:
 - [ ] `python -m mgit --help` displays help  
 - [ ] No ImportError when running
 - [ ] Original functionality preserved
+
+### MAWEP Anti-Patterns (Critical)
+❌ **DON'T** assume agents continue working between invocations
+❌ **DON'T** over-engineer coordination when simple sequential work suffices
+❌ **DON'T** modify other pods' worktrees
+❌ **DON'T** reorganize files when make small changes
+❌ **DON'T** continue when blocked - report immediately
+
+### Starting MAWEP Orchestration
+When ready to use MAWEP, reference the framework entry point above for complete instructions. Always get explicit user consent before starting multi-agent coordination.
