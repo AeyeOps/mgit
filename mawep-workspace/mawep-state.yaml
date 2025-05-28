@@ -1,29 +1,29 @@
 agents:
   agent-1:
     status: working
-    current_issue: 1
+    current_issue: 96
     worktree_path: ./worktrees/agent-1
-    last_update: "2025-05-27T07:45:00Z"
+    last_update: "2025-05-27T10:30:00Z"
   agent-2:
-    status: idle
-    current_issue: null
+    status: working
+    current_issue: 98
     worktree_path: ./worktrees/agent-2
-    last_update: "2025-05-27T07:40:00Z"
+    last_update: "2025-05-27T10:30:00Z"
   agent-3:
-    status: idle
-    current_issue: null
+    status: working
+    current_issue: 100
     worktree_path: ./worktrees/agent-3
-    last_update: "2025-05-27T07:40:00Z"
+    last_update: "2025-05-27T10:30:00Z"
   agent-4:
-    status: idle
-    current_issue: null
+    status: working
+    current_issue: 101
     worktree_path: ./worktrees/agent-4
-    last_update: "2025-05-27T07:40:00Z"
+    last_update: "2025-05-27T10:30:00Z"
   agent-5:
-    status: idle
-    current_issue: null
+    status: working
+    current_issue: 102
     worktree_path: ./worktrees/agent-5
-    last_update: "2025-05-27T07:40:00Z"
+    last_update: "2025-05-27T10:30:00Z"
 
 issues:
   1:
@@ -35,40 +35,49 @@ issues:
     priority: P0
   96:
     title: "Extract logging module"
-    status: ready
-    assigned_to: null
+    status: assigned
+    assigned_to: agent-1
     dependencies: [1]
     branch_name: feature/96-extract-logging
+    pr_url: null
   98:
-    title: "Extract configuration module"
-    status: ready
-    assigned_to: null
+    title: "Extract configuration module"  
+    status: assigned
+    assigned_to: agent-2
     dependencies: [1]
     branch_name: feature/98-extract-config
   100:
     title: "Extract utility functions"
-    status: ready
-    assigned_to: null
+    status: assigned
+    assigned_to: agent-3
     dependencies: [1]
     branch_name: feature/100-extract-utils
   101:
     title: "Extract CLI module"
-    status: ready
-    assigned_to: null
+    status: assigned
+    assigned_to: agent-4
     dependencies: [1]
     branch_name: feature/101-extract-cli
   102:
     title: "Create constants module"
-    status: ready
-    assigned_to: null
+    status: assigned
+    assigned_to: agent-5
     dependencies: [1]
     branch_name: feature/102-create-constants
   103:
     title: "[PROVIDER] Create provider interface"
-    status: ready
+    status: blocked
     assigned_to: null
-    dependencies: [1]
+    dependencies: [1, 105]
     branch_name: feature/103-provider-interface
+  105:
+    title: "[FOUNDATION] Establish module ownership and shared dependencies"
+    status: assigned
+    assigned_to: agent-1
+    dependencies: [1, 96]
+    branch_name: feature/105-foundation-sprint2
+    priority: P0
+    github_issue: 105
 
 current_sprint: 2
 workflow_status: active
