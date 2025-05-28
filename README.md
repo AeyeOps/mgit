@@ -1,18 +1,51 @@
-# mgit - Multi-Git CLI Tool
+# mgit - Multi-Git CLI Tool 🚀
 
 A powerful command-line tool for managing repositories across multiple git platforms (Azure DevOps, GitHub, BitBucket Cloud). Clone entire projects, update multiple repositories, and automate your git workflows across different platforms.
 
+**Plus**: Built-in MAWEP (Multi-Agent Workflow Execution Process) support for coordinating parallel AI development across multiple issues!
+
 ## Overview
 
-The mgit simplifies common repository management tasks by providing an intuitive command-line interface. It was created to solve the challenge of managing multiple repositories across Azure DevOps projects, allowing developers and DevOps engineers to:
+mgit simplifies repository management and enables advanced parallel development workflows:
 
+**Core Git Operations:**
 - Clone all repositories from a project with a single command
-- Pull updates for multiple repositories simultaneously
+- Pull updates for multiple repositories simultaneously  
 - Configure global settings for repeated operations
 - Manage authentication credentials securely
 - Automatically handle disabled repositories with clear reporting
 
-Built with Python, it leverages asynchronous operations for speed and provides rich console output for better visibility.
+**MAWEP Integration:**
+- Coordinate multiple AI agents working on different GitHub issues in parallel
+- Isolated git worktrees (pods) for conflict-free parallel development
+- State management and progress tracking across development pods
+- Perfect for sprint work and large refactoring efforts
+
+Built with Python using modern package structure, leveraging asynchronous operations for speed and providing rich console output for better visibility.
+
+## Project Structure
+
+```
+mgit/
+├── mgit/                    # Main package
+│   ├── __main__.py         # Entry point
+│   ├── cli/                # CLI components  
+│   ├── config/             # Configuration management
+│   ├── git/                # Git operations
+│   └── utils/              # Utility functions
+├── docs/                   # Comprehensive documentation
+│   ├── architecture/       # Technical design docs
+│   ├── configuration/      # Config system docs
+│   └── kb/                 # Knowledge base
+├── mawep-workspace/        # MAWEP parallel development
+│   ├── mawep-state.yaml   # Pod and issue tracking
+│   └── worktrees/         # Development pods
+│       ├── pod-1/         # Isolated workspace for issue #101
+│       ├── pod-2/         # Isolated workspace for issue #102
+│       └── pod-3/         # Isolated workspace for issue #103
+├── memory-bank/           # Project context and progress
+└── scripts/               # Automation scripts
+```
 
 ## Installation
 
@@ -32,36 +65,36 @@ Built with Python, it leverages asynchronous operations for speed and provides r
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
+   pip install -e .  # Development installation for package structure
    ```
 
 3. Run the tool:
    ```bash
-   python mgit.py
+   python -m mgit
    ```
 
 ### Building a Standalone Executable
 
-For convenience, you can build a standalone executable that can be distributed without requiring Python:
+For convenience, you can build a standalone executable:
 
 ```bash
 # Install PyInstaller
 pip install pyinstaller
 
 # Create a single executable file
-pyinstaller --onefile mgit.py
-```
+pyinstaller --onefile mgit/__main__.py
 
-The executable will be created in the `dist/` directory and can be run directly:
-
-```bash
-./dist/mgit
+# Run the executable
+./dist/__main__
 ```
 
 ## Quick Start
 
+### Basic Git Operations
+
 Get the current version:
 ```bash
-python mgit.py --version
+python -m mgit --version
 ```
 
 ### Authentication
@@ -70,10 +103,10 @@ First, authenticate with Azure DevOps:
 
 ```bash
 # Interactive login with prompts
-python mgit.py login
+python -m mgit login
 
 # Or specify credentials directly
-python mgit.py login --org https://dev.azure.com/your-org --pat your-pat
+python -m mgit login --org https://dev.azure.com/your-org --pat your-pat
 ```
 
 ### Clone All Repositories
@@ -81,14 +114,14 @@ python mgit.py login --org https://dev.azure.com/your-org --pat your-pat
 Clone all repositories from a project:
 
 ```bash
-python mgit.py clone-all my-project ./repos
+python -m mgit clone-all my-project ./repos
 ```
 
 With custom options:
 
 ```bash
 # Clone with 8 concurrent operations and force mode (overwrite existing repos)
-python mgit.py clone-all my-project ./repos -c 8 -u force
+python -m mgit clone-all my-project ./repos -c 8 -u force
 ```
 
 ### Update All Repositories
@@ -96,7 +129,7 @@ python mgit.py clone-all my-project ./repos -c 8 -u force
 Pull the latest changes for all repositories:
 
 ```bash
-python mgit.py pull-all my-project ./repos
+python -m mgit pull-all my-project ./repos
 ```
 
 ### Global Configuration
@@ -105,34 +138,53 @@ View or set global configuration:
 
 ```bash
 # Show current settings
-python mgit.py config --show
+python -m mgit config --show
 
 # Set default values
-python mgit.py config --org https://dev.azure.com/your-org --concurrency 16 --update-mode pull
+python -m mgit config --org https://dev.azure.com/your-org --concurrency 16 --update-mode pull
 ```
+
+### MAWEP Parallel Development
+
+Coordinate multiple AI agents working on GitHub issues in parallel:
+
+```bash
+# Start MAWEP orchestration for sprint work
+python -m mgit mawep start --issues 101,102,103,104
+
+# Check status of all development pods
+python -m mgit mawep status
+
+# Monitor specific pod progress
+python -m mgit mawep pod-status pod-1
+```
+
+MAWEP creates isolated git worktrees (`pod-1`, `pod-2`, etc.) where AI agents work independently on different issues, preventing conflicts while enabling parallel development.
 
 ## Commands Reference
 
 Run without arguments to see available commands:
 
 ```bash
-python mgit.py
+python -m mgit
 ```
 
-### login
+### Core Git Commands
+
+#### login
 
 Authenticate with Azure DevOps using a Personal Access Token (PAT).
 
 ```bash
-python mgit.py login [--org URL] [--pat TOKEN] [--no-store]
+python -m mgit login [--org URL] [--pat TOKEN] [--no-store]
 ```
 
-### clone-all
+#### clone-all
 
 Clone all repositories from an Azure DevOps project.
 
 ```bash
-python mgit.py clone-all PROJECT DESTINATION [--concurrency N] [--update-mode MODE]
+python -m mgit clone-all PROJECT DESTINATION [--concurrency N] [--update-mode MODE]
 ```
 
 Update modes:
@@ -140,36 +192,80 @@ Update modes:
 - `pull`: Try to git pull if it's a valid repository 
 - `force`: Remove existing directories and clone fresh
 
-### pull-all
+#### pull-all
 
 Pull updates for all repositories in a directory.
 
 ```bash
-python mgit.py pull-all PROJECT REPOSITORY_PATH
+python -m mgit pull-all PROJECT REPOSITORY_PATH
 ```
 
-### config
+#### config
 
 View or set global configuration settings.
 
 ```bash
-python mgit.py config [--show] [--org URL] [--concurrency N] [--update-mode MODE]
+python -m mgit config [--show] [--org URL] [--concurrency N] [--update-mode MODE]
 ```
 
-### generate-env
+#### generate-env
 
 Generate a sample environment file with configuration options.
 
 ```bash
-python mgit.py generate-env
+python -m mgit generate-env
 ```
 
-### --version
+### MAWEP Commands (Parallel Development)
+
+#### mawep start
+
+Launch MAWEP orchestration for parallel issue development.
+
+```bash
+python -m mgit mawep start --issues ISSUE_LIST [--repository REPO] [--concurrency N]
+```
+
+#### mawep status
+
+Show status of all development pods and assigned issues.
+
+```bash
+python -m mgit mawep status [--detailed]
+```
+
+#### mawep pod-status
+
+Get detailed status of a specific pod.
+
+```bash
+python -m mgit mawep pod-status POD_NAME
+```
+
+#### mawep stop
+
+Stop MAWEP orchestration and cleanup resources.
+
+```bash
+python -m mgit mawep stop [--preserve-worktrees]
+```
+
+### Global Options
+
+#### --version
 
 Show the application's version and exit.
 
 ```bash
-python mgit.py --version
+python -m mgit --version
+```
+
+#### --help
+
+Show help for any command.
+
+```bash
+python -m mgit [command] --help
 ```
 
 ## Configuration
@@ -194,9 +290,122 @@ The tool handles sensitive information securely:
 - Configuration files have secure permissions (0600)
 - Credentials can be stored securely or used only for the current session
 
+## MAWEP: Parallel Development Made Easy
+
+MAWEP (Multi-Agent Workflow Execution Process) transforms how you handle multi-issue development sprints. Instead of working on issues sequentially, coordinate multiple AI agents in parallel.
+
+### When to Use MAWEP
+
+✅ **Perfect for:**
+- Sprint work with 3-10 independent issues
+- Module extraction and refactoring
+- Feature development with clear separation
+- Large-scale code organization
+
+❌ **Skip for:**
+- Single issues or quick fixes
+- Tightly coupled changes
+- Simple sequential work
+
+### How MAWEP Works
+
+```
+┌─────────────────┐    "Status report from all pods!"
+│   Orchestrator  │ ──────────────────────────┐
+│   (You via     │                            │
+│    Claude Code) │                            │
+└─────────────────┘                            │
+        │                                      ▼
+        │              ┌─────────────┐   ┌─────────────┐
+        │              │    Pod-1    │   │    Pod-2    │  
+        │              │(Issue #101) │   │(Issue #102) │
+        │              └─────────────┘   └─────────────┘
+        ▼                     │                 │
+┌─────────────────┐          │                 │
+│ mawep-state.yaml│          ▼                 ▼
+│  (The Truth)    │   ┌─────────────┐   ┌─────────────┐
+└─────────────────┘   │ Git Worktree│   │ Git Worktree│
+                      │   + Memory  │   │   + Memory  │
+                      │     Bank    │   │     Bank    │
+                      └─────────────┘   └─────────────┘
+```
+
+### Key Concepts
+
+- **🎭 Agent**: Ephemeral AI task execution (single message → response → done)
+- **🏠 Pod**: Persistent git worktree where agents work over time (`pod-1`, `pod-2`, etc.)
+- **📊 Orchestrator**: You, coordinating everything through Claude Code
+- **💾 Memory Bank**: Persistent context in each pod so agents remember progress
+
+### Getting Started with MAWEP
+
+1. **Launch the Orchestrator**
+   ```bash
+   # In Claude Code, tell it:
+   "Act as MAWEP Orchestrator for parallel development.
+   Repository: my-org/awesome-project
+   Issues: #101, #102, #103, #104
+   Please start by analyzing dependencies and setting up pods."
+   ```
+
+2. **MAWEP Sets Up**
+   - Analyzes issue dependencies
+   - Creates `mawep-workspace/` with state tracking  
+   - Spawns git worktrees (`pod-1`, `pod-2`, etc.)
+   - Assigns issues to pods based on dependencies
+
+3. **Monitor Progress**
+   ```bash
+   # Check overall status
+   python -m mgit mawep status
+   
+   # Check specific pod
+   python -m mgit mawep pod-status pod-1
+   ```
+
+### Pod Structure
+
+Each pod is a complete, isolated workspace:
+
+```
+pod-1/
+├── memory-bank/           # Persistent context
+│   ├── activeContext.md  # What am I working on?
+│   ├── progress.md       # What's done/next?
+│   └── blockers.md       # What's stopping me?
+├── mgit/                 # Full project code
+└── [all project files]   # Isolated git worktree
+```
+
+### State Management
+
+MAWEP tracks everything in `mawep-state.yaml`:
+
+```yaml
+pods:
+  pod-1:
+    status: working
+    current_issue: 101
+    worktree_path: ./worktrees/pod-1
+    last_agent_invocation: "2025-05-27T23:45:00Z"
+    active_agents: 0
+
+issues:
+  101:
+    title: "Extract logging module"
+    status: assigned
+    assigned_to: pod-1
+    dependencies: []
+    branch_name: feature/101-extract-logging
+```
+
 ## For Developers
 
 For technical implementation details, architecture diagrams, and future improvement plans, please see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+### Development Workflow
+
+This project uses MAWEP for its own development! The current structure shows Sprint 2 module extraction in progress with 5 active pods working on different components.
 
 ## License
 
