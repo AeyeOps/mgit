@@ -2,7 +2,7 @@
 
 A powerful command-line tool for managing repositories across multiple git platforms (Azure DevOps, GitHub, BitBucket Cloud). Clone entire projects, update multiple repositories, and automate your git workflows across different platforms.
 
-**Plus**: Built-in MAWEP (Multi-Agent Workflow Execution Process) support for coordinating parallel AI development across multiple issues!
+**Plus**: Built-in MAWEP (Multi-Agent Workflow Execution Process) support for orchestrating parallel AI development across multiple issues!
 
 ## Overview
 
@@ -16,8 +16,8 @@ mgit simplifies repository management and enables advanced parallel development 
 - Automatically handle disabled repositories with clear reporting
 
 **MAWEP Integration:**
-- Coordinate multiple AI agents working on different GitHub issues in parallel
-- Isolated git worktrees (pods) for conflict-free parallel development
+- Orchestrate AI agents working in persistent pods (git worktrees) on GitHub issues
+- Isolated development environments for conflict-free parallel work
 - State management and progress tracking across development pods
 - Perfect for sprint work and large refactoring efforts
 
@@ -36,7 +36,7 @@ mgit/
 ├── docs/                   # Comprehensive documentation
 │   ├── architecture/       # Technical design docs
 │   ├── configuration/      # Config system docs
-│   └── kb/                 # Knowledge base
+│   └── framework/          # MAWEP framework docs
 ├── mawep-workspace/        # MAWEP parallel development
 │   ├── mawep-state.yaml   # Pod and issue tracking
 │   └── worktrees/         # Development pods
@@ -146,7 +146,7 @@ python -m mgit config --org https://dev.azure.com/your-org --concurrency 16 --up
 
 ### MAWEP Parallel Development
 
-Coordinate multiple AI agents working on GitHub issues in parallel:
+Orchestrate AI agents working in dedicated pods on GitHub issues:
 
 ```bash
 # Start MAWEP orchestration for sprint work
@@ -292,7 +292,7 @@ The tool handles sensitive information securely:
 
 ## MAWEP: Parallel Development Made Easy
 
-MAWEP (Multi-Agent Workflow Execution Process) transforms how you handle multi-issue development sprints. Instead of working on issues sequentially, coordinate multiple AI agents in parallel.
+MAWEP (Multi-Agent Workflow Execution Process) transforms how you handle multi-issue development sprints. Instead of working on issues sequentially, orchestrate AI agents working in persistent pods to tackle multiple issues in parallel.
 
 ### When to Use MAWEP
 
@@ -310,24 +310,34 @@ MAWEP (Multi-Agent Workflow Execution Process) transforms how you handle multi-i
 ### How MAWEP Works
 
 ```
-┌─────────────────┐    "Status report from all pods!"
-│   Orchestrator  │ ──────────────────────────┐
-│   (You via     │                            │
-│    Claude Code) │                            │
-└─────────────────┘                            │
-        │                                      ▼
-        │              ┌─────────────┐   ┌─────────────┐
-        │              │    Pod-1    │   │    Pod-2    │  
-        │              │(Issue #101) │   │(Issue #102) │
-        │              └─────────────┘   └─────────────┘
-        ▼                     │                 │
-┌─────────────────┐          │                 │
-│ mawep-state.yaml│          ▼                 ▼
-│  (The Truth)    │   ┌─────────────┐   ┌─────────────┐
-└─────────────────┘   │ Git Worktree│   │ Git Worktree│
-                      │   + Memory  │   │   + Memory  │
-                      │     Bank    │   │     Bank    │
-                      └─────────────┘   └─────────────┘
+                    ┌─────────────────┐
+                    │   Orchestrator  │ ← You control this
+                    │ (Claude Code)   │
+                    └─────────┬───────┘
+                              │
+                   "Invoke agent for pod-1"
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────┐
+│                    Agent Invocation                     │ ← Ephemeral
+│  "Work on pod-1, check memory-bank, update progress"   │   (Task tool)
+└──────────────────────┬──────────────────────────────────┘
+                       │
+            Agent works in persistent pod
+                       │
+                       ▼
+    ┌─────────────────────────────────────────────┐
+    │               Pod-1 Workspace               │ ← Persistent
+    │         (Git Worktree + Memory Bank)        │   (Survives)
+    │                                             │
+    │  📁 mawep-workspace/worktrees/pod-1/        │
+    │  ├── [complete project copy]               │
+    │  ├── memory-bank/                          │
+    │  │   ├── activeContext.md                  │
+    │  │   ├── progress.md                       │
+    │  │   └── blockers.md                       │
+    │  └── .git/ (worktree branch: pod-1-issue-101) │
+    └─────────────────────────────────────────────┘
 ```
 
 ### Key Concepts
@@ -370,11 +380,31 @@ Each pod is a complete, isolated workspace:
 ```
 pod-1/
 ├── memory-bank/           # Persistent context
-│   ├── activeContext.md  # What am I working on?
-│   ├── progress.md       # What's done/next?
-│   └── blockers.md       # What's stopping me?
+│   ├── activeContext.md  # What's being worked on
+│   ├── progress.md       # What's done/next
+│   ├── blockers.md       # What's stopping progress
+│   └── systemPatterns.md # Codebase conventions
 ├── mgit/                 # Full project code
 └── [all project files]   # Isolated git worktree
+```
+
+### Git Worktree Management
+
+MAWEP automatically handles git worktree operations:
+
+```bash
+# Pod creation (MAWEP does this)
+git worktree add mawep-workspace/worktrees/pod-1 -b pod-1-issue-101
+
+# Manual pod management commands
+git worktree list              # See all active pods
+git worktree remove pod-1      # Clean up completed pod
+git worktree repair pod-1      # Fix corrupted pod
+
+# Pod isolation means:
+# - pod-1 can modify files without affecting pod-2
+# - Each pod has its own branch
+# - Changes merge back to main via PRs
 ```
 
 ### State Management
@@ -396,8 +426,12 @@ issues:
     status: assigned
     assigned_to: pod-1
     dependencies: []
-    branch_name: feature/101-extract-logging
+    branch_name: pod-1-issue-101
 ```
+
+### Important MAWEP Reality
+
+⚠️ **Agents don't work in the background!** Each agent invocation is a single request-response cycle. The orchestrator (you) must continuously invoke agents to keep work progressing. Think of it like conducting an orchestra - if you stop conducting, the music stops.
 
 ## For Developers
 
