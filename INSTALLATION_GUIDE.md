@@ -94,18 +94,18 @@ Pre-built standalone executables that require no dependencies.
 
 1. **Download the binary**:
    
-   Visit: https://github.com/steveant/mgit/releases/tag/v0.2.1
+   Visit: https://github.com/AeyeOps/mgit/releases/tag/v0.2.1
    
    Or use command line:
    ```bash
    # Linux
-   wget https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-v0.2.1-linux-x64
+   wget https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-linux-x64
    
    # macOS
-   curl -L https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-v0.2.1-macos-x64 -o mgit
+   curl -L https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-macos-x64 -o mgit
    
    # Windows (PowerShell)
-   Invoke-WebRequest -Uri https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-v0.2.1-windows-x64.exe -OutFile mgit.exe
+   Invoke-WebRequest -Uri https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-windows-x64.exe -OutFile mgit.exe
    ```
 
 2. **Make executable** (Linux/macOS):
@@ -134,17 +134,17 @@ Ideal for isolated environments and consistent behavior across platforms.
 
 ```bash
 # Pull the latest stable version
-docker pull ghcr.io/steveant/mgit:latest
+docker pull ghcr.io/aeyeops/mgit:latest
 
 # Or pull a specific version
-docker pull ghcr.io/steveant/mgit:v0.2.1
+docker pull ghcr.io/aeyeops/mgit:v0.2.1
 ```
 
 #### Create an Alias (Recommended)
 
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
-alias mgit='docker run --rm -v $(pwd):/workspace -v ~/.config/mgit:/root/.config/mgit ghcr.io/steveant/mgit:latest'
+alias mgit='docker run --rm -v $(pwd):/workspace -v ~/.config/mgit:/root/.config/mgit ghcr.io/aeyeops/mgit:latest'
 
 # Reload shell configuration
 source ~/.bashrc  # or ~/.zshrc
@@ -154,13 +154,13 @@ source ~/.bashrc  # or ~/.zshrc
 
 ```bash
 # Run mgit commands
-docker run --rm ghcr.io/steveant/mgit:latest --version
+docker run --rm ghcr.io/aeyeops/mgit:latest --version
 
 # With volume mounts for file access
 docker run --rm \
   -v $(pwd):/workspace \
   -v ~/.config/mgit:/root/.config/mgit \
-  ghcr.io/steveant/mgit:latest \
+  ghcr.io/aeyeops/mgit:latest \
   clone-all my-org /workspace/repos
 ```
 
@@ -172,7 +172,7 @@ Create a `docker-compose.yml`:
 version: '3.8'
 services:
   mgit:
-    image: ghcr.io/steveant/mgit:latest
+    image: ghcr.io/aeyeops/mgit:latest
     volumes:
       - .:/workspace
       - ~/.config/mgit:/root/.config/mgit
@@ -193,7 +193,7 @@ For developers and contributors who want the latest features or need to modify t
 
 ```bash
 # Clone the repository
-git clone https://github.com/steveant/mgit.git
+git clone https://github.com/AeyeOps/mgit.git
 cd mgit
 
 # Create virtual environment (recommended)
@@ -461,7 +461,7 @@ rm -rf ~/.config/mgit
 
 ```bash
 # Remove the image
-docker rmi ghcr.io/steveant/mgit:latest
+docker rmi ghcr.io/aeyeops/mgit:latest
 
 # Remove all mgit images
 docker rmi $(docker images | grep mgit | awk '{print $3}')
@@ -486,8 +486,8 @@ rm -rf ~/.config/mgit
 ## Getting Help
 
 1. **Documentation**: See the [README](README.md) for usage instructions
-2. **Issues**: Report bugs at https://github.com/steveant/mgit/issues
-3. **Discussions**: Ask questions at https://github.com/steveant/mgit/discussions
+2. **Issues**: Report bugs at https://github.com/AeyeOps/mgit/issues
+3. **Discussions**: Ask questions at https://github.com/AeyeOps/mgit/discussions
 
 ## Next Steps
 

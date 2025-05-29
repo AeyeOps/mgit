@@ -14,7 +14,7 @@ setup(
     description="Multi-provider Git management tool",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/steveant/mgit",
+    url="https://github.com/AeyeOps/mgit",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
