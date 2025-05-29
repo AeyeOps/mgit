@@ -16,6 +16,19 @@ from .base import (
 # Factory pattern
 from .factory import ProviderFactory
 
+# Registry pattern
+from .registry import (
+    ProviderRegistry,
+    register_provider,
+    get_provider,
+    get_provider_by_name,
+    list_providers,
+    get_provider_info,
+    auto_discover,
+    validate_all,
+    registry,
+)
+
 # Exceptions
 from .exceptions import (
     ProviderError,
@@ -40,6 +53,16 @@ __all__ = [
     "AuthMethod",
     # Factory
     "ProviderFactory",
+    # Registry
+    "ProviderRegistry",
+    "register_provider",
+    "get_provider",
+    "get_provider_by_name",
+    "list_providers",
+    "get_provider_info",
+    "auto_discover",
+    "validate_all",
+    "registry",
     # Exceptions
     "ProviderError",
     "AuthenticationError",
