@@ -1,6 +1,7 @@
 # mgit - Multi-Provider Git CLI Tool 🚀
 
 [![PyPI version](https://img.shields.io/pypi/v/mgit.svg)](https://pypi.org/project/mgit/)
+[![Install from GitHub](https://img.shields.io/badge/pip%20install-GitHub%20Release-brightgreen)](https://github.com/steveant/mgit/releases/latest)
 [![Docker Image](https://img.shields.io/docker/v/steveant/mgit?label=docker)](https://ghcr.io/steveant/mgit)
 [![GitHub Release](https://img.shields.io/github/release/steveant/mgit.svg)](https://github.com/steveant/mgit/releases/latest)
 [![Enterprise Certified](https://img.shields.io/badge/Enterprise-Certified-gold)](ENTERPRISE_CERTIFICATION_SUMMARY.md)
@@ -61,6 +62,16 @@ mgit/
 
 ## Installation
 
+### 🚀 Quick Install - Works NOW!
+
+```bash
+# Install mgit directly from GitHub Release (Available NOW!)
+pip install https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
+
+# Verify installation
+mgit --version
+```
+
 ### Prerequisites
 
 - Python 3.7 or higher (for pip/source installation)
@@ -69,17 +80,24 @@ mgit/
 
 ### Installation Methods
 
-#### Method 1: Install from PyPI (Recommended)
+#### Method 1: Install from GitHub Release (Available NOW!)
 
 ```bash
-# Install the latest stable version
-pip install mgit
+# Install directly from GitHub - THIS WORKS RIGHT NOW!
+pip install https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
 
 # Run mgit directly
 mgit --version
 ```
 
-#### Method 2: Download from GitHub Releases
+#### Method 2: Install from PyPI (Coming Soon)
+
+```bash
+# Will be available after PyPI approval
+pip install mgit
+```
+
+#### Method 3: Download Binary from GitHub Releases
 
 Download the pre-built binary for your platform:
 
@@ -94,7 +112,7 @@ Download the pre-built binary for your platform:
    ./mgit-v0.2.1-linux-x64 --version
    ```
 
-#### Method 3: Use Docker
+#### Method 4: Use Docker
 
 ```bash
 # Pull the latest image
@@ -107,7 +125,7 @@ docker run --rm ghcr.io/steveant/mgit:latest --version
 docker run --rm -v $(pwd):/workspace ghcr.io/steveant/mgit:latest clone-all my-project /workspace/repos
 ```
 
-#### Method 4: Install from Source
+#### Method 5: Install from Source
 
 1. Clone this repository:
    ```bash
@@ -128,14 +146,42 @@ docker run --rm -v $(pwd):/workspace ghcr.io/steveant/mgit:latest clone-all my-p
 
 ### Installation Method Comparison
 
-| Method | Prerequisites | Pros | Cons | Best For |
-|--------|--------------|------|------|---------|
-| **PyPI** | Python 3.7+, pip | • Easy updates<br>• Standard Python workflow<br>• Automatic dependencies | • Requires Python environment | Regular users, Python developers |
-| **GitHub Binary** | None | • No dependencies<br>• Fast startup<br>• Single file | • Manual updates<br>• Platform-specific | CI/CD, users without Python |
-| **Docker** | Docker | • Fully isolated<br>• Consistent environment<br>• No local dependencies | • Requires Docker<br>• Slightly slower startup | Containers, isolated environments |
-| **Source** | Python 3.7+, Git | • Latest features<br>• Can modify code<br>• Development mode | • Manual updates<br>• Requires Git | Contributors, developers |
+| Method | Prerequisites | Pros | Cons | Best For | Available Now? |
+|--------|--------------|------|------|---------|----------------|
+| **GitHub pip** | Python 3.7+, pip | • Works NOW!<br>• Easy install<br>• Automatic dependencies | • Manual version specification | Anyone needing pip install TODAY | ✅ YES |
+| **PyPI** | Python 3.7+, pip | • Easy updates<br>• Standard Python workflow<br>• Automatic dependencies | • Requires Python environment | Regular users, Python developers | ❌ Coming Soon |
+| **GitHub Binary** | None | • No dependencies<br>• Fast startup<br>• Single file | • Manual updates<br>• Platform-specific | CI/CD, users without Python | ✅ YES |
+| **Docker** | Docker | • Fully isolated<br>• Consistent environment<br>• No local dependencies | • Requires Docker<br>• Slightly slower startup | Containers, isolated environments | ✅ YES |
+| **Source** | Python 3.7+, Git | • Latest features<br>• Can modify code<br>• Development mode | • Manual updates<br>• Requires Git | Contributors, developers | ✅ YES |
 
 For detailed installation instructions and troubleshooting, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md).
+
+### 🎯 Working Installation Methods Summary
+
+**All of these methods are available and working RIGHT NOW:**
+
+1. **pip from GitHub** (Recommended for Python users):
+   ```bash
+   pip install https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
+   ```
+
+2. **Binary Download** (No Python required):
+   - [Linux](https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-v0.2.1-linux-x64)
+   - [macOS](https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-v0.2.1-macos-x64)
+   - [Windows](https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-v0.2.1-windows-x64.exe)
+
+3. **Docker** (Fully isolated):
+   ```bash
+   docker pull ghcr.io/steveant/mgit:latest
+   ```
+
+4. **From Source** (For developers):
+   ```bash
+   git clone https://github.com/steveant/mgit.git && cd mgit
+   pip install -r requirements.txt && pip install -e .
+   ```
+
+See [WORKING_INSTALLATION_METHODS.md](WORKING_INSTALLATION_METHODS.md) for quick installation instructions.
 
 ## Quick Start
 

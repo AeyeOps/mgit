@@ -62,7 +62,7 @@ venv.bak/
 Thumbs.db
 
 # Documentation and markdown (not needed in container)
-*.md
+# Note: README.md is needed for setup.py, so we can't exclude *.md
 docs/
 *.rst
 *.txt
