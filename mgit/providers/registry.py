@@ -131,12 +131,14 @@ class ProviderRegistry:
                     field="provider_class"
                 )
         
-        # Check that PROVIDER_NAME matches registered name
+        # Check that PROVIDER_NAME matches registered name (skip for aliases)
         if provider_class.PROVIDER_NAME.lower() != name:
-            logger.warning(
-                "Provider name mismatch: registered as '%s' but PROVIDER_NAME is '%s'",
-                name, provider_class.PROVIDER_NAME
-            )
+            # Only warn for the primary name, not aliases
+            if provider_class.PROVIDER_NAME.lower() not in [n.lower() for n in self._providers.keys()]:
+                logger.warning(
+                    "Provider name mismatch: registered as '%s' but PROVIDER_NAME is '%s'",
+                    name, provider_class.PROVIDER_NAME
+                )
         
         # Verify abstract methods are implemented
         abstract_methods = [
