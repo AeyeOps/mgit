@@ -46,6 +46,14 @@ from .exceptions import (
     APIError,
 )
 
+# Import and register providers
+from .azdevops import AzureDevOpsProvider
+
+# Register available providers
+ProviderFactory.register_provider("azuredevops", AzureDevOpsProvider)
+ProviderFactory.register_provider("azdevops", AzureDevOpsProvider)  # Alias
+ProviderFactory.register_provider("azure", AzureDevOpsProvider)  # Alias
+
 __all__ = [
     # Base classes
     "GitProvider",
@@ -79,4 +87,6 @@ __all__ = [
     "ProjectNotFoundError",
     "PermissionError",
     "APIError",
+    # Providers
+    "AzureDevOpsProvider",
 ]
