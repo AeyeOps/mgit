@@ -1,0 +1,93 @@
+# Migration Sprint State - Repository Migration from steveant/mgit to AeyeOps/mgit
+# Generated: 2025-05-29
+
+sprint:
+  name: Repository-Migration-Sprint
+  duration: 20 minutes
+  start_time: "2025-05-29T10:00:00"
+  objectives:
+    - Update git remote configuration
+    - Update all documentation references (32 files)
+    - Re-tag Docker images for new registry
+    - Verify all changes work correctly
+
+pods:
+  pod-1:
+    name: Git Configuration Pod
+    status: pending
+    assigned_issues:
+      - GIT-001
+    current_agent: none
+    last_update: "2025-05-29T10:00:00"
+    
+  pod-2:
+    name: Documentation Update Pod
+    status: pending
+    assigned_issues:
+      - DOC-001
+      - DOC-002
+    current_agent: none
+    last_update: "2025-05-29T10:00:00"
+    
+  pod-3:
+    name: Docker Registry Pod
+    status: pending
+    assigned_issues:
+      - DOCKER-001
+    current_agent: none
+    last_update: "2025-05-29T10:00:00"
+
+issues:
+  GIT-001:
+    title: "Update Git Remote and Verify Configuration"
+    priority: critical
+    status: pending
+    pod: pod-1
+    tasks:
+      - Update git remote URL to AeyeOps/mgit
+      - Verify remote configuration
+      - Test push/pull operations
+      - Update .git/config if needed
+      
+  DOC-001:
+    title: "Update Primary Documentation Files"
+    priority: high
+    status: pending
+    pod: pod-2
+    tasks:
+      - Update README.md references
+      - Update INSTALLATION_GUIDE.md
+      - Update PROJECT_CLOSURE.md
+      - Update docs/deployment/deployment-guide.md
+      
+  DOC-002:
+    title: "Update Scripts and Configuration Files"
+    priority: high
+    status: pending
+    pod: pod-2
+    tasks:
+      - Update all shell scripts in scripts/
+      - Update Dockerfile
+      - Update Helm charts
+      - Update setup.py
+      
+  DOCKER-001:
+    title: "Re-tag Docker Images and Update References"
+    priority: medium
+    status: pending
+    pod: pod-3
+    tasks:
+      - Document Docker re-tagging commands
+      - Update all Docker registry references
+      - Update deployment documentation
+      - Create migration instructions
+
+orchestration:
+  status: initialized
+  current_phase: planning
+  last_check: "2025-05-29T10:00:00"
+  notes:
+    - All pods can work in parallel
+    - Pod-1 is most critical - must complete first
+    - Pod-2 has the most work (32 files to update)
+    - Pod-3 focuses on Docker-specific changes
