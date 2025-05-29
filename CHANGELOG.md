@@ -6,29 +6,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Nothing yet.
+
 ### Changed
-- Renamed project from `ado-cli` to `mgit` to reflect multi-platform git support
-- Updated all references throughout codebase to use new `mgit` name
-- Updated `requirements.txt` to use stable `azure-devops>=7.1.0` after resolving merge conflict.
+- Nothing yet.
 
 ### Deprecated
 - Nothing yet.
 
 ### Removed
-- Obsolete `pathlib` dependency from `requirements.txt` to resolve `pyinstaller` conflict.
+- Nothing yet.
 
 ### Fixed
-- Resolved `PermissionError` in the bundled executable by changing the log file path to `~/.config/mgit/mgit.log`.
+- Nothing yet.
 
 ### Security
 - Nothing yet.
 
-## [0.2.1] - 2025-04-11
+## [0.2.1] - 2025-01-29
 
 ### Added
-- Functionality to build a standalone executable using `pyinstaller`.
-- Enhanced progress display using `rich.progress` for `clone-all` and `pull-all`, showing individual repository status.
-- Interactive confirmation prompts using `rich.prompt.Confirm` for potentially destructive actions (`clone-all --force`, `login --store`).
+- **Multi-Provider Support**: Complete transformation from Azure DevOps-only to multi-provider architecture
+  - Full GitHub provider implementation with organization and user repository support
+  - Complete BitBucket provider implementation with workspace management
+  - Provider auto-detection from URLs for seamless workflow
+  - Feature parity across all providers (login, clone-all, pull-all, config)
+- **Provider Registry System**: Dynamic provider registration and discovery
+- **Unified Authentication**: Consistent credential management across all providers
+  - Azure DevOps: Personal Access Token (PAT)
+  - GitHub: Personal Access Token
+  - BitBucket: App Password
+- **Enhanced Update Modes**: Support for skip/pull/force modes across all providers
+- **Improved Error Handling**: Provider-specific error messages and retry logic
+- **Rich Console Output**: Enhanced progress indicators for multi-provider operations
+- **Comprehensive Documentation**: Complete docs for architecture, configuration, and CLI design
+
+### Changed
+- **Architecture Overhaul**: Refactored from monolithic to modular provider-based architecture
+  - Abstract base provider class for consistent interface
+  - Provider factory pattern for dynamic instantiation
+  - Separated git operations from provider-specific logic
+- **Configuration System**: Extended to support provider-specific settings
+  - Provider-specific authentication storage
+  - Per-provider concurrency settings
+  - Hierarchical configuration (env vars → config file → defaults)
+- **CLI Structure**: Reorganized commands for provider flexibility
+  - Auto-detection of provider from URLs
+  - Explicit provider specification with `--provider` flag
+  - Consistent command interface across all providers
+- **Project Rename**: Renamed from `ado-cli` to `mgit` to reflect multi-platform support
+- **Package Structure**: Modernized with proper module separation
+  - Dedicated modules for CLI, config, git, providers, and utilities
+  - Clean dependency hierarchy to prevent circular imports
+
+### Fixed
+- Resolved provider initialization and registration issues
+- Fixed provider naming warnings for aliases
+- Corrected module import paths for package structure
+- Enhanced error messages for authentication failures
+- Improved handling of disabled/inaccessible repositories
+
+### Breaking Changes
+- **Configuration File Format**: Provider-specific sections now required
+  - Old: Single flat configuration
+  - New: Provider-scoped configuration sections
+- **Environment Variables**: Provider-specific prefixes now used
+  - Old: `AZURE_DEVOPS_PAT`
+  - New: `MGIT_AZDEVOPS_PAT`, `MGIT_GITHUB_TOKEN`, `MGIT_BITBUCKET_APP_PASSWORD`
+- **Login Command**: Now requires provider specification or URL
+  - Old: `mgit login --org https://dev.azure.com/myorg --pat TOKEN`
+  - New: `mgit login --provider github --pat TOKEN` or auto-detection from URL
 
 ### Fixed
 - Corrected a Mypy type hint error related to `subprocess.CalledProcessError`.

@@ -73,7 +73,7 @@ PROVIDER_CONFIG_PATTERNS = {
     ProviderType.AZURE_DEVOPS: {
         "organization": "AZURE_DEVOPS_ORG",
         "organization_url": "AZURE_DEVOPS_ORG_URL",
-        "pat": "AZURE_DEVOPS_PAT",
+        "pat": "AZURE_DEVOPS_EXT_PAT",
         "username": "AZURE_DEVOPS_USERNAME",
     },
     ProviderType.GITHUB: {

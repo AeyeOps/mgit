@@ -1,0 +1,27 @@
+apiVersion: v2
+name: mgit
+description: A Helm chart for mgit - Multi-provider Git management tool
+type: application
+version: 0.2.1
+appVersion: "0.2.1"
+
+keywords:
+  - git
+  - development
+  - devops
+  - multi-provider
+  - azure-devops
+  - github
+  - bitbucket
+
+home: https://github.com/steveant/mgit
+sources:
+  - https://github.com/steveant/mgit
+
+maintainers:
+  - name: Steve Antonakakis
+    email: steve.antonakakis@gmail.com
+
+annotations:
+  category: Development Tools
+  licenses: MIT

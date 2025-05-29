@@ -1,4 +1,6 @@
-# Multi-Provider Command Structure Design
+# Multi-Provider Command Structure Design (Future Design)
+
+**Note: This document describes potential future command structures. The current implementation only supports the commands shown in `mgit --help`.**
 
 ## Design Principles
 
@@ -13,7 +15,7 @@
 ```bash
 mgit clone-all <project> <path>
 mgit pull-all <project> <path>
-mgit login --org <url> --pat <token>
+mgit login --org <url> --token <token>
 mgit config --show
 mgit generate-env
 ```
@@ -64,7 +66,7 @@ mgit config -p github
 # Configure provider credentials
 mgit config github --token <token>
 mgit config bitbucket --username <user> --app-password <password>
-mgit config azuredevops --org <url> --pat <token>
+mgit config azuredevops --org <url> --token <token>
 ```
 
 ### 2. Authentication Commands
@@ -244,7 +246,7 @@ Hint: Run 'mgit login --provider bitbucket' first.
 1. **Phase 1**: Detect old-style usage and provide warnings
    ```
    Warning: Using legacy Azure DevOps configuration.
-   Consider updating to: mgit config azuredevops --org <url> --pat <token>
+   Consider updating to: mgit config azuredevops --org <url> --token <token>
    ```
 
 2. **Phase 2**: Auto-migration of config files

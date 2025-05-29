@@ -27,9 +27,6 @@ Command-line interface design
 - `cli-subcommand-design.md` - Subcommand-based CLI structure
 - `command-structure-design.md` - Command hierarchy and patterns
 
-### `/framework/`
-Advanced frameworks and patterns
-- `mawep-framework-design.md` - Multi-Agent Workflow Execution Process
 
 ### `/kb/`
 Knowledge base and reference materials

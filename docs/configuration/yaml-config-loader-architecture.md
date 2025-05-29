@@ -1,8 +1,12 @@
 # YAML Configuration Loader Architecture
 
+> **NOTE**: This document describes a proposed YAML configuration architecture that is NOT currently implemented in mgit. 
+> The actual mgit tool uses a simple key=value configuration format (like .env files) in `~/.config/mgit/config`.
+> See [mgit-configuration-examples.md](./mgit-configuration-examples.md) for the actual configuration format.
+
 ## Executive Summary
 
-This document presents the architectural design for migrating mgit from environment variable/dotenv-based configuration to a YAML-based configuration system with local override support, while maintaining all existing functionality and visual features.
+This document presents the architectural design for potentially migrating mgit from environment variable/dotenv-based configuration to a YAML-based configuration system with local override support, while maintaining all existing functionality and visual features.
 
 ## Current State Analysis
 

@@ -1,8 +1,12 @@
 # YAML Configuration Design for mgit
 
+> **NOTE**: This document describes a proposed YAML configuration design that is NOT currently implemented in mgit. 
+> The actual mgit tool uses a simple key=value configuration format (like .env files) in `~/.config/mgit/config`.
+> See [mgit-configuration-examples.md](./mgit-configuration-examples.md) for the actual configuration format.
+
 ## Overview
 
-This document defines the YAML-based configuration schema for mgit, focusing on a clean, intuitive structure that replaces environment variables with configuration values while maintaining flexibility.
+This document defines a proposed YAML-based configuration schema for mgit, focusing on a clean, intuitive structure that could replace environment variables with configuration values while maintaining flexibility.
 
 ## Configuration File Location
 

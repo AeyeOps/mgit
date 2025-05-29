@@ -1,8 +1,8 @@
-# CLI Subcommand Design for mgit
+# CLI Subcommand Design for mgit (Future Design)
 
 ## Overview
 
-This document outlines the redesigned CLI structure for mgit, moving from flag-based commands to a more intuitive subcommand structure that follows modern CLI patterns.
+This document outlines a potential future redesigned CLI structure for mgit, moving from flag-based commands to a more intuitive subcommand structure that follows modern CLI patterns. **Note: This is a design proposal and these commands are not yet implemented.**
 
 ## Design Principles
 
@@ -54,7 +54,7 @@ mgit pull single <path> [options]
 ### Authentication
 ```bash
 # Current
-mgit login --org <url> --pat <token>
+mgit login --org <url> --token <token>
 mgit login --store
 
 # Proposed
@@ -96,15 +96,15 @@ mgit config
 └── migrate         # Migrate from old format
 ```
 
-### Auth Subcommands
+### Auth Subcommands (Proposed)
 ```
 mgit auth
-├── login [provider]     # Authenticate with provider
-├── logout [provider]    # Remove authentication
-├── status              # Show auth status
-├── list                # List configured authentications
-├── test [provider]     # Test authentication
-└── switch <provider>   # Switch default provider
+├── login [provider]     # Authenticate with provider (partially implemented as 'mgit login')
+├── logout [provider]    # Remove authentication (not implemented)
+├── status              # Show auth status (not implemented)
+├── list                # List configured authentications (not implemented)
+├── test [provider]     # Test authentication (not implemented)
+└── switch <provider>   # Switch default provider (not implemented)
 ```
 
 ### Clone Subcommands
@@ -116,25 +116,25 @@ mgit clone
 └── resume <path>        # Resume interrupted clone
 ```
 
-### List Subcommands
+### List Subcommands (Not Implemented)
 ```
 mgit list
-├── repos <scope>        # List repositories
-├── projects <org>       # List projects/workspaces
-├── providers           # List available providers
-├── filters             # List saved filters
-└── worktrees           # List active worktrees
+├── repos <scope>        # List repositories (not implemented)
+├── projects <org>       # List projects/workspaces (not implemented)
+├── providers           # List available providers (not implemented)
+├── filters             # List saved filters (not implemented)
+└── worktrees           # List active worktrees (not implemented)
 ```
 
-### Filter Subcommands
+### Filter Subcommands (Not Implemented)
 ```
 mgit filter
-├── create <name>       # Create named filter
-├── edit <name>         # Edit existing filter
-├── delete <name>       # Delete filter
-├── show <name>         # Show filter details
-├── list                # List all filters
-└── test <name> <scope> # Test filter results
+├── create <name>       # Create named filter (not implemented)
+├── edit <name>         # Edit existing filter (not implemented)
+├── delete <name>       # Delete filter (not implemented)
+├── show <name>         # Show filter details (not implemented)
+├── list                # List all filters (not implemented)
+└── test <name> <scope> # Test filter results (not implemented)
 ```
 
 ### Provider Subcommands
