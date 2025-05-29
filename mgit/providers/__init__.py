@@ -31,6 +31,13 @@ from .exceptions import (
     APIError,
 )
 
+# Import and register providers
+try:
+    from . import bitbucket
+    bitbucket.register()
+except ImportError:
+    pass  # Provider not available
+
 __all__ = [
     # Base classes
     "GitProvider",
