@@ -437,7 +437,7 @@ mgit clone-all my-org ./repos
 
 ## Uninstallation
 
-### PyPI Installation
+### GitHub pip / PyPI Installation
 
 ```bash
 # Uninstall mgit

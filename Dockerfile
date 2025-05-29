@@ -34,7 +34,8 @@ RUN groupadd -r mgit && useradd -r -g mgit mgit
 WORKDIR /app
 
 # Copy dependency files first (for better caching)
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
+COPY --chown=mgit:mgit setup.py ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
