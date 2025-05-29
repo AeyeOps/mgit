@@ -1,9 +1,9 @@
 # mgit - Multi-Provider Git CLI Tool 🚀
 
 [![PyPI version](https://img.shields.io/pypi/v/mgit.svg)](https://pypi.org/project/mgit/)
-[![Install from GitHub](https://img.shields.io/badge/pip%20install-GitHub%20Release-brightgreen)](https://github.com/steveant/mgit/releases/latest)
-[![Docker Image](https://img.shields.io/docker/v/steveant/mgit?label=docker)](https://ghcr.io/steveant/mgit)
-[![GitHub Release](https://img.shields.io/github/release/steveant/mgit.svg)](https://github.com/steveant/mgit/releases/latest)
+[![Install from GitHub](https://img.shields.io/badge/pip%20install-GitHub%20Release-brightgreen)](https://github.com/AeyeOps/mgit/releases/latest)
+[![Docker Image](https://img.shields.io/docker/v/aeyeops/mgit?label=docker)](https://ghcr.io/aeyeops/mgit)
+[![GitHub Release](https://img.shields.io/github/release/AeyeOps/mgit.svg)](https://github.com/AeyeOps/mgit/releases/latest)
 [![Enterprise Certified](https://img.shields.io/badge/Enterprise-Certified-gold)](ENTERPRISE_CERTIFICATION_SUMMARY.md)
 [![Security](https://img.shields.io/badge/Security-AES--256-green)](docs/security)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue)](Dockerfile)
@@ -66,7 +66,7 @@ mgit/
 
 ```bash
 # Install mgit directly from GitHub Release (Available NOW!)
-pip install https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
+pip install https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
 
 # Verify installation
 mgit --version
@@ -84,7 +84,7 @@ mgit --version
 
 ```bash
 # Install directly from GitHub - THIS WORKS RIGHT NOW!
-pip install https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
+pip install https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
 
 # Run mgit directly
 mgit --version
@@ -101,7 +101,7 @@ pip install mgit
 
 Download the pre-built binary for your platform:
 
-1. Visit [mgit releases](https://github.com/steveant/mgit/releases/tag/v0.2.1)
+1. Visit [mgit releases](https://github.com/AeyeOps/mgit/releases/tag/v0.2.1)
 2. Download the appropriate binary for your OS:
    - `mgit-v0.2.1-linux-x64` for Linux
    - `mgit-v0.2.1-macos-x64` for macOS
@@ -116,20 +116,20 @@ Download the pre-built binary for your platform:
 
 ```bash
 # Pull the latest image
-docker pull ghcr.io/steveant/mgit:latest
+docker pull ghcr.io/aeyeops/mgit:latest
 
 # Run mgit in Docker
-docker run --rm ghcr.io/steveant/mgit:latest --version
+docker run --rm ghcr.io/aeyeops/mgit:latest --version
 
 # With volume mount for local repo access
-docker run --rm -v $(pwd):/workspace ghcr.io/steveant/mgit:latest clone-all my-project /workspace/repos
+docker run --rm -v $(pwd):/workspace ghcr.io/aeyeops/mgit:latest clone-all my-project /workspace/repos
 ```
 
 #### Method 5: Install from Source
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/steveant/mgit.git
+   git clone https://github.com/AeyeOps/mgit.git
    cd mgit
    ```
 
@@ -162,22 +162,22 @@ For detailed installation instructions and troubleshooting, see [INSTALLATION_GU
 
 1. **pip from GitHub** (Recommended for Python users):
    ```bash
-   pip install https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
+   pip install https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
    ```
 
 2. **Binary Download** (No Python required):
-   - [Linux](https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-v0.2.1-linux-x64)
-   - [macOS](https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-v0.2.1-macos-x64)
-   - [Windows](https://github.com/steveant/mgit/releases/download/v0.2.1/mgit-v0.2.1-windows-x64.exe)
+   - [Linux](https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-linux-x64)
+   - [macOS](https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-macos-x64)
+   - [Windows](https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-windows-x64.exe)
 
 3. **Docker** (Fully isolated):
    ```bash
-   docker pull ghcr.io/steveant/mgit:latest
+   docker pull ghcr.io/aeyeops/mgit:latest
    ```
 
 4. **From Source** (For developers):
    ```bash
-   git clone https://github.com/steveant/mgit.git && cd mgit
+   git clone https://github.com/AeyeOps/mgit.git && cd mgit
    pip install -r requirements.txt && pip install -e .
    ```
 
@@ -193,7 +193,7 @@ Get the current version:
 mgit --version
 
 # If using Docker
-docker run --rm ghcr.io/steveant/mgit:latest --version
+docker run --rm ghcr.io/aeyeops/mgit:latest --version
 
 # If running from source
 python -m mgit --version
@@ -212,7 +212,7 @@ mgit login --provider azuredevops
 mgit login --provider azuredevops --org https://dev.azure.com/your-org --token your-pat
 
 # Using Docker (credentials saved in mounted volume)
-docker run --rm -v ~/.config/mgit:/root/.config/mgit ghcr.io/steveant/mgit:latest login --provider azuredevops --store
+docker run --rm -v ~/.config/mgit:/root/.config/mgit ghcr.io/aeyeops/mgit:latest login --provider azuredevops --store
 ```
 
 #### GitHub
@@ -248,7 +248,7 @@ mgit clone-all my-org ./repos https://github.com
 mgit clone-all my-workspace ./repos https://bitbucket.org
 
 # Using Docker
-docker run --rm -v $(pwd):/workspace ghcr.io/steveant/mgit:latest clone-all my-org /workspace/repos https://github.com
+docker run --rm -v $(pwd):/workspace ghcr.io/aeyeops/mgit:latest clone-all my-org /workspace/repos https://github.com
 ```
 
 #### Explicit provider selection
@@ -275,7 +275,7 @@ mgit clone-all my-org ./repos -c 20 --provider github
 docker run --rm \
   -e GITHUB_PAT=your-token \
   -v $(pwd):/workspace \
-  ghcr.io/steveant/mgit:latest \
+  ghcr.io/aeyeops/mgit:latest \
   clone-all my-org /workspace/repos -c 20 --provider github
 ```
 
@@ -292,7 +292,7 @@ mgit pull-all my-org ./repos --provider github
 mgit pull-all my-workspace ./repos --provider bitbucket
 
 # Using Docker
-docker run --rm -v $(pwd):/workspace ghcr.io/steveant/mgit:latest pull-all my-project /workspace/repos
+docker run --rm -v $(pwd):/workspace ghcr.io/aeyeops/mgit:latest pull-all my-project /workspace/repos
 ```
 
 ### Global Configuration
@@ -320,7 +320,7 @@ Run without arguments to see available commands:
 mgit
 
 # Or with Docker
-docker run --rm ghcr.io/steveant/mgit:latest
+docker run --rm ghcr.io/aeyeops/mgit:latest
 ```
 
 ### Core Git Commands
@@ -501,7 +501,7 @@ mgit clone-all devops-tools ./repos/ops https://bitbucket.org
 
 ```bash
 # Create an alias for convenience
-alias mgit-docker='docker run --rm -v $(pwd):/workspace -v ~/.config/mgit:/root/.config/mgit ghcr.io/steveant/mgit:latest'
+alias mgit-docker='docker run --rm -v $(pwd):/workspace -v ~/.config/mgit:/root/.config/mgit ghcr.io/aeyeops/mgit:latest'
 
 # Use mgit with Docker like normal
 mgit-docker login --provider github --store
