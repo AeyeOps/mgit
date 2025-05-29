@@ -49,12 +49,14 @@ from .exceptions import (
 # Import and register providers
 from .azdevops import AzureDevOpsProvider
 from .github import GitHubProvider
+from .bitbucket import BitBucketProvider
 
 # Register available providers
 ProviderFactory.register_provider("azuredevops", AzureDevOpsProvider)
 ProviderFactory.register_provider("azdevops", AzureDevOpsProvider)  # Alias
 ProviderFactory.register_provider("azure", AzureDevOpsProvider)  # Alias
 ProviderFactory.register_provider("github", GitHubProvider)
+ProviderFactory.register_provider("bitbucket", BitBucketProvider)
 
 __all__ = [
     # Base classes
@@ -92,4 +94,5 @@ __all__ = [
     # Providers
     "AzureDevOpsProvider",
     "GitHubProvider",
+    "BitBucketProvider",
 ]
