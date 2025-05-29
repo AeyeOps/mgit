@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 # Import the actual utils once available
-from mgit.utils.helpers import embed_pat_in_url, sanitize_repo_name
+from mgit.git.utils import embed_pat_in_url, sanitize_repo_name
 
 
 class TestHelperFunctions:
@@ -19,7 +19,7 @@ class TestHelperFunctions:
         pat = "test-pat-token"
         
         result = embed_pat_in_url(url, pat)
-        assert result == "https://test-pat-token@dev.azure.com/org/project/_git/repo"
+        assert result == "https://PersonalAccessToken:test-pat-token@dev.azure.com/org/project/_git/repo"
 
     def test_embed_pat_in_url_already_has_auth(self):
         """Test embedding PAT when URL already has authentication."""
@@ -27,7 +27,7 @@ class TestHelperFunctions:
         pat = "test-pat-token"
         
         result = embed_pat_in_url(url, pat)
-        assert result == "https://test-pat-token@dev.azure.com/org/project/_git/repo"
+        assert result == "https://PersonalAccessToken:test-pat-token@dev.azure.com/org/project/_git/repo"
 
     def test_embed_pat_in_url_ssh(self):
         """Test that SSH URLs are not modified."""

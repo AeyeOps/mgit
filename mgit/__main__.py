@@ -31,6 +31,7 @@ from azure.devops.exceptions import ClientRequestError, AzureDevOpsAuthenticatio
 # Local imports - Sprint 3A integrations
 from mgit.git import GitManager, embed_pat_in_url, sanitize_repo_name
 from mgit.utils import AsyncExecutor
+from mgit.providers.manager import ProviderManager
 from mgit.exceptions import (
     MgitError,
     ConfigurationError,
@@ -59,6 +60,8 @@ from mgit.providers import (
     PermissionError,
     APIError,
 )
+from mgit.providers.manager import ProviderManager
+from mgit.legacy.azdevops_manager import AzDevOpsManager
 
 __version__ = "0.2.1"
 
@@ -263,75 +266,8 @@ def main_options(
 
 
 # -----------------------------------------------------------------------------
-# Azure DevOps Manager
+# Azure DevOps Manager - moved to mgit.legacy.azdevops_manager
 # -----------------------------------------------------------------------------
-class AzDevOpsManager:
-    def __init__(self, organization_url: Optional[str] = None, pat: Optional[str] = None):
-        # Get organization URL and PAT, prioritizing arguments, then config/env
-        self.ado_org = organization_url or get_config_value("AZURE_DEVOPS_ORG_URL")
-        self.ado_pat = pat or get_config_value("AZURE_DEVOPS_EXT_PAT")
-
-        # Ensure the URL is properly formatted
-        if self.ado_org and not self.ado_org.startswith(("http://", "https://")):
-            self.ado_org = f"https://{self.ado_org}"
-
-        self.connection: Optional[Connection] = None
-        self.core_client: Optional[CoreClient] = None
-        self.git_client: Optional[GitClient] = None
-
-        if not self.ado_org or not self.ado_pat:
-            logger.debug("Organization URL or PAT not provided. Cannot initialize SDK connection.")
-            # Allow initialization but connection will fail later if needed
-            return
-
-        try:
-            # Initialize connection
-            credentials = BasicAuthentication('', self.ado_pat)
-            self.connection = Connection(base_url=self.ado_org, creds=credentials)
-
-            # Get clients
-            self.core_client = self.connection.clients.get_core_client()
-            self.git_client = self.connection.clients.get_git_client()
-            logger.debug("Azure DevOps SDK connection and clients initialized for %s", self.ado_org)
-        except Exception as e:
-            logger.error("Failed to initialize Azure DevOps SDK connection: %s", e)
-            # Set clients to None to indicate failure
-            self.connection = None
-            self.core_client = None
-            self.git_client = None
-            # Don't raise here, let commands handle the lack of connection
-
-    def test_connection(self) -> bool:
-        """Tests the SDK connection by trying to list projects."""
-        if not self.core_client:
-            logger.error("Cannot test connection: SDK client not initialized.")
-            return False
-        try:
-            # A simple call to verify authentication and connection
-            self.core_client.get_projects()
-            logger.debug("SDK connection test successful.")
-            return True
-        except (AzureDevOpsAuthenticationError, ClientRequestError) as e:
-            logger.error("SDK connection test failed: %s", e)
-            return False
-        except Exception as e:
-            logger.error("Unexpected error during SDK connection test: %s", e)
-            return False
-
-    def get_project(self, project_name_or_id: str) -> Optional[TeamProjectReference]:
-        """Get project details by name or ID."""
-        if not self.core_client:
-            logger.error("Cannot get project: SDK client not initialized.")
-            return None
-        try:
-            return self.core_client.get_project(project_name_or_id)
-        except Exception as e:
-            logger.error(f"Failed to get project '{project_name_or_id}': {e}")
-            return None
-
-    # Removed check_az_cli_installed and ensure_ado_ext_installed
-    # Removed is_logged_into_az_devops and login_to_az_devops (handled by __init__ and test_connection)
-    # Removed configure_az_devops (handled by SDK client initialization)
 
 
 # -----------------------------------------------------------------------------
@@ -436,15 +372,21 @@ class UpdateMode(str, Enum):
 @app.command()
 def clone_all(
     project: str = typer.Argument(
-        ..., help="Azure DevOps project name."
+        ..., help="Project name (DevOps project, GitHub org/user, or BitBucket workspace)."
     ),
     rel_path: str = typer.Argument(
         ..., help="Relative path to clone into."
     ),
     url: Optional[str] = typer.Argument(
         None,
-        help="Organization URL (defaults to "
-        f"{DEFAULT_VALUES['AZURE_DEVOPS_ORG_URL']} if not provided).",
+        help="Organization URL (auto-detects provider if provided, "
+        f"defaults to {DEFAULT_VALUES['AZURE_DEVOPS_ORG_URL']} for backward compatibility).",
+    ),
+    provider: Optional[str] = typer.Option(
+        None,
+        "--provider",
+        "-p",
+        help="Git provider (azuredevops, github, bitbucket). Auto-detected from URL if not specified.",
     ),
     concurrency: int = typer.Option(
         int(get_config_value("DEFAULT_CONCURRENCY", "4")),
@@ -465,60 +407,62 @@ def clone_all(
     ),
 ):
     """
-    Clone all repositories from Azure DevOps project.
+    Clone all repositories from a git provider project/organization.
+    
+    Supports Azure DevOps, GitHub, and BitBucket providers.
+    Provider is auto-detected from URL or can be specified explicitly.
     """
 
-    # Determine organization URL
-    org_url = url or get_config_value("AZURE_DEVOPS_ORG_URL")
-    if not org_url:
-        logger.error("Azure DevOps organization URL is not configured. Use --url or set AZURE_DEVOPS_ORG_URL.")
+    # Initialize provider manager with provider selection
+    try:
+        # Auto-detect or use explicit provider
+        if provider:
+            provider_manager = ProviderManager(provider_type=provider)
+        elif url:
+            provider_manager = ProviderManager(auto_detect_url=url)
+        else:
+            # Default to Azure DevOps for backward compatibility
+            provider_manager = ProviderManager(provider_type="azuredevops")
+            
+        logger.debug(f"Using provider: {provider_manager.provider_type}")
+        
+        # Check if provider is supported
+        if not provider_manager.supports_provider():
+            logger.error(
+                f"Provider {provider_manager.provider_type} is not fully implemented yet. "
+                "Fully supported: Azure DevOps. In development: GitHub, BitBucket"
+            )
+            raise typer.Exit(code=1)
+            
+        # Test connection
+        if not provider_manager.test_connection():
+            logger.error(
+                f"Failed to connect or authenticate to {provider_manager.provider_type}. "
+                "Please check your configuration and credentials."
+            )
+            raise typer.Exit(code=1)
+            
+    except Exception as e:
+        logger.error(f"Provider initialization failed: {e}")
         raise typer.Exit(code=1)
-
-    # Initialize managers
-    ado = AzDevOpsManager(organization_url=org_url) # PAT is picked up from env/config by default
+        
     git_manager = GitManager()
-
-    # Check connection/authentication
-    if not ado.connection or not ado.git_client or not ado.core_client:
-         logger.error(
-             "Failed to initialize Azure DevOps SDK connection. "
-             "Ensure AZURE_DEVOPS_ORG_URL and AZURE_DEVOPS_EXT_PAT are correctly set."
-         )
-         raise typer.Exit(code=1)
-
-    if not ado.test_connection():
-        logger.error(
-            "Failed to connect or authenticate to Azure DevOps at %s. "
-            "Ensure PAT is valid and has correct permissions.",
-            ado.ado_org
-        )
-        raise typer.Exit(code=1)
-
-    # Get project ID
-    logger.debug(f"Fetching project details for: {project}")
-    project_details = ado.get_project(project)
-    if not project_details:
-        logger.error(f"Could not find project '{project}' in organization '{ado.ado_org}'.")
-        raise typer.Exit(code=1)
-    project_id = project_details.id
-    logger.debug(f"Found project ID: {project_id}")
 
 
     # Prepare local folder
     target_path = Path.cwd() / rel_path
     target_path.mkdir(parents=True, exist_ok=True)
 
-    # List repos using SDK
-    logger.debug(f"Fetching repository list for project ID: {project_id}...")
+    # List repositories using provider manager
+    logger.debug(f"Fetching repository list for project: {project}...")
     try:
-        # Note: The SDK returns GitRepository objects directly
-        repos: list[GitRepository] = ado.git_client.get_repositories(project=project_id)
-        logger.info(f"Found {len(repos)} repositories in project '{project}'.")
+        repositories = provider_manager.list_repositories(project)
+        logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
     except Exception as e:
-        logger.error(f"Error fetching repository list via SDK: {e}")
+        logger.error(f"Error fetching repository list: {e}")
         raise typer.Exit(code=1)
 
-    if not repos:
+    if not repositories:
         logger.info(f"No repositories found in project '{project}'.")
         return # Exit gracefully if no repos
 
@@ -529,8 +473,8 @@ def clone_all(
     dirs_to_remove = []
     if update_mode == UpdateMode.force:
         logger.debug("Checking for existing directories to remove (force mode)...")
-        for repo in repos:
-            repo_url = repo.remote_url
+        for repo in repositories:
+            repo_url = repo.clone_url
             sanitized_name = sanitize_repo_name(repo_url)
             repo_folder = target_path / sanitized_name
             if repo_folder.exists():
@@ -564,12 +508,12 @@ def clone_all(
         with Progress() as progress:
             overall_task_id = progress.add_task(
                 "[green]Processing Repositories...",
-                total=len(repos),
+                total=len(repositories),
             )
 
-            async def process_one_repo(repo: GitRepository): # repo is now a GitRepository object
+            async def process_one_repo(repo): # repo is now a Repository object
                 repo_name = repo.name
-                repo_url = repo.remote_url # Use remote_url from SDK object
+                repo_url = repo.clone_url # Use clone_url from Repository object
                 is_disabled = repo.is_disabled # Use is_disabled attribute
                 display_name = repo_name[:30] + "..." if len(repo_name) > 30 else repo_name
 
@@ -648,7 +592,13 @@ def clone_all(
                     # - Folder didn't exist OR
                     # - Force mode was confirmed AND removal succeeded
                     progress.update(repo_task_id, description=f"[cyan]Cloning: {display_name}...", visible=True)
-                    pat_url = embed_pat_in_url(repo_url, ado.ado_pat) # Use PAT from AzDevOpsManager instance
+                    # Get PAT from provider manager for URL embedding
+                    if provider_manager.provider_type == "azuredevops":
+                        legacy_manager = provider_manager.get_legacy_manager()
+                        pat_url = embed_pat_in_url(repo_url, legacy_manager.ado_pat) if legacy_manager else repo_url
+                    else:
+                        # For other providers, use the clone URL as-is (PAT should be in config)
+                        pat_url = repo_url
                     try:
                         # Use the sanitized name for the directory argument
                         await git_manager.git_clone(pat_url, target_path, sanitized_name)
@@ -664,8 +614,8 @@ def clone_all(
 
                     progress.advance(overall_task_id, 1)
 
-            # Iterate through the GitRepository objects from the SDK
-            await asyncio.gather(*(process_one_repo(repo) for repo in repos))
+            # Iterate through the Repository objects from provider manager
+            await asyncio.gather(*(process_one_repo(repo) for repo in repositories))
 
     logger.info(
         "Processing all repositories for project: "
@@ -693,143 +643,266 @@ def clone_all(
 @app.command()
 def pull_all(
     project: str = typer.Argument(
-        ..., help="Azure DevOps project name."
+        ..., help="Project name (DevOps project, GitHub org/user, or BitBucket workspace)."
     ),
     rel_path: str = typer.Argument(
         ..., help="Relative path where repositories exist."
     ),
+    provider: Optional[str] = typer.Option(
+        None,
+        "--provider",
+        "-p",
+        help="Git provider (azuredevops, github, bitbucket). Defaults to azuredevops for backward compatibility.",
+    ),
+    concurrency: int = typer.Option(
+        int(get_config_value("DEFAULT_CONCURRENCY", "4")),
+        "--concurrency",
+        "-c",
+        help="Number of concurrent pull operations.",
+    ),
+    update_mode: UpdateMode = typer.Option(
+        get_config_value("DEFAULT_UPDATE_MODE", "skip"),
+        "--update-mode",
+        "-u",
+        help=(
+            "How to handle existing folders: "
+            "'skip' => do nothing if folder exists, "
+            "'pull' => attempt a 'git pull' if it's a valid repo, "
+            "'force' => remove the folder and clone fresh."
+        ),
+    ),
 ):
     """
-    Pull the latest changes for all repositories
-    in the specified relative path.
+    Pull the latest changes for all repositories in the specified path.
+    
+    Supports Azure DevOps, GitHub, and BitBucket providers.
+    Provider is auto-detected from URL or can be specified explicitly.
     """
-    # Determine organization URL (needed for AzDevOpsManager initialization)
-    org_url = get_config_value("AZURE_DEVOPS_ORG_URL")
-    if not org_url:
-        logger.error("Azure DevOps organization URL is not configured. Set AZURE_DEVOPS_ORG_URL.")
-        raise typer.Exit(code=1)
 
-    # Initialize managers
-    ado = AzDevOpsManager(organization_url=org_url)
+    # Initialize provider manager with provider selection
+    try:
+        # Use explicit provider
+        provider_manager = ProviderManager(provider_type=provider or "azuredevops")
+            
+        logger.debug(f"Using provider: {provider_manager.provider_type}")
+        
+        # Check if provider is supported
+        if not provider_manager.supports_provider():
+            logger.error(
+                f"Provider {provider_manager.provider_type} is not fully implemented yet. "
+                "Fully supported: Azure DevOps. In development: GitHub, BitBucket"
+            )
+            raise typer.Exit(code=1)
+            
+        # Test connection
+        if not provider_manager.test_connection():
+            logger.error(
+                f"Failed to connect or authenticate to {provider_manager.provider_type}. "
+                "Please check your configuration and credentials."
+            )
+            raise typer.Exit(code=1)
+            
+    except Exception as e:
+        logger.error(f"Provider initialization failed: {e}")
+        raise typer.Exit(code=1)
+        
     git_manager = GitManager()
 
-    # Check connection/authentication
-    if not ado.connection or not ado.git_client or not ado.core_client:
-         logger.error(
-             "Failed to initialize Azure DevOps SDK connection. "
-             "Ensure AZURE_DEVOPS_ORG_URL and AZURE_DEVOPS_EXT_PAT are correctly set."
-         )
-         raise typer.Exit(code=1)
-
-    if not ado.test_connection():
-        logger.error(
-            "Failed to connect or authenticate to Azure DevOps at %s. "
-            "Ensure PAT is valid and has correct permissions.",
-            ado.ado_org
-        )
-        raise typer.Exit(code=1)
-
-    # Get project ID
-    logger.debug(f"Fetching project details for: {project}")
-    project_details = ado.get_project(project)
-    if not project_details:
-        logger.error(f"Could not find project '{project}' in organization '{ado.ado_org}'.")
-        raise typer.Exit(code=1)
-    project_id = project_details.id
-    logger.debug(f"Found project ID: {project_id}")
-
-    # Check target path
+    # Prepare local folder
     target_path = Path.cwd() / rel_path
-    if not target_path.exists() or not target_path.is_dir():
-        logger.error(f"Target path does not exist or is not a directory: {target_path}")
+    if not target_path.exists():
+        if update_mode == UpdateMode.force:
+            target_path.mkdir(parents=True, exist_ok=True)
+        else:
+            logger.error(f"Target path does not exist: {target_path}")
+            raise typer.Exit(code=1)
+    elif not target_path.is_dir():
+        logger.error(f"Target path is not a directory: {target_path}")
         raise typer.Exit(code=1)
 
-    # List repos using SDK
-    logger.debug(f"Fetching repository list for project ID: {project_id}...")
+    # List repositories using provider manager
+    logger.debug(f"Fetching repository list for project: {project}...")
     try:
-        repos: list[GitRepository] = ado.git_client.get_repositories(project=project_id)
-        logger.info(f"Found {len(repos)} repositories in project '{project}' to check for pulling.")
+        repositories = provider_manager.list_repositories(project)
+        logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
     except Exception as e:
-        logger.error(f"Error fetching repository list via SDK: {e}")
+        logger.error(f"Error fetching repository list: {e}")
         raise typer.Exit(code=1)
 
-    if not repos:
+    if not repositories:
         logger.info(f"No repositories found in project '{project}'.")
-        return
+        return # Exit gracefully if no repos
 
-    async def do_pulls():
-        failures = []
-        repo_tasks = {} # Keep track of individual repo tasks
+    failures = []
+    confirmed_force_remove = False # Flag to track user confirmation
 
-        # Use Progress bar for visual feedback
+    # --- Pre-check for force mode ---
+    dirs_to_remove = []
+    if update_mode == UpdateMode.force:
+        logger.debug("Checking for existing directories to remove (force mode)...")
+        for repo in repositories:
+            repo_url = repo.clone_url
+            sanitized_name = sanitize_repo_name(repo_url)
+            repo_folder = target_path / sanitized_name
+            if repo_folder.exists():
+                dirs_to_remove.append((repo.name, sanitized_name, repo_folder))
+
+        if dirs_to_remove:
+            console.print("[bold yellow]Force mode selected. The following existing directories will be REMOVED:[/bold yellow]")
+            for _, s_name, _ in dirs_to_remove:
+                console.print(f" - {s_name}")
+            if Confirm.ask("Proceed with removing these directories and cloning fresh?", default=False):
+                confirmed_force_remove = True
+                logger.info("User confirmed removal of existing directories.")
+            else:
+                logger.warning("User declined removal. Force mode aborted for existing directories.")
+                # Optionally, switch mode or just let the tasks skip later
+                # For simplicity, we'll let the tasks handle skipping based on confirmed_force_remove flag
+    # --- End Pre-check ---
+
+    async def do_operations():
+        """
+        Process repos asynchronously with a concurrency
+        limit and a progress bar. Also embed the PAT in the remote URL.
+        Handle each repo's failure gracefully, storing it in 'failures'.
+        """
+        sem = asyncio.Semaphore(concurrency)
+
+        # Keep track of individual repo tasks
+        repo_tasks = {}
+
         with Progress() as progress:
-            overall_task_id = progress.add_task("[cyan]Pulling repositories...", total=len(repos))
+            overall_task_id = progress.add_task(
+                "[green]Processing Repositories...",
+                total=len(repositories),
+            )
 
-            for repo in repos: # repo is GitRepository object
+            async def process_one_repo(repo): # repo is now a Repository object
                 repo_name = repo.name
-                repo_url = repo.remote_url # Needed for sanitization consistency
-                is_disabled = repo.is_disabled
+                repo_url = repo.clone_url # Use clone_url from Repository object
+                is_disabled = repo.is_disabled # Use is_disabled attribute
                 display_name = repo_name[:30] + "..." if len(repo_name) > 30 else repo_name
 
-                # Add task for this repo
+                # Add a task for this specific repo early
                 repo_task_id = progress.add_task(f"[grey50]Pending: {display_name}[/grey50]", total=1, visible=True)
                 repo_tasks[repo_name] = repo_task_id
 
-                if is_disabled:
-                    logger.info(f"Skipping disabled repository: {repo_name}")
-                    failures.append((repo_name, "repository is disabled"))
-                    progress.update(repo_task_id, description=f"[yellow]Disabled: {display_name}[/yellow]", completed=1)
-                    progress.advance(overall_task_id, 1)
-                    continue
+                async with sem:
+                    # Check if repository is disabled
+                    if is_disabled:
+                        logger.info(f"Skipping disabled repository: {repo_name}")
+                        failures.append((repo_name, "repository is disabled"))
+                        progress.update(repo_task_id, description=f"[yellow]Disabled: {display_name}[/yellow]", completed=1)
+                        progress.advance(overall_task_id, 1)
+                        return
 
-                # Use sanitized name to find the local directory, consistent with clone_all
-                sanitized_name = sanitize_repo_name(repo_url)
-                if sanitized_name != repo_name:
-                    logger.debug(
-                        f"Checking sanitized path '{sanitized_name}' for repository '{repo_name}'"
-                    )
+                    # Sanitize the repository name for filesystem use
+                    # Use the actual repo name for the folder, sanitize the URL for logging/cloning if needed
+                    # but the folder name should match the repo name ideally.
+                    # Let's use the sanitized name based on the URL for consistency with previous behavior.
+                    sanitized_name = sanitize_repo_name(repo_url)
+                    if sanitized_name != repo_name:
+                         logger.debug(
+                             f"Using sanitized name '{sanitized_name}' for repository '{repo_name}' folder"
+                         )
 
-                repo_dir = target_path / sanitized_name
-                if (
-                    repo_dir.exists()
-                    and (repo_dir / ".git").exists()
-                ):
+                    repo_folder = target_path / sanitized_name
+                    # Decide how to handle if folder already exists
+                    if repo_folder.exists():
+                        if update_mode == UpdateMode.skip:
+                            logger.info(f"Skipping existing repo folder: {sanitized_name}")
+                            progress.update(repo_task_id, description=f"[blue]Skipped (exists): {display_name}[/blue]", completed=1)
+                            progress.advance(overall_task_id, 1)
+                            return
+                        elif update_mode == UpdateMode.pull:
+                            progress.update(repo_task_id, description=f"[cyan]Pulling: {display_name}...", visible=True)
+                            if (
+                                repo_folder / ".git"
+                            ).exists():
+                                # Attempt to do a pull
+                                try:
+                                    await git_manager.git_pull(repo_folder)
+                                    progress.update(repo_task_id, description=f"[green]Pulled (update): {display_name}[/green]", completed=1)
+                                except subprocess.CalledProcessError as e:
+                                    logger.warning(f"Pull failed for {repo_name}: {e}")
+                                    failures.append((repo_name, "pull failed"))
+                                    progress.update(repo_task_id, description=f"[red]Pull Failed (update): {display_name}[/red]", completed=1)
+                            else:
+                                msg = "Folder exists but is not a git repo."
+                                logger.warning(f"{repo_name}: {msg}")
+                                failures.append((repo_name, msg))
+                                progress.update(repo_task_id, description=f"[yellow]Skipped (not repo): {display_name}[/yellow]", completed=1)
+                            progress.advance(overall_task_id, 1)
+                            return
+                        elif update_mode == UpdateMode.force:
+                            # Check if removal was confirmed AND this dir was marked
+                            should_remove = confirmed_force_remove and any(rf == repo_folder for _, _, rf in dirs_to_remove)
+                            if should_remove:
+                                progress.update(repo_task_id, description=f"[magenta]Removing: {display_name}...", visible=True)
+                                logger.info(f"Removing existing folder: {sanitized_name}")
+                                try:
+                                    shutil.rmtree(repo_folder)
+                                    # Removal successful, fall through to clone
+                                except Exception as e:
+                                    failures.append((repo_name, f"Failed removing old folder: {e}"))
+                                    progress.update(repo_task_id, description=f"[red]Remove Failed: {display_name}[/red]", completed=1)
+                                    progress.advance(overall_task_id, 1)
+                                    return
+                            else:
+                                # Either user declined or this specific folder wasn't marked (shouldn't happen with current logic, but safe check)
+                                logger.warning(f"Skipping removal of existing folder (not confirmed): {sanitized_name}")
+                                progress.update(repo_task_id, description=f"[blue]Skipped (force declined/not applicable): {display_name}[/blue]", completed=1)
+                                progress.advance(overall_task_id, 1)
+                                return
+                    # If we made it here:
+                    # - Folder didn't exist OR
+                    # - Force mode was confirmed AND removal succeeded
+                    progress.update(repo_task_id, description=f"[cyan]Cloning: {display_name}...", visible=True)
+                    # Get PAT from provider manager for URL embedding
+                    if provider_manager.provider_type == "azuredevops":
+                        legacy_manager = provider_manager.get_legacy_manager()
+                        pat_url = embed_pat_in_url(repo_url, legacy_manager.ado_pat) if legacy_manager else repo_url
+                    else:
+                        # For other providers, use the clone URL as-is (PAT should be in config)
+                        pat_url = repo_url
                     try:
-                        progress.update(repo_task_id, description=f"[cyan]Pulling: {display_name}...", visible=True)
-                        await git_manager.git_pull(repo_dir)
-                        progress.update(repo_task_id, description=f"[green]Pulled: {display_name}[/green]", completed=1)
+                        # Use the sanitized name for the directory argument
+                        await git_manager.git_clone(pat_url, target_path, sanitized_name)
+                        progress.update(repo_task_id, description=f"[green]Cloned: {display_name}[/green]", completed=1)
                     except subprocess.CalledProcessError as e:
-                        logger.warning(f"Pull failed for {repo_name}: {e}")
-                        failures.append((repo_name, "pull failed"))
-                        progress.update(repo_task_id, description=f"[red]Pull Failed: {display_name}[/red]", completed=1)
-                else:
-                    logger.warning(f"Repository path is missing or not a git repo: {repo_dir}")
-                    failures.append((repo_name, "local directory missing or not a git repo"))
-                    progress.update(repo_task_id, description=f"[yellow]Skipped (missing): {display_name}[/yellow]", completed=1)
+                        logger.warning(f"Clone failed for {repo_name}: {e}")
+                        failures.append((repo_name, "clone failed"))
+                        progress.update(repo_task_id, description=f"[red]Clone Failed: {display_name}[/red]", completed=1)
 
-                progress.advance(overall_task_id, 1) # Advance overall progress
+                    progress.advance(overall_task_id, 1)
 
-        if failures:
-            logger.warning(
-                "Some repositories had issues during pull:"
-            )
-            for name, reason in failures:
-                logger.warning(f" - {name}: {reason}")
-        else:
-            logger.info(
-                "All repositories have been pulled successfully."
-            )
+            # Iterate through the Repository objects from provider manager
+            await asyncio.gather(*(process_one_repo(repo) for repo in repositories))
 
     logger.info(
-        f"Pulling all repositories for project: {project} in '{target_path}'"
+        "Processing all repositories for project: "
+        "%s into '%s' with update_mode='%s'",
+        project,
+        target_path,
+        update_mode,
     )
-    asyncio.run(do_pulls())
+    asyncio.run(do_operations())
+
+    # Summarize
+    if failures:
+        logger.warning("Some repositories had issues:")
+        for repo_name, reason in failures:
+            logger.warning(f" - {repo_name}: {reason}")
+    else:
+        logger.info(
+            "All repositories processed successfully with no errors."
+        )
 
 
 # -----------------------------------------------------------------------------
 # generate_env Command
 # -----------------------------------------------------------------------------
-@app.command(help="Generate a sample environment file with configuration options.")
+@app.command(help="Generate a sample environment file with configuration options for multiple git providers.")
 def generate_env():
     """
     Generate a detailed sample environment file with all configuration options.
@@ -838,19 +911,29 @@ def generate_env():
     comments explaining each configuration option. Users can copy this file
     to .env to set local environment variables.
     """
-    env_content = """# Azure DevOps CLI Configuration Sample
+    env_content = """# Multi-Git CLI Configuration Sample
 # Copy this file to .env to configure environment variables
-# Or use ~/.config/ado-cli/config for global settings
+# Or use ~/.config/mgit/config for global settings
 
-# Azure DevOps organization URL (required)
-AZURE_DEVOPS_ORG_URL=https://www.visualstudio.com
+# ===== Provider Configuration =====
+# mgit supports multiple git providers: Azure DevOps, GitHub, and BitBucket
 
-# Personal Access Token for authentication (required)
-# Can also be set in ~/.config/ado-cli/config
-AZURE_DEVOPS_EXT_PAT=<YOUR_PERSONAL_ACCESS_TOKEN>
+# Azure DevOps Configuration
+AZURE_DEVOPS_ORG_URL=https://dev.azure.com/your-org
+AZURE_DEVOPS_EXT_PAT=<YOUR_AZURE_PAT>
 
-# Log file name (default: ado-cli.log)
-LOG_FILENAME=ado-cli.log
+# GitHub Configuration
+GITHUB_ORG_URL=https://github.com/your-org
+GITHUB_PAT=<YOUR_GITHUB_PAT>
+
+# BitBucket Configuration
+BITBUCKET_ORG_URL=https://bitbucket.org/your-workspace
+BITBUCKET_APP_PASSWORD=<YOUR_BITBUCKET_APP_PASSWORD>
+
+# ===== Default Settings =====
+
+# Log file name (default: mgit.log)
+LOG_FILENAME=mgit.log
 
 # Logging level for file logs (DEBUG, INFO, WARNING, ERROR)
 LOG_LEVEL=DEBUG
@@ -867,6 +950,9 @@ DEFAULT_CONCURRENCY=4
 # - pull: Try to git pull if it's a valid git repository
 # - force: Remove existing folder and clone fresh
 DEFAULT_UPDATE_MODE=skip
+
+# Default provider (azuredevops, github, bitbucket)
+DEFAULT_PROVIDER=azuredevops
 """
 
     counter = 0
@@ -890,75 +976,118 @@ def gen_env():
 # -----------------------------------------------------------------------------
 # login Command
 # -----------------------------------------------------------------------------
-@app.command(help="Login to Azure DevOps and validate credentials.")
+@app.command(help="Login to git provider and validate credentials. Supports Azure DevOps, GitHub, and BitBucket.")
 def login(
-    organization: Optional[str] = typer.Option(
-        None, "--org", "-o", help="Azure DevOps organization URL (optional, uses config/env if not provided)."
+    provider: Optional[str] = typer.Option(
+        "azuredevops", "--provider", "-p", help="Git provider (azuredevops, github, bitbucket)."
     ),
-    pat: Optional[str] = typer.Option(
-        None, "--pat", "-p", help="Personal Access Token (optional, uses config/env if not provided)."
+    organization: Optional[str] = typer.Option(
+        None, "--org", "-o", help="Provider organization/workspace URL (optional, uses config/env if not provided)."
+    ),
+    token: Optional[str] = typer.Option(
+        None, "--token", "-t", help="Access token (PAT/API token, optional, uses config/env if not provided)."
     ),
     store: bool = typer.Option(
         False, # Default to False for explicit login command
         "--store/--no-store",
-        help="Store provided credentials in global config file (~/.config/ado-cli/config)."
+        help="Store provided credentials in global config file (~/.config/mgit/config)."
     )
 ):
     """
-    Validate Azure DevOps credentials and optionally store them.
+    Validate git provider credentials and optionally store them.
 
-    Tests connection using PAT from arguments, environment variables,
+    Tests connection using credentials from arguments, environment variables,
     or global config file. If --store is used, saves the provided
-    (or discovered) organization URL and PAT to the global config.
+    (or discovered) credentials to the global config.
     """
-    # Initialize with provided args (or None to use config/env)
-    ado = AzDevOpsManager(organization_url=organization, pat=pat)
+    # Create provider manager for selected provider
+    provider_config = {}
+    if organization:
+        provider_config["organization_url"] = organization
+    if token:
+        provider_config["pat"] = token
+    
+    provider_manager = ProviderManager(
+        provider_type=provider,
+        config=provider_config
+    )
 
-    # Prompt if still missing after checking args/config/env
-    if not ado.ado_org:
-         ado.ado_org = typer.prompt(
-             "Enter Azure DevOps organization URL",
-             default=DEFAULT_VALUES["AZURE_DEVOPS_ORG_URL"]
-         )
-         # Re-initialize if org was prompted
-         ado = AzDevOpsManager(organization_url=ado.ado_org, pat=ado.ado_pat)
-
-    if not ado.ado_pat:
-         ado.ado_pat = typer.prompt(
-             "Enter Personal Access Token (PAT)",
-             hide_input=True
-         )
-         # Re-initialize if PAT was prompted
-         ado = AzDevOpsManager(organization_url=ado.ado_org, pat=ado.ado_pat)
-
-    # Ensure URL format is correct after potential prompt
-    if ado.ado_org and not ado.ado_org.startswith(("http://", "https://")):
-        ado.ado_org = f"https://{ado.ado_org}"
-        # Re-initialize if URL format changed
-        ado = AzDevOpsManager(organization_url=ado.ado_org, pat=ado.ado_pat)
-
-
-    # Test the connection
-    if ado.test_connection():
-        console.print(f"[green]✓[/green] Successfully connected to Azure DevOps organization: {ado.ado_org}")
-
-        # Store credentials if requested and if they were provided/discovered
-        if store and ado.ado_org and ado.ado_pat:
-            should_store = True
-            if CONFIG_FILE.exists():
-                 # Ask for confirmation before overwriting
-                 should_store = Confirm.ask(f"Overwrite existing credentials in {CONFIG_FILE}?", default=False)
-
-            if should_store:
-                # Use the potentially prompted/formatted values
-                store_credentials(ado.ado_org, ado.ado_pat)
+    # Check if provider is supported, fallback to legacy for Azure DevOps
+    try:
+        provider_supported = provider_manager.supports_provider()
+    except Exception as e:
+        # Configuration error or other validation issue
+        console.print(f"[red]✗[/red] Provider configuration error: {e}")
+        raise typer.Exit(code=1)
+        
+    if not provider_supported:
+        if provider == "azuredevops":
+            # Use legacy Azure DevOps manager
+            ado = AzDevOpsManager(organization_url=organization, pat=token)
+            
+            # Prompt if still missing after checking args/config/env
+            if not ado.ado_org:
+                ado.ado_org = typer.prompt(
+                    "Enter Azure DevOps organization URL",
+                    default=DEFAULT_VALUES["AZURE_DEVOPS_ORG_URL"]
+                )
+                # Re-initialize if org was prompted
+                ado = AzDevOpsManager(organization_url=ado.ado_org, pat=ado.ado_pat)
+            
+            if not ado.ado_pat:
+                ado.ado_pat = typer.prompt(
+                    "Enter Personal Access Token (PAT)",
+                    hide_input=True
+                )
+                # Re-initialize if PAT was prompted
+                ado = AzDevOpsManager(organization_url=ado.ado_org, pat=ado.ado_pat)
+            
+            # Ensure URL format is correct after potential prompt
+            if ado.ado_org and not ado.ado_org.startswith(("http://", "https://")):
+                ado.ado_org = f"https://{ado.ado_org}"
+                # Re-initialize if URL format changed
+                ado = AzDevOpsManager(organization_url=ado.ado_org, pat=ado.ado_pat)
+            
+            # Test the connection
+            if ado.test_connection():
+                console.print(f"[green]✓[/green] Successfully connected to Azure DevOps organization: {ado.ado_org}")
+                
+                # Store credentials if requested and if they were provided/discovered
+                if store and ado.ado_org and ado.ado_pat:
+                    should_store = True
+                    if CONFIG_FILE.exists():
+                        # Ask for confirmation before overwriting
+                        should_store = Confirm.ask(f"Overwrite existing credentials in {CONFIG_FILE}?", default=False)
+                    if should_store:
+                        # Use the potentially prompted/formatted values
+                        store_credentials(ado.ado_org, ado.ado_pat)
+                    else:
+                        console.print("[yellow]Credentials not stored.[/yellow]")
+                elif store:
+                    logger.warning("Could not store credentials as organization URL or PAT was missing.")
             else:
-                console.print("[yellow]Credentials not stored.[/yellow]")
-        elif store:
-             logger.warning("Could not store credentials as organization URL or PAT was missing.")
-
-    else:
-        console.print(f"[red]✗[/red] Failed to connect/authenticate to {ado.ado_org}. Please check URL and PAT.")
+                console.print(f"[red]✗[/red] Failed to connect/authenticate to {ado.ado_org}. Please check URL and PAT.")
+                raise typer.Exit(code=1)
+            return
+        else:
+            console.print(f"[red]✗[/red] Provider '{provider}' is not yet fully implemented.")
+            console.print(f"[yellow]Available providers: {', '.join(provider_manager.list_supported_providers())}[/yellow]")
+            raise typer.Exit(code=1)
+    
+    # Use new provider system
+    try:
+        # Test connection with the provider
+        if provider_manager.test_connection():
+            console.print(f"[green]✓[/green] Successfully connected to {provider} provider")
+            
+            # TODO: Implement credential storage for multi-provider
+            if store:
+                console.print(f"[yellow]Credential storage for {provider} provider not yet implemented.[/yellow]")
+        else:
+            console.print(f"[red]✗[/red] Failed to connect/authenticate to {provider} provider. Please check credentials.")
+            raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"[red]✗[/red] Error testing {provider} provider connection: {e}")
         raise typer.Exit(code=1)
 
 
@@ -988,11 +1117,11 @@ def store_credentials(organization: str, pat: str):
 # -----------------------------------------------------------------------------
 # config Command
 # -----------------------------------------------------------------------------
-@app.command(help="Set or view global configuration settings for ado-cli.")
+@app.command(help="Set or view global configuration settings for mgit.")
 def config(
     show: bool = typer.Option(False, "--show", help="Show current global configuration and exit."),
     organization: Optional[str] = typer.Option(
-        None, "--org", help="Default Azure DevOps organization URL."
+        None, "--org", help="Default organization/workspace URL (provider-specific)."
     ),
     concurrency: Optional[int] = typer.Option(
         None, "--concurrency", help="Default concurrency for clone operations."
@@ -1002,10 +1131,10 @@ def config(
     ),
 ):
     """
-    Configure global settings for ado-cli.
+    Configure global settings for mgit.
 
     This command allows you to set default values for common parameters
-    that will be used across all invocations of ado-cli.
+    that will be used across all invocations of mgit.
     """
     # Create config directory if it doesn't exist
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)

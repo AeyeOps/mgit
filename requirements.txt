@@ -3,6 +3,7 @@ typer>=0.9.0
 python-dotenv>=1.0.0
 rich>=13.6.0
 asyncio>=3.4.3
+aiohttp>=3.9.0
 # For building the executable
 pyinstaller>=6.0.0
 # For testing (when implemented)

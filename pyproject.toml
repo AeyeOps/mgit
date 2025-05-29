@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=45", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -15,7 +15,6 @@ authors = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -23,10 +22,11 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
-    "typer>=0.9.0",
-    "rich>=13.0.0",
+    "aiohttp>=3.9.0",
     "azure-devops>=7.1.0b1",
     "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+    "typer>=0.9.0",
 ]
 
 [project.optional-dependencies]
@@ -68,6 +68,13 @@ python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*", "*Tests"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "unit: marks tests as unit tests",
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow (for long-running tests)",
+    "requires_network: marks tests that require network access",
+]
 addopts = [
     "-v",
     "--strict-markers",

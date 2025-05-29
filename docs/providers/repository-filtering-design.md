@@ -72,56 +72,16 @@ mgit clone-all MyProject ./repos \
 
 ## Filter Configuration Schema
 
-### YAML Configuration Support
+### Configuration Support
 
-```yaml
-# ~/.config/mgit/config.yaml
-settings:
-  # Default filter settings
-  filters:
-    case_sensitive: false
-    use_regex: false  # Use wildcards by default
-    
-providers:
-  github:
-    accounts:
-      work:
-        token: !env GITHUB_TOKEN
-        # Default filters for this account
-        default_filters:
-          include_patterns:
-            - "*-service"
-            - "*-api"
-          exclude_patterns:
-            - "*-deprecated"
-            - "*-archive"
-          languages:
-            - "Python"
-            - "Go"
-          exclude_forks: true
-          exclude_archived: true
-          
-  azuredevops:
-    organizations:
-      myorg:
-        url: https://dev.azure.com/myorg
-        pat: !env AZURE_DEVOPS_PAT
-        default_filters:
-          include_patterns:
-            - "*.Api"
-            - "*.Service"
-          exclude_patterns:
-            - "*.Test"
-            - "*.Deprecated"
+> **NOTE**: The YAML configuration shown below is a proposed design. The actual mgit tool uses a simple key=value configuration format in `~/.config/mgit/config`.
 
-# Named filter sets
-filter_sets:
-  backend:
-    include_patterns: ["*-api", "*-service", "*-worker"]
-    languages: ["Python", "Go", "Java"]
-    exclude_archived: true
-    
-  frontend:
+Currently, filtering is done via command-line arguments. A future enhancement could support filter configurations in a config file:
+
+```bash
+# Potential future configuration format
+# ~/.config/mgit/config
+# Filter settings could be added as environment variables or command aliases
     include_patterns: ["*-ui", "*-web", "*-app"]
     languages: ["JavaScript", "TypeScript"]
     exclude_patterns: ["*-legacy"]

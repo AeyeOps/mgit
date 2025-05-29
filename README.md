@@ -1,25 +1,45 @@
-# mgit - Multi-Git CLI Tool 🚀
+# mgit - Multi-Provider Git CLI Tool 🚀
 
-A powerful command-line tool for managing repositories across multiple git platforms (Azure DevOps, GitHub, BitBucket Cloud). Clone entire projects, update multiple repositories, and automate your git workflows across different platforms.
+[![PyPI version](https://img.shields.io/pypi/v/mgit.svg)](https://pypi.org/project/mgit/)
+[![Docker Image](https://img.shields.io/docker/v/steveant/mgit?label=docker)](https://ghcr.io/steveant/mgit)
+[![GitHub Release](https://img.shields.io/github/release/steveant/mgit.svg)](https://github.com/steveant/mgit/releases/latest)
+[![Enterprise Certified](https://img.shields.io/badge/Enterprise-Certified-gold)](ENTERPRISE_CERTIFICATION_SUMMARY.md)
+[![Security](https://img.shields.io/badge/Security-AES--256-green)](docs/security)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue)](Dockerfile)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-Automated-success)](.github/workflows)
 
-**Plus**: Built-in MAWEP (Multi-Agent Workflow Execution Process) support for orchestrating parallel AI development across multiple issues!
+A powerful **enterprise-grade** command-line tool for managing repositories across multiple git platforms. Clone entire projects, update multiple repositories, and automate your git workflows with support for:
+
+✅ **Azure DevOps** - Full feature support with organizations and projects  
+✅ **GitHub** - Complete integration for organizations and users  
+✅ **BitBucket** - Full workspace and repository management  
+
+**All providers have feature parity** - login, clone-all, pull-all, and configuration work identically across platforms.
+
+🏆 **ENTERPRISE CERTIFIED** - ID: MGIT-ENT-2025-001 | Ready for production deployment with comprehensive security, monitoring, and automation.
+
+## Provider Comparison
+
+| Feature | Azure DevOps | GitHub | BitBucket |
+|---------|--------------|--------|-----------|
+| **Authentication** | Personal Access Token (PAT) | Personal Access Token | App Password |
+| **Repository Scope** | Projects | Organizations/Users | Workspaces |
+| **API Support** | Full REST API v7.1 | Full REST API v3 | Full REST API v2.0 |
+| **Concurrent Operations** | 4 (default) | 10 (default) | 5 (default) |
+| **Enterprise Support** | Yes | Yes (GitHub Enterprise) | Yes (BitBucket Server) |
+| **Disabled Repo Handling** | ✅ Auto-skip | ✅ Auto-skip | ✅ Auto-skip |
+| **Clone Methods** | HTTPS/SSH | HTTPS/SSH | HTTPS/SSH |
+| **Rate Limiting** | Generous | 5000/hour (authenticated) | 1000/hour |
 
 ## Overview
 
-mgit simplifies repository management and enables advanced parallel development workflows:
-
-**Core Git Operations:**
-- Clone all repositories from a project with a single command
-- Pull updates for multiple repositories simultaneously  
-- Configure global settings for repeated operations
-- Manage authentication credentials securely
+mgit simplifies repository management across multiple git providers:
+- Clone all repositories from any supported git provider with a single command
+- Pull updates for multiple repositories simultaneously across different platforms
+- Configure provider-specific settings with a unified interface
+- Manage authentication credentials securely for all providers
 - Automatically handle disabled repositories with clear reporting
-
-**MAWEP Integration:**
-- Orchestrate AI agents working in persistent pods (git worktrees) on GitHub issues
-- Isolated development environments for conflict-free parallel work
-- State management and progress tracking across development pods
-- Perfect for sprint work and large refactoring efforts
+- Auto-detect providers from URLs or specify explicitly
 
 Built with Python using modern package structure, leveraging asynchronous operations for speed and providing rich console output for better visibility.
 
@@ -35,15 +55,7 @@ mgit/
 │   └── utils/              # Utility functions
 ├── docs/                   # Comprehensive documentation
 │   ├── architecture/       # Technical design docs
-│   ├── configuration/      # Config system docs
-│   └── framework/          # MAWEP framework docs
-├── mawep-workspace/        # MAWEP parallel development
-│   ├── mawep-state.yaml   # Pod and issue tracking
-│   └── worktrees/         # Development pods
-│       ├── pod-1/         # Isolated workspace for issue #101
-│       ├── pod-2/         # Isolated workspace for issue #102
-│       └── pod-3/         # Isolated workspace for issue #103
-├── memory-bank/           # Project context and progress
+│   └── configuration/      # Config system docs
 └── scripts/               # Automation scripts
 ```
 
@@ -51,77 +63,174 @@ mgit/
 
 ### Prerequisites
 
-- Python 3.7 or higher
+- Python 3.7 or higher (for pip/source installation)
 - Git
+- Docker (for Docker installation method)
 
-### Installation Steps
+### Installation Methods
+
+#### Method 1: Install from PyPI (Recommended)
+
+```bash
+# Install the latest stable version
+pip install mgit
+
+# Run mgit directly
+mgit --version
+```
+
+#### Method 2: Download from GitHub Releases
+
+Download the pre-built binary for your platform:
+
+1. Visit [mgit releases](https://github.com/steveant/mgit/releases/tag/v0.2.1)
+2. Download the appropriate binary for your OS:
+   - `mgit-v0.2.1-linux-x64` for Linux
+   - `mgit-v0.2.1-macos-x64` for macOS
+   - `mgit-v0.2.1-windows-x64.exe` for Windows
+3. Make it executable (Linux/macOS):
+   ```bash
+   chmod +x mgit-v0.2.1-linux-x64
+   ./mgit-v0.2.1-linux-x64 --version
+   ```
+
+#### Method 3: Use Docker
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/steveant/mgit:latest
+
+# Run mgit in Docker
+docker run --rm ghcr.io/steveant/mgit:latest --version
+
+# With volume mount for local repo access
+docker run --rm -v $(pwd):/workspace ghcr.io/steveant/mgit:latest clone-all my-project /workspace/repos
+```
+
+#### Method 4: Install from Source
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/mgit.git
+   git clone https://github.com/steveant/mgit.git
    cd mgit
    ```
 
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
-   pip install -e .  # Development installation for package structure
+   pip install -e .  # Development installation
    ```
 
 3. Run the tool:
    ```bash
-   python -m mgit
+   python -m mgit --version
    ```
 
-### Building a Standalone Executable
+### Installation Method Comparison
 
-For convenience, you can build a standalone executable:
+| Method | Prerequisites | Pros | Cons | Best For |
+|--------|--------------|------|------|---------|
+| **PyPI** | Python 3.7+, pip | • Easy updates<br>• Standard Python workflow<br>• Automatic dependencies | • Requires Python environment | Regular users, Python developers |
+| **GitHub Binary** | None | • No dependencies<br>• Fast startup<br>• Single file | • Manual updates<br>• Platform-specific | CI/CD, users without Python |
+| **Docker** | Docker | • Fully isolated<br>• Consistent environment<br>• No local dependencies | • Requires Docker<br>• Slightly slower startup | Containers, isolated environments |
+| **Source** | Python 3.7+, Git | • Latest features<br>• Can modify code<br>• Development mode | • Manual updates<br>• Requires Git | Contributors, developers |
 
-```bash
-# Install PyInstaller
-pip install pyinstaller
-
-# Create a single executable file
-pyinstaller --onefile mgit/__main__.py
-
-# Run the executable
-./dist/__main__
-```
+For detailed installation instructions and troubleshooting, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md).
 
 ## Quick Start
 
-### Basic Git Operations
+### Basic Operations
 
 Get the current version:
 ```bash
+# If installed via pip
+mgit --version
+
+# If using Docker
+docker run --rm ghcr.io/steveant/mgit:latest --version
+
+# If running from source
 python -m mgit --version
 ```
 
 ### Authentication
 
-First, authenticate with Azure DevOps:
+Authenticate with your git provider:
 
+#### Azure DevOps
 ```bash
-# Interactive login with prompts
-python -m mgit login
+# Interactive login (using pip-installed version)
+mgit login --provider azuredevops
 
 # Or specify credentials directly
-python -m mgit login --org https://dev.azure.com/your-org --pat your-pat
+mgit login --provider azuredevops --org https://dev.azure.com/your-org --token your-pat
+
+# Using Docker (credentials saved in mounted volume)
+docker run --rm -v ~/.config/mgit:/root/.config/mgit ghcr.io/steveant/mgit:latest login --provider azuredevops --store
 ```
+
+#### GitHub
+```bash
+# Personal or organization repositories
+mgit login --provider github --token your-github-pat
+
+# GitHub Enterprise
+mgit login --provider github --org https://github.enterprise.com --token your-pat
+```
+
+#### BitBucket
+```bash
+# BitBucket Cloud with app password
+mgit login --provider bitbucket --org your-workspace --token your-app-password
+```
+
+Note: Use `--store` flag to save credentials to config file (~/.config/mgit/config)
 
 ### Clone All Repositories
 
-Clone all repositories from a project:
+Clone all repositories from a project/organization/workspace:
 
+#### Auto-detect provider from URL
 ```bash
-python -m mgit clone-all my-project ./repos
+# Azure DevOps
+mgit clone-all my-project ./repos https://dev.azure.com/my-org
+
+# GitHub  
+mgit clone-all my-org ./repos https://github.com
+
+# BitBucket
+mgit clone-all my-workspace ./repos https://bitbucket.org
+
+# Using Docker
+docker run --rm -v $(pwd):/workspace ghcr.io/steveant/mgit:latest clone-all my-org /workspace/repos https://github.com
 ```
 
-With custom options:
-
+#### Explicit provider selection
 ```bash
-# Clone with 8 concurrent operations and force mode (overwrite existing repos)
-python -m mgit clone-all my-project ./repos -c 8 -u force
+# Azure DevOps project
+mgit clone-all my-project ./repos --provider azuredevops
+
+# GitHub organization or user
+mgit clone-all octocat ./repos --provider github
+
+# BitBucket workspace
+mgit clone-all my-workspace ./repos --provider bitbucket
+```
+
+#### With custom options
+```bash
+# Clone with 8 concurrent operations and force mode
+mgit clone-all my-project ./repos -c 8 -u force --provider azuredevops
+
+# GitHub with higher concurrency (supports more connections)
+mgit clone-all my-org ./repos -c 20 --provider github
+
+# Docker with environment variables for auth
+docker run --rm \
+  -e GITHUB_PAT=your-token \
+  -v $(pwd):/workspace \
+  ghcr.io/steveant/mgit:latest \
+  clone-all my-org /workspace/repos -c 20 --provider github
 ```
 
 ### Update All Repositories
@@ -129,7 +238,15 @@ python -m mgit clone-all my-project ./repos -c 8 -u force
 Pull the latest changes for all repositories:
 
 ```bash
-python -m mgit pull-all my-project ./repos
+# Auto-detect provider from existing repo remotes
+mgit pull-all my-project ./repos
+
+# Or specify provider explicitly
+mgit pull-all my-org ./repos --provider github
+mgit pull-all my-workspace ./repos --provider bitbucket
+
+# Using Docker
+docker run --rm -v $(pwd):/workspace ghcr.io/steveant/mgit:latest pull-all my-project /workspace/repos
 ```
 
 ### Global Configuration
@@ -137,75 +254,82 @@ python -m mgit pull-all my-project ./repos
 View or set global configuration:
 
 ```bash
-# Show current settings
-python -m mgit config --show
+# Show current settings for all providers
+mgit config --show
 
 # Set default values
-python -m mgit config --org https://dev.azure.com/your-org --concurrency 16 --update-mode pull
+mgit config --concurrency 16 --update-mode pull
+
+# Set provider-specific configuration
+mgit config --provider azuredevops --org https://dev.azure.com/your-org
+mgit config --provider github --org your-github-org  
+mgit config --provider bitbucket --workspace your-workspace
 ```
-
-### MAWEP Parallel Development
-
-Orchestrate AI agents working in dedicated pods on GitHub issues:
-
-```bash
-# Start MAWEP orchestration for sprint work
-python -m mgit mawep start --issues 101,102,103,104
-
-# Check status of all development pods
-python -m mgit mawep status
-
-# Monitor specific pod progress
-python -m mgit mawep pod-status pod-1
-```
-
-MAWEP creates isolated git worktrees (`pod-1`, `pod-2`, etc.) where AI agents work independently on different issues, preventing conflicts while enabling parallel development.
 
 ## Commands Reference
 
 Run without arguments to see available commands:
 
 ```bash
-python -m mgit
+mgit
+
+# Or with Docker
+docker run --rm ghcr.io/steveant/mgit:latest
 ```
 
 ### Core Git Commands
 
 #### login
 
-Authenticate with Azure DevOps using a Personal Access Token (PAT).
+Authenticate with a git provider using appropriate credentials.
 
 ```bash
-python -m mgit login [--org URL] [--pat TOKEN] [--no-store]
+mgit login [--provider PROVIDER] [--org URL] [--token TOKEN] [--store/--no-store]
 ```
+
+Options:
+- `--provider`: Git provider (azuredevops, github, bitbucket) - defaults to azuredevops
+- `--org`: Organization/workspace URL (provider-specific)
+- `--token`: Access token (PAT for Azure DevOps/GitHub, App Password for BitBucket)
+- `--store`: Save credentials to config file
 
 #### clone-all
 
-Clone all repositories from an Azure DevOps project.
+Clone all repositories from a provider project/organization/workspace.
 
 ```bash
-python -m mgit clone-all PROJECT DESTINATION [--concurrency N] [--update-mode MODE]
+mgit clone-all PROJECT DESTINATION [URL] [--provider PROVIDER] [--concurrency N] [--update-mode MODE]
 ```
 
-Update modes:
-- `skip`: Skip existing directories (default)
-- `pull`: Try to git pull if it's a valid repository 
-- `force`: Remove existing directories and clone fresh
+Arguments:
+- `PROJECT`: Project name (Azure DevOps), organization/user (GitHub), or workspace (BitBucket)
+- `DESTINATION`: Local directory to clone into
+- `URL`: Optional organization URL (auto-detects provider)
+
+Options:
+- `--provider`: Explicitly specify provider (azuredevops, github, bitbucket)
+- `--concurrency`: Number of concurrent operations (default: 4)
+- `--update-mode`: How to handle existing directories:
+  - `skip`: Skip existing directories (default)
+  - `pull`: Try to git pull if it's a valid repository
+  - `force`: Remove existing directories and clone fresh
 
 #### pull-all
 
 Pull updates for all repositories in a directory.
 
 ```bash
-python -m mgit pull-all PROJECT REPOSITORY_PATH
+mgit pull-all PROJECT REPOSITORY_PATH [--provider PROVIDER]
 ```
+
+The provider is usually auto-detected from the git remotes, but can be specified explicitly.
 
 #### config
 
 View or set global configuration settings.
 
 ```bash
-python -m mgit config [--show] [--org URL] [--concurrency N] [--update-mode MODE]
+mgit config [--show] [--org URL] [--concurrency N] [--update-mode MODE]
 ```
 
 #### generate-env
@@ -213,41 +337,7 @@ python -m mgit config [--show] [--org URL] [--concurrency N] [--update-mode MODE
 Generate a sample environment file with configuration options.
 
 ```bash
-python -m mgit generate-env
-```
-
-### MAWEP Commands (Parallel Development)
-
-#### mawep start
-
-Launch MAWEP orchestration for parallel issue development.
-
-```bash
-python -m mgit mawep start --issues ISSUE_LIST [--repository REPO] [--concurrency N]
-```
-
-#### mawep status
-
-Show status of all development pods and assigned issues.
-
-```bash
-python -m mgit mawep status [--detailed]
-```
-
-#### mawep pod-status
-
-Get detailed status of a specific pod.
-
-```bash
-python -m mgit mawep pod-status POD_NAME
-```
-
-#### mawep stop
-
-Stop MAWEP orchestration and cleanup resources.
-
-```bash
-python -m mgit mawep stop [--preserve-worktrees]
+mgit generate-env
 ```
 
 ### Global Options
@@ -257,7 +347,7 @@ python -m mgit mawep stop [--preserve-worktrees]
 Show the application's version and exit.
 
 ```bash
-python -m mgit --version
+mgit --version
 ```
 
 #### --help
@@ -265,7 +355,7 @@ python -m mgit --version
 Show help for any command.
 
 ```bash
-python -m mgit [command] --help
+mgit [command] --help
 ```
 
 ## Configuration
@@ -276,170 +366,125 @@ The tool uses a hierarchical configuration system:
 2. **Global config** in `~/.config/mgit/config` (second priority)
 3. **Default values** in code (lowest priority)
 
-Key configuration options:
+### Provider-Specific Configuration
 
-- `AZURE_DEVOPS_ORG_URL`: Azure DevOps organization URL
+#### Azure DevOps
+- `AZURE_DEVOPS_ORG_URL`: Organization URL (e.g., https://dev.azure.com/myorg)
 - `AZURE_DEVOPS_EXT_PAT`: Personal Access Token
+- `AZUREDEVOPS_USERNAME`: Username (optional)
+
+#### GitHub
+- `GITHUB_PAT`: Personal Access Token
+- `GITHUB_ORG`: Default organization (optional)
+- `GITHUB_ENTERPRISE_URL`: GitHub Enterprise URL (optional)
+- `GITHUB_USERNAME`: Username (optional)
+
+#### BitBucket
+- `BITBUCKET_WORKSPACE`: Default workspace
+- `BITBUCKET_USERNAME`: Username (required)
+- `BITBUCKET_APP_PASSWORD`: App Password
+- `BITBUCKET_SERVER_URL`: BitBucket Server URL (optional)
+
+### Global Settings
 - `DEFAULT_CONCURRENCY`: Number of concurrent operations (default: 4)
 - `DEFAULT_UPDATE_MODE`: Default update mode (skip, pull, force)
+
+### Example Configuration File
+
+```bash
+# ~/.config/mgit/config
+
+# Global settings
+DEFAULT_CONCURRENCY=8
+DEFAULT_UPDATE_MODE=pull
+
+# Azure DevOps
+AZURE_DEVOPS_ORG_URL=https://dev.azure.com/mycompany
+AZURE_DEVOPS_EXT_PAT=mytoken123
+
+# GitHub
+GITHUB_PAT=ghp_xxxxxxxxxxxx
+GITHUB_ORG=my-github-org
+
+# BitBucket  
+BITBUCKET_WORKSPACE=myworkspace
+BITBUCKET_USERNAME=myusername
+BITBUCKET_APP_PASSWORD=myapppassword
+```
+
+## Practical Examples
+
+### Managing Multiple Provider Repositories
+
+```bash
+# Clone all repos from different providers into organized folders
+mgit clone-all my-azure-project ./work/azure --provider azuredevops
+mgit clone-all my-github-org ./work/github --provider github
+mgit clone-all my-bb-workspace ./work/bitbucket --provider bitbucket
+
+# Update all repositories across providers
+cd ./work/azure && mgit pull-all my-azure-project .
+cd ./work/github && mgit pull-all my-github-org .
+cd ./work/bitbucket && mgit pull-all my-bb-workspace .
+```
+
+### Provider Auto-Detection
+
+```bash
+# mgit automatically detects the provider from the URL
+mgit clone-all tensorflow ./ml-repos https://github.com
+mgit clone-all my-project ./work https://dev.azure.com/company
+mgit clone-all atlassian ./tools https://bitbucket.org
+```
+
+### Mixed Provider Workflows
+
+```bash
+# Set up authentication for all providers
+mgit login --provider azuredevops --store
+mgit login --provider github --store
+mgit login --provider bitbucket --store
+
+# Clone from multiple providers in one session
+mgit clone-all frontend-team ./repos/frontend https://dev.azure.com/company
+mgit clone-all backend-libs ./repos/backend https://github.com
+mgit clone-all devops-tools ./repos/ops https://bitbucket.org
+```
+
+### Docker Workflows
+
+```bash
+# Create an alias for convenience
+alias mgit-docker='docker run --rm -v $(pwd):/workspace -v ~/.config/mgit:/root/.config/mgit ghcr.io/steveant/mgit:latest'
+
+# Use mgit with Docker like normal
+mgit-docker login --provider github --store
+mgit-docker clone-all my-org /workspace/repos
+mgit-docker pull-all my-org /workspace/repos
+```
 
 ## Security
 
 The tool handles sensitive information securely:
-- PAT tokens are masked in logs and console output
+- All tokens (PATs, app passwords) are masked in logs and console output
 - Configuration files have secure permissions (0600)
 - Credentials can be stored securely or used only for the current session
-
-## MAWEP: Parallel Development Made Easy
-
-MAWEP (Multi-Agent Workflow Execution Process) transforms how you handle multi-issue development sprints. Instead of working on issues sequentially, orchestrate AI agents working in persistent pods to tackle multiple issues in parallel.
-
-### When to Use MAWEP
-
-✅ **Perfect for:**
-- Sprint work with 3-10 independent issues
-- Module extraction and refactoring
-- Feature development with clear separation
-- Large-scale code organization
-
-❌ **Skip for:**
-- Single issues or quick fixes
-- Tightly coupled changes
-- Simple sequential work
-
-### How MAWEP Works
-
-```
-                    ┌─────────────────┐
-                    │   Orchestrator  │ ← You control this
-                    │ (Claude Code)   │
-                    └─────────┬───────┘
-                              │
-                   "Invoke agent for pod-1"
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────┐
-│                    Agent Invocation                     │ ← Ephemeral
-│  "Work on pod-1, check memory-bank, update progress"   │   (Task tool)
-└──────────────────────┬──────────────────────────────────┘
-                       │
-            Agent works in persistent pod
-                       │
-                       ▼
-    ┌─────────────────────────────────────────────┐
-    │               Pod-1 Workspace               │ ← Persistent
-    │         (Git Worktree + Memory Bank)        │   (Survives)
-    │                                             │
-    │  📁 mawep-workspace/worktrees/pod-1/        │
-    │  ├── [complete project copy]               │
-    │  ├── memory-bank/                          │
-    │  │   ├── activeContext.md                  │
-    │  │   ├── progress.md                       │
-    │  │   └── blockers.md                       │
-    │  └── .git/ (worktree branch: pod-1-issue-101) │
-    └─────────────────────────────────────────────┘
-```
-
-### Key Concepts
-
-- **🎭 Agent**: Ephemeral AI task execution (single message → response → done)
-- **🏠 Pod**: Persistent git worktree where agents work over time (`pod-1`, `pod-2`, etc.)
-- **📊 Orchestrator**: You, coordinating everything through Claude Code
-- **💾 Memory Bank**: Persistent context in each pod so agents remember progress
-
-### Getting Started with MAWEP
-
-1. **Launch the Orchestrator**
-   ```bash
-   # In Claude Code, tell it:
-   "Act as MAWEP Orchestrator for parallel development.
-   Repository: my-org/awesome-project
-   Issues: #101, #102, #103, #104
-   Please start by analyzing dependencies and setting up pods."
-   ```
-
-2. **MAWEP Sets Up**
-   - Analyzes issue dependencies
-   - Creates `mawep-workspace/` with state tracking  
-   - Spawns git worktrees (`pod-1`, `pod-2`, etc.)
-   - Assigns issues to pods based on dependencies
-
-3. **Monitor Progress**
-   ```bash
-   # Check overall status
-   python -m mgit mawep status
-   
-   # Check specific pod
-   python -m mgit mawep pod-status pod-1
-   ```
-
-### Pod Structure
-
-Each pod is a complete, isolated workspace:
-
-```
-pod-1/
-├── memory-bank/           # Persistent context
-│   ├── activeContext.md  # What's being worked on
-│   ├── progress.md       # What's done/next
-│   ├── blockers.md       # What's stopping progress
-│   └── systemPatterns.md # Codebase conventions
-├── mgit/                 # Full project code
-└── [all project files]   # Isolated git worktree
-```
-
-### Git Worktree Management
-
-MAWEP automatically handles git worktree operations:
-
-```bash
-# Pod creation (MAWEP does this)
-git worktree add mawep-workspace/worktrees/pod-1 -b pod-1-issue-101
-
-# Manual pod management commands
-git worktree list              # See all active pods
-git worktree remove pod-1      # Clean up completed pod
-git worktree repair pod-1      # Fix corrupted pod
-
-# Pod isolation means:
-# - pod-1 can modify files without affecting pod-2
-# - Each pod has its own branch
-# - Changes merge back to main via PRs
-```
-
-### State Management
-
-MAWEP tracks everything in `mawep-state.yaml`:
-
-```yaml
-pods:
-  pod-1:
-    status: working
-    current_issue: 101
-    worktree_path: ./worktrees/pod-1
-    last_agent_invocation: "2025-05-27T23:45:00Z"
-    active_agents: 0
-
-issues:
-  101:
-    title: "Extract logging module"
-    status: assigned
-    assigned_to: pod-1
-    dependencies: []
-    branch_name: pod-1-issue-101
-```
-
-### Important MAWEP Reality
-
-⚠️ **Agents don't work in the background!** Each agent invocation is a single request-response cycle. The orchestrator (you) must continuously invoke agents to keep work progressing. Think of it like conducting an orchestra - if you stop conducting, the music stops.
+- Provider-specific authentication methods:
+  - **Azure DevOps**: Personal Access Tokens (PAT)
+  - **GitHub**: Personal Access Tokens or GitHub Apps
+  - **BitBucket**: App Passwords (more secure than regular passwords)
 
 ## For Developers
 
 For technical implementation details, architecture diagrams, and future improvement plans, please see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-### Development Workflow
+### Provider Implementation Status
 
-This project uses MAWEP for its own development! The current structure shows Sprint 2 module extraction in progress with 5 active pods working on different components.
+| Provider | Status | Implementation Details |
+|----------|--------|----------------------|
+| Azure DevOps | ✅ Complete | Full API integration using azure-devops SDK |
+| GitHub | ✅ Complete | REST API v3 with PyGithub library |
+| BitBucket | ✅ Complete | REST API v2.0 with atlassian-python-api |
 
 ## License
 

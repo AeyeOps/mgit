@@ -1,6 +1,6 @@
 # mgit Refactoring Issues
 
-This document contains all issues needed for refactoring mgit from a monolithic file to a modular architecture with multi-provider support and MAWEP integration.
+This document contains all issues needed for refactoring mgit from a monolithic file to a modular architecture with multi-provider support.
 
 ## Foundation Issues (No Dependencies)
 
@@ -25,8 +25,6 @@ Transform mgit from a single-file application into a proper Python package struc
   ├── git/
   │   └── __init__.py
   ├── config/
-  │   └── __init__.py
-  ├── mawep/
   │   └── __init__.py
   └── utils/
       └── __init__.py
@@ -301,26 +299,6 @@ Split CLI commands into separate modules.
 
 ---
 
-### Issue #15: Add worktree support
-**Type**: Enhancement
-**Priority**: Medium
-**Labels**: enhancement, mawep
-
-**Description**:
-Add git worktree operations for MAWEP support.
-
-**Acceptance Criteria**:
-- [ ] Create mgit/git/worktree.py
-- [ ] Implement create_worktree()
-- [ ] Implement remove_worktree()
-- [ ] Implement list_worktrees()
-- [ ] Add worktree path management
-- [ ] Add tests for worktree operations
-
-**Dependencies**: #13
-
----
-
 ### Issue #16: Create async executor
 **Type**: Enhancement
 **Priority**: Medium
@@ -380,88 +358,6 @@ Define and validate configuration structure.
 - [ ] Add schema versioning
 
 **Dependencies**: #17
-
----
-
-## MAWEP System
-
-### Issue #19: Add MAWEP orchestrator module
-**Type**: MAWEP, Enhancement
-**Priority**: Medium
-**Labels**: mawep, enhancement
-
-**Description**:
-Create the core MAWEP orchestrator module.
-
-**Acceptance Criteria**:
-- [ ] Create mgit/mawep/orchestrator.py
-- [ ] Implement Orchestrator class
-- [ ] Add issue fetching from providers
-- [ ] Add dependency graph building
-- [ ] Add agent assignment logic
-- [ ] Add continuous monitoring loop
-
-**Dependencies**: #1, #15
-
----
-
-### Issue #20: Add MAWEP state tracking
-**Type**: MAWEP
-**Priority**: Medium
-**Labels**: mawep
-
-**Description**:
-Implement state management for MAWEP.
-
-**Acceptance Criteria**:
-- [ ] Create mgit/mawep/state.py
-- [ ] Define state schema (agents, issues, worktrees)
-- [ ] Implement state persistence (YAML)
-- [ ] Add state validation
-- [ ] Add state update methods
-- [ ] Add state querying methods
-
-**Dependencies**: #19
-
----
-
-### Issue #21: Create MAWEP CLI commands
-**Type**: MAWEP, CLI
-**Priority**: Medium
-**Labels**: mawep, cli
-
-**Description**:
-Add CLI commands for MAWEP operations.
-
-**Acceptance Criteria**:
-- [ ] Create mgit/commands/mawep.py
-- [ ] Add `mgit mawep start` command
-- [ ] Add `mgit mawep status` command
-- [ ] Add `mgit mawep stop` command
-- [ ] Add `mgit mawep logs` command
-- [ ] Integrate with main CLI
-
-**Dependencies**: #19, #14
-
----
-
-### Issue #22: Add agent communication
-**Type**: MAWEP
-**Priority**: Low
-**Labels**: mawep
-
-**Description**:
-Implement inter-agent communication system.
-
-**Acceptance Criteria**:
-- [ ] Create mgit/mawep/communication.py
-- [ ] Define message types
-- [ ] Implement message routing
-- [ ] Add message persistence
-- [ ] Add message validation
-- [ ] Document communication protocol
-
-**Dependencies**: #19
 
 ---
 
@@ -658,22 +554,12 @@ graph TD
         13[Git Operations] --> 1
         14[Commands] --> 1
         14 --> 5
-        15[Worktree] --> 13
         16[Async] --> 1
     end
     
     subgraph Configuration
         17[YAML Loader] --> 3
         18[Schema] --> 17
-    end
-    
-    subgraph MAWEP
-        19[Orchestrator] --> 1
-        19 --> 15
-        20[State] --> 19
-        21[CLI] --> 19
-        21 --> 14
-        22[Communication] --> 19
     end
     
     subgraph Support
@@ -705,9 +591,8 @@ graph TD
 **Group 2 (Core Modules)**: Issues #2, #3, #4, #5, #6 (after #1)
 **Group 3 (Provider Foundation)**: Issue #7 (after #1)
 **Group 4 (Providers)**: Issues #8, #9, #10, #11, #12 (after #7)
-**Group 5 (Git/Commands)**: Issues #13, #14, #15, #16 (after #1)
+**Group 5 (Git/Commands)**: Issues #13, #14, #16 (after #1)
 **Group 6 (Config)**: Issues #17, #18 (after #3)
-**Group 7 (MAWEP)**: Issue #19 (after #1, #15), then #20, #21, #22
-**Group 8 (Support)**: Issues #23, #24, #25 (after #1)
+**Group 7 (Support)**: Issues #23, #24, #25 (after #1)
 **Group 9 (Testing)**: Issue #26 (after #1), then #27, #28
 **Group 10 (Final)**: Issues #29, #30 (after most others)

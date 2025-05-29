@@ -14,7 +14,7 @@ python -m mgit
 python -m mgit --help
 
 # Common commands
-python -m mgit login --org https://dev.azure.com/your-org --pat your-pat
+python -m mgit login --org https://dev.azure.com/your-org --token your-pat
 python -m mgit clone-all [project-name] [destination-path] [-c concurrency] [-u update-mode]
 python -m mgit pull-all [project-name] [repositories-path]
 python -m mgit generate-env

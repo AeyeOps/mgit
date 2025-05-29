@@ -1,8 +1,12 @@
 # Configuration Schema Design for Multi-Provider mgit
 
+> **NOTE**: This document describes proposed configuration formats (INI, YAML) that are NOT currently implemented in mgit. 
+> The actual mgit tool uses a simple key=value configuration format (like .env files) in `~/.config/mgit/config`.
+> See [mgit-configuration-examples.md](./mgit-configuration-examples.md) for the actual configuration format.
+
 ## Overview
 
-This document defines the configuration schema for mgit to support multiple Git providers while maintaining backward compatibility with existing Azure DevOps configurations.
+This document defines a proposed configuration schema for mgit to support multiple Git providers while maintaining backward compatibility with existing Azure DevOps configurations.
 
 ## Configuration Hierarchy
 

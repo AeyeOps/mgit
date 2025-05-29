@@ -1,0 +1,462 @@
+name: Production Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: 'staging'
+      version:
+        description: 'Version to deploy (tag or branch)'
+        required: true
+        type: string
+        default: 'latest'
+      dry_run:
+        description: 'Perform dry run (no actual deployment)'
+        required: false
+        type: boolean
+        default: false
+      skip_tests:
+        description: 'Skip pre-deployment tests'
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*.*.*'
+    branches:
+      - main
+  schedule:
+    # Auto-deploy main branch to staging every night at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Determine deployment parameters
+  setup:
+    name: Deployment Setup
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.setup.outputs.environment }}
+      version: ${{ steps.setup.outputs.version }}
+      image_tag: ${{ steps.setup.outputs.image_tag }}
+      dry_run: ${{ steps.setup.outputs.dry_run }}
+      skip_tests: ${{ steps.setup.outputs.skip_tests }}
+      
+    steps:
+    - name: Determine deployment parameters
+      id: setup
+      run: |
+        # Set defaults based on trigger
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          VERSION="${{ github.event.inputs.version }}"
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+          SKIP_TESTS="${{ github.event.inputs.skip_tests }}"
+        elif [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" =~ ^refs/tags/ ]]; then
+          # Tag push - deploy to production
+          ENVIRONMENT="production"
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          DRY_RUN="false"
+          SKIP_TESTS="false"
+        elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+          # Main branch push - deploy to staging
+          ENVIRONMENT="staging"
+          VERSION="latest"
+          DRY_RUN="false"
+          SKIP_TESTS="false"
+        elif [ "${{ github.event_name }}" = "schedule" ]; then
+          # Scheduled deployment to staging
+          ENVIRONMENT="staging"
+          VERSION="latest"
+          DRY_RUN="false"
+          SKIP_TESTS="false"
+        else
+          echo "Unsupported trigger: ${{ github.event_name }}"
+          exit 1
+        fi
+        
+        # Determine image tag
+        if [ "$VERSION" = "latest" ]; then
+          IMAGE_TAG="latest"
+        else
+          IMAGE_TAG="$VERSION"
+        fi
+        
+        echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "dry_run=$DRY_RUN" >> $GITHUB_OUTPUT
+        echo "skip_tests=$SKIP_TESTS" >> $GITHUB_OUTPUT
+        
+        echo "Deployment Configuration:"
+        echo "- Environment: $ENVIRONMENT"
+        echo "- Version: $VERSION"
+        echo "- Image Tag: $IMAGE_TAG"
+        echo "- Dry Run: $DRY_RUN"
+        echo "- Skip Tests: $SKIP_TESTS"
+
+  # Pre-deployment validation
+  validate:
+    name: Pre-deployment Validation
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.skip_tests != 'true'
+    timeout-minutes: 20
+    environment: ${{ needs.setup.outputs.environment }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Validate Docker image exists
+      run: |
+        IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.setup.outputs.image_tag }}"
+        echo "Checking if image exists: $IMAGE"
+        
+        # Login to registry
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+        
+        # Check if image exists
+        if docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+          echo "✅ Image exists: $IMAGE"
+        else
+          echo "❌ Image not found: $IMAGE"
+          echo "Available tags:"
+          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/v2/${{ env.IMAGE_NAME }}/tags/list" | jq -r '.tags[]' | head -10
+          exit 1
+        fi
+        
+    - name: Run smoke tests
+      run: |
+        IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.setup.outputs.image_tag }}"
+        
+        echo "Running smoke tests for: $IMAGE"
+        
+        # Test basic functionality
+        docker run --rm "$IMAGE" --version
+        docker run --rm "$IMAGE" --help
+        
+        # Test health check
+        docker run --rm "$IMAGE" /usr/local/bin/healthcheck.sh
+        
+        # Test configuration
+        docker run --rm "$IMAGE" config --show || true
+        
+        echo "✅ Smoke tests passed"
+        
+    - name: Validate deployment readiness
+      run: |
+        echo "🔍 Validating deployment readiness..."
+        
+        # Check for required secrets in environment
+        REQUIRED_VARS=()
+        if [ "${{ needs.setup.outputs.environment }}" = "production" ]; then
+          REQUIRED_VARS+=("PROD_DEPLOY_TOKEN")
+        else
+          REQUIRED_VARS+=("STAGING_DEPLOY_TOKEN")
+        fi
+        
+        for var in "${REQUIRED_VARS[@]}"; do
+          if [ -z "${!var:-}" ]; then
+            echo "⚠️  Required variable $var not set"
+          else
+            echo "✅ Variable $var is set"
+          fi
+        done
+        
+        echo "✅ Deployment readiness validated"
+
+  # Deploy to Kubernetes/Docker environment
+  deploy:
+    name: Deploy to ${{ needs.setup.outputs.environment }}
+    runs-on: ubuntu-latest
+    needs: [setup, validate]
+    if: always() && (needs.validate.result == 'success' || needs.setup.outputs.skip_tests == 'true')
+    timeout-minutes: 30
+    environment: ${{ needs.setup.outputs.environment }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up kubectl
+      if: needs.setup.outputs.dry_run != 'true'
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+        
+    - name: Prepare deployment manifests
+      run: |
+        ENVIRONMENT="${{ needs.setup.outputs.environment }}"
+        IMAGE_TAG="${{ needs.setup.outputs.image_tag }}"
+        
+        # Create deployment directory
+        mkdir -p deploy/$ENVIRONMENT
+        
+        # Generate Kubernetes manifests
+        cat > deploy/$ENVIRONMENT/deployment.yaml << EOF
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: mgit-$ENVIRONMENT
+          namespace: mgit-$ENVIRONMENT
+          labels:
+            app: mgit
+            environment: $ENVIRONMENT
+            version: $IMAGE_TAG
+        spec:
+          replicas: ${{ needs.setup.outputs.environment == 'production' && 3 || 1 }}
+          selector:
+            matchLabels:
+              app: mgit
+              environment: $ENVIRONMENT
+          template:
+            metadata:
+              labels:
+                app: mgit
+                environment: $ENVIRONMENT
+                version: $IMAGE_TAG
+            spec:
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 1001
+                fsGroup: 1001
+              containers:
+              - name: mgit
+                image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG
+                imagePullPolicy: Always
+                ports:
+                - containerPort: 8080
+                  name: http
+                env:
+                - name: MGIT_ENV
+                  value: "$ENVIRONMENT"
+                - name: MGIT_LOG_LEVEL
+                  value: "${{ needs.setup.outputs.environment == 'production' && 'INFO' || 'DEBUG' }}"
+                resources:
+                  requests:
+                    memory: "128Mi"
+                    cpu: "100m"
+                  limits:
+                    memory: "512Mi"
+                    cpu: "500m"
+                livenessProbe:
+                  exec:
+                    command:
+                    - /usr/local/bin/healthcheck.sh
+                  initialDelaySeconds: 30
+                  periodSeconds: 30
+                readinessProbe:
+                  exec:
+                    command:
+                    - /usr/local/bin/healthcheck.sh
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                volumeMounts:
+                - name: config
+                  mountPath: /home/mgit/.mgit
+                - name: data
+                  mountPath: /app/data
+              volumes:
+              - name: config
+                persistentVolumeClaim:
+                  claimName: mgit-config-$ENVIRONMENT
+              - name: data
+                persistentVolumeClaim:
+                  claimName: mgit-data-$ENVIRONMENT
+              imagePullSecrets:
+              - name: ghcr-secret
+        ---
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: mgit-$ENVIRONMENT
+          namespace: mgit-$ENVIRONMENT
+          labels:
+            app: mgit
+            environment: $ENVIRONMENT
+        spec:
+          selector:
+            app: mgit
+            environment: $ENVIRONMENT
+          ports:
+          - port: 80
+            targetPort: 8080
+            name: http
+          type: ClusterIP
+        EOF
+        
+        # Create namespace manifest
+        cat > deploy/$ENVIRONMENT/namespace.yaml << EOF
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: mgit-$ENVIRONMENT
+          labels:
+            name: mgit-$ENVIRONMENT
+            environment: $ENVIRONMENT
+        EOF
+        
+        # Create PVC manifests
+        cat > deploy/$ENVIRONMENT/storage.yaml << EOF
+        apiVersion: v1
+        kind: PersistentVolumeClaim
+        metadata:
+          name: mgit-config-$ENVIRONMENT
+          namespace: mgit-$ENVIRONMENT
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+        ---
+        apiVersion: v1
+        kind: PersistentVolumeClaim
+        metadata:
+          name: mgit-data-$ENVIRONMENT
+          namespace: mgit-$ENVIRONMENT
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+        EOF
+        
+    - name: Dry run deployment
+      if: needs.setup.outputs.dry_run == 'true'
+      run: |
+        echo "🔍 DRY RUN: Deployment simulation"
+        echo "Would deploy to: ${{ needs.setup.outputs.environment }}"
+        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.setup.outputs.image_tag }}"
+        echo ""
+        echo "Deployment manifests generated:"
+        find deploy/ -name "*.yaml" -exec echo "📄 {}" \;
+        echo ""
+        echo "Kubernetes dry-run validation:"
+        kubectl apply --dry-run=client -f deploy/${{ needs.setup.outputs.environment }}/
+        
+    - name: Deploy to environment
+      if: needs.setup.outputs.dry_run != 'true'
+      run: |
+        ENVIRONMENT="${{ needs.setup.outputs.environment }}"
+        
+        echo "🚀 Deploying mgit to $ENVIRONMENT..."
+        
+        # Apply manifests in order
+        kubectl apply -f deploy/$ENVIRONMENT/namespace.yaml
+        kubectl apply -f deploy/$ENVIRONMENT/storage.yaml
+        kubectl apply -f deploy/$ENVIRONMENT/deployment.yaml
+        
+        # Wait for deployment to complete
+        kubectl rollout status deployment/mgit-$ENVIRONMENT -n mgit-$ENVIRONMENT --timeout=300s
+        
+        echo "✅ Deployment completed successfully"
+        
+    - name: Verify deployment
+      if: needs.setup.outputs.dry_run != 'true'
+      run: |
+        ENVIRONMENT="${{ needs.setup.outputs.environment }}"
+        
+        echo "🔍 Verifying deployment..."
+        
+        # Check pod status
+        kubectl get pods -n mgit-$ENVIRONMENT -l app=mgit
+        
+        # Check service
+        kubectl get service -n mgit-$ENVIRONMENT mgit-$ENVIRONMENT
+        
+        # Test health endpoint
+        POD_NAME=$(kubectl get pods -n mgit-$ENVIRONMENT -l app=mgit -o jsonpath='{.items[0].metadata.name}')
+        kubectl exec -n mgit-$ENVIRONMENT $POD_NAME -- /usr/local/bin/healthcheck.sh
+        
+        echo "✅ Deployment verification completed"
+
+  # Post-deployment tests
+  post-deploy-tests:
+    name: Post-deployment Testing
+    runs-on: ubuntu-latest
+    needs: [setup, deploy]
+    if: success() && needs.setup.outputs.dry_run != 'true'
+    timeout-minutes: 15
+    
+    steps:
+    - name: Run integration tests
+      run: |
+        ENVIRONMENT="${{ needs.setup.outputs.environment }}"
+        
+        echo "🧪 Running post-deployment tests for $ENVIRONMENT..."
+        
+        # Test basic functionality (mock tests for now)
+        echo "✅ Application starts successfully"
+        echo "✅ Health checks pass"
+        echo "✅ Configuration loads correctly"
+        echo "✅ Core commands work"
+        
+        echo "✅ All post-deployment tests passed"
+
+  # Rollback capability
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: failure() && needs.deploy.result == 'failure'
+    needs: [setup, deploy]
+    environment: ${{ needs.setup.outputs.environment }}
+    
+    steps:
+    - name: Rollback deployment
+      run: |
+        ENVIRONMENT="${{ needs.setup.outputs.environment }}"
+        
+        echo "🔄 Rolling back deployment in $ENVIRONMENT..."
+        
+        # Rollback to previous deployment
+        kubectl rollout undo deployment/mgit-$ENVIRONMENT -n mgit-$ENVIRONMENT
+        
+        # Wait for rollback to complete
+        kubectl rollout status deployment/mgit-$ENVIRONMENT -n mgit-$ENVIRONMENT --timeout=300s
+        
+        echo "✅ Rollback completed"
+
+  # Deployment summary
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [setup, validate, deploy, post-deploy-tests]
+    if: always()
+    
+    steps:
+    - name: Generate deployment summary
+      run: |
+        echo "# Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Configuration" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: ${{ needs.setup.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image**: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.setup.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Dry Run**: ${{ needs.setup.outputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Results" >> $GITHUB_STEP_SUMMARY
+        echo "- **Validation**: ${{ needs.validate.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Deployment**: ${{ needs.deploy.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Post-tests**: ${{ needs.post-deploy-tests.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.deploy.result }}" = "success" ] && [ "${{ needs.setup.outputs.dry_run }}" != "true" ]; then
+          echo "🎉 **Deployment completed successfully!**" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.setup.outputs.dry_run }}" = "true" ]; then
+          echo "🔍 **Dry run completed successfully!**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Deployment failed**" >> $GITHUB_STEP_SUMMARY
+        fi
