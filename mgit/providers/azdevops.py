@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class AzureDevOpsProvider(GitProvider):
     """Azure DevOps provider implementation."""
     
-    PROVIDER_NAME = "azure_devops"
+    PROVIDER_NAME = "azuredevops"
     SUPPORTED_AUTH_METHODS = [AuthMethod.PAT]
     DEFAULT_API_VERSION = "7.1"
     

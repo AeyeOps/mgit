@@ -59,8 +59,7 @@ ProviderFactory.register_provider("github", GitHubProvider)
 ProviderFactory.register_provider("bitbucket", BitBucketProvider)
 
 # Register with registry (new pattern)
-register_provider("azuredevops", AzureDevOpsProvider)
-register_provider("azure_devops", AzureDevOpsProvider)  # Match PROVIDER_NAME
+register_provider("azuredevops", AzureDevOpsProvider)  # Primary name
 register_provider("azure", AzureDevOpsProvider)  # Alias
 register_provider("github", GitHubProvider)
 register_provider("bitbucket", BitBucketProvider)
