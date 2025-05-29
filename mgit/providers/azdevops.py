@@ -39,7 +39,7 @@ class AzureDevOpsProvider(GitProvider):
                 - organization_url: Azure DevOps organization URL
                 - pat: Personal Access Token
         """
-        super().__init__(config)
+        # Set instance attributes before calling super() which calls _validate_config
         self.organization_url = config.get('organization_url', '')
         self.pat = config.get('pat', '')
         
@@ -51,6 +51,9 @@ class AzureDevOpsProvider(GitProvider):
         self.connection: Optional[Connection] = None
         self.core_client: Optional[CoreClient] = None
         self.git_client: Optional[GitClient] = None
+        
+        # Now call super() which will validate the config
+        super().__init__(config)
         
     def _validate_config(self) -> None:
         """Validate provider-specific configuration.
