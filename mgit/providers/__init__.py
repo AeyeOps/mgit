@@ -31,6 +31,12 @@ from .exceptions import (
     APIError,
 )
 
+# Provider implementations
+from .github import GitHubProvider
+
+# Register providers with factory
+ProviderFactory.register_provider("github", GitHubProvider)
+
 __all__ = [
     # Base classes
     "GitProvider",
@@ -52,4 +58,6 @@ __all__ = [
     "ProjectNotFoundError",
     "PermissionError",
     "APIError",
+    # Provider implementations
+    "GitHubProvider",
 ]
