@@ -177,3 +177,12 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Temporary files and directories
+tmp/
+
+# VS Code Claude extension development
+.vscode/claude-reminder/
+
+# Personal shell scripts
+/*.sh
