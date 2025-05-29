@@ -407,3 +407,70 @@ def migrate_legacy_config() -> None:
     if updates:
         config.update(updates)
         save_config_file(config)
+
+
+def get_provider_defaults(provider: str) -> Dict[str, Any]:
+    """Get default configuration values for a provider.
+    
+    Args:
+        provider: Provider name
+        
+    Returns:
+        Dictionary of default values
+    """
+    if provider not in PROVIDER_DEFAULTS:
+        raise ValueError(f"Unknown provider: {provider}")
+    return PROVIDER_DEFAULTS[provider].copy()
+
+
+def list_provider_fields(provider: str) -> List[str]:
+    """List all configuration fields for a provider.
+    
+    Args:
+        provider: Provider name
+        
+    Returns:
+        List of field names
+    """
+    if provider not in PROVIDER_CONFIG_PATTERNS:
+        raise ValueError(f"Unknown provider: {provider}")
+    return list(PROVIDER_CONFIG_PATTERNS[provider].keys())
+
+
+def clear_provider_config(provider: str) -> None:
+    """Clear all configuration for a specific provider.
+    
+    Args:
+        provider: Provider name
+    """
+    if provider not in PROVIDER_CONFIG_PATTERNS:
+        raise ValueError(f"Unknown provider: {provider}")
+    
+    config = load_config_file()
+    fields = list_provider_fields(provider)
+    
+    # Remove all provider fields
+    for field in fields:
+        config.pop(field, None)
+    
+    save_config_file(config)
+
+
+def is_provider_configured(provider: str) -> bool:
+    """Check if a provider is properly configured.
+    
+    Args:
+        provider: Provider name
+        
+    Returns:
+        True if provider is configured and valid
+    """
+    errors = validate_provider_config(provider)
+    return len(errors) == 0
+
+
+# Provider constants for export
+PROVIDER_AZUREDEVOPS = ProviderType.AZURE_DEVOPS.value
+PROVIDER_GITHUB = ProviderType.GITHUB.value
+PROVIDER_BITBUCKET = ProviderType.BITBUCKET.value
+SUPPORTED_PROVIDERS = [p.value for p in ProviderType]
