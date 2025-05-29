@@ -51,12 +51,19 @@ from .azdevops import AzureDevOpsProvider
 from .github import GitHubProvider
 from .bitbucket import BitBucketProvider
 
-# Register available providers
+# Register available providers (Factory pattern)
 ProviderFactory.register_provider("azuredevops", AzureDevOpsProvider)
 ProviderFactory.register_provider("azdevops", AzureDevOpsProvider)  # Alias
 ProviderFactory.register_provider("azure", AzureDevOpsProvider)  # Alias
 ProviderFactory.register_provider("github", GitHubProvider)
 ProviderFactory.register_provider("bitbucket", BitBucketProvider)
+
+# Register with registry (new pattern)
+register_provider("azuredevops", AzureDevOpsProvider)
+register_provider("azure_devops", AzureDevOpsProvider)  # Match PROVIDER_NAME
+register_provider("azure", AzureDevOpsProvider)  # Alias
+register_provider("github", GitHubProvider)
+register_provider("bitbucket", BitBucketProvider)
 
 __all__ = [
     # Base classes
