@@ -1,0 +1,6 @@
+{
+  "parallelAgents": {
+    "enabled": true,
+    "count": 1
+  }
+}

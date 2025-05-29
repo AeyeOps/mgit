@@ -1,7 +1,4 @@
 # Generic MAWEP Framework Improvements
-## (To be integrated into global framework)
-
-This document contains generic MAWEP framework improvements extracted from Sprint 2 learnings. These should be integrated into the global MAWEP framework documentation.
 
 ## 6-Stage MAWEP Sprint Process
 
