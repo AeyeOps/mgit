@@ -1,53 +1,46 @@
 """Configuration management package for mgit.
 
-This package provides configuration management functionality including
-general configuration and provider-specific configuration.
+This package provides YAML-based configuration management functionality 
+for both global settings and provider-specific configurations.
 """
 
-# General configuration management
-from .manager import (
-    get_config_value,
-    load_config_file,
-    save_config_file,
+# YAML configuration management
+from .yaml_manager import (
+    get_provider_configs,
+    get_provider_config,
+    get_default_provider_config,
+    get_default_provider_name,
+    list_provider_names,
+    detect_provider_type,
+    get_global_config,
+    get_global_setting,
+    add_provider_config,
+    remove_provider_config,
+    set_default_provider,
+    set_global_setting,
+    migrate_from_dotenv,
     CONFIG_DIR,
     CONFIG_FILE,
 )
 
-# Provider-specific configuration
-from .providers import (
-    get_provider_config,
-    set_provider_config,
-    validate_provider_config,
-    get_provider_defaults,
-    list_provider_fields,
-    get_all_provider_configs,
-    clear_provider_config,
-    is_provider_configured,
-    PROVIDER_AZUREDEVOPS,
-    PROVIDER_GITHUB,
-    PROVIDER_BITBUCKET,
-    SUPPORTED_PROVIDERS,
-)
-
 __all__ = [
-    # General config
-    "get_config_value",
-    "load_config_file",
-    "save_config_file",
+    # Provider config
+    "get_provider_configs",
+    "get_provider_config", 
+    "get_default_provider_config",
+    "get_default_provider_name",
+    "list_provider_names",
+    "detect_provider_type",
+    "add_provider_config",
+    "remove_provider_config",
+    "set_default_provider",
+    # Global config
+    "get_global_config",
+    "get_global_setting",
+    "set_global_setting",
+    # Migration
+    "migrate_from_dotenv",
+    # Paths
     "CONFIG_DIR",
     "CONFIG_FILE",
-    # Provider config
-    "get_provider_config",
-    "set_provider_config",
-    "validate_provider_config",
-    "get_provider_defaults",
-    "list_provider_fields",
-    "get_all_provider_configs",
-    "clear_provider_config",
-    "is_provider_configured",
-    # Provider constants
-    "PROVIDER_AZUREDEVOPS",
-    "PROVIDER_GITHUB",
-    "PROVIDER_BITBUCKET",
-    "SUPPORTED_PROVIDERS",
 ]

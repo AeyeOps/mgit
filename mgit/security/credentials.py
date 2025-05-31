@@ -321,8 +321,15 @@ def validate_bitbucket_app_password(password: str) -> bool:
     if not password or not isinstance(password, str):
         return False
     
-    # BitBucket App Password format: ATBB + 28 characters
-    return bool(re.match(r'^ATBB[a-zA-Z0-9]{28}$', password))
+    # BitBucket App Password formats:
+    # - New format: ATBB + alphanumeric characters (variable length)
+    # - Legacy format: Long alphanumeric strings
+    # We'll be lenient and accept any reasonable app password
+    if password.startswith('ATBB'):
+        return bool(re.match(r'^ATBB[a-zA-Z0-9]+$', password))
+    else:
+        # Accept any string that looks like a token (alphanumeric, min 20 chars)
+        return bool(re.match(r'^[a-zA-Z0-9]{20,}$', password))
 
 
 def is_credential_exposed(text: str) -> bool:
