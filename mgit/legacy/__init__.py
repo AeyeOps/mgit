@@ -1,1 +1,0 @@
-"""Legacy module for mgit components that will be refactored later."""

@@ -1,13 +1,10 @@
 # mgit - Multi-Provider Git CLI Tool 🚀
 
-[![PyPI version](https://img.shields.io/pypi/v/mgit.svg)](https://pypi.org/project/mgit/)
+[![GitHub Release](https://img.shields.io/github/release/AeyeOps/mgit.svg)](https://github.com/AeyeOps/mgit/releases/latest)
 [![Install from GitHub](https://img.shields.io/badge/pip%20install-GitHub%20Release-brightgreen)](https://github.com/AeyeOps/mgit/releases/latest)
 [![Docker Image](https://img.shields.io/docker/v/aeyeops/mgit?label=docker)](https://ghcr.io/aeyeops/mgit)
-[![GitHub Release](https://img.shields.io/github/release/AeyeOps/mgit.svg)](https://github.com/AeyeOps/mgit/releases/latest)
-[![Enterprise Certified](https://img.shields.io/badge/Enterprise-Certified-gold)](ENTERPRISE_CERTIFICATION_SUMMARY.md)
 [![Security](https://img.shields.io/badge/Security-AES--256-green)](docs/security)
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue)](Dockerfile)
-[![CI/CD](https://img.shields.io/badge/CI%2FCD-Automated-success)](.github/workflows)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A powerful **enterprise-grade** command-line tool for managing repositories across multiple git platforms. Clone entire projects, update multiple repositories, and automate your git workflows with support for:
 
@@ -17,7 +14,7 @@ A powerful **enterprise-grade** command-line tool for managing repositories acro
 
 **All providers have feature parity** - login, clone-all, pull-all, and configuration work identically across platforms.
 
-🏆 **ENTERPRISE CERTIFIED** - ID: MGIT-ENT-2025-001 | Ready for production deployment with comprehensive security, monitoring, and automation.
+Ready for production deployment with comprehensive security, monitoring, and automation capabilities.
 
 ## Provider Comparison
 
@@ -62,126 +59,93 @@ mgit/
 
 ## Installation
 
-### 🚀 Quick Install - Works NOW!
+### Prerequisites
+
+- **Git** (required for all installation methods)
+- **Python 3.8+** (for pip and source installation)
+- **Docker** (for containerized installation)
+
+### Installation Methods
+
+#### 1. Install from GitHub Release (Recommended)
 
 ```bash
-# Install mgit directly from GitHub Release (Available NOW!)
+# Install the latest release
 pip install https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
 
 # Verify installation
 mgit --version
 ```
 
-### Prerequisites
+#### 2. Download Pre-built Binary (No Python Required)
 
-- Python 3.7 or higher (for pip/source installation)
-- Git
-- Docker (for Docker installation method)
-
-### Installation Methods
-
-#### Method 1: Install from GitHub Release (Available NOW!)
+Download the standalone executable for your platform from the [latest release](https://github.com/AeyeOps/mgit/releases/latest):
 
 ```bash
-# Install directly from GitHub - THIS WORKS RIGHT NOW!
-pip install https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
+# Linux
+wget https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-linux-x64
+chmod +x mgit-v0.2.1-linux-x64
+./mgit-v0.2.1-linux-x64 --version
 
-# Run mgit directly
-mgit --version
+# macOS
+curl -L https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-macos-x64 -o mgit
+chmod +x mgit
+./mgit --version
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-windows-x64.exe -OutFile mgit.exe
+.\mgit.exe --version
 ```
 
-#### Method 2: Install from PyPI (Coming Soon)
-
-```bash
-# Will be available after PyPI approval
-pip install mgit
-```
-
-#### Method 3: Download Binary from GitHub Releases
-
-Download the pre-built binary for your platform:
-
-1. Visit [mgit releases](https://github.com/AeyeOps/mgit/releases/tag/v0.2.1)
-2. Download the appropriate binary for your OS:
-   - `mgit-v0.2.1-linux-x64` for Linux
-   - `mgit-v0.2.1-macos-x64` for macOS
-   - `mgit-v0.2.1-windows-x64.exe` for Windows
-3. Make it executable (Linux/macOS):
-   ```bash
-   chmod +x mgit-v0.2.1-linux-x64
-   ./mgit-v0.2.1-linux-x64 --version
-   ```
-
-#### Method 4: Use Docker
+#### 3. Use Docker
 
 ```bash
 # Pull the latest image
 docker pull ghcr.io/aeyeops/mgit:latest
 
-# Run mgit in Docker
+# Run mgit
 docker run --rm ghcr.io/aeyeops/mgit:latest --version
 
-# With volume mount for local repo access
-docker run --rm -v $(pwd):/workspace ghcr.io/aeyeops/mgit:latest clone-all my-project /workspace/repos
+# Create an alias for convenience
+alias mgit='docker run --rm -v $(pwd):/workspace -v ~/.config/mgit:/root/.config/mgit ghcr.io/aeyeops/mgit:latest'
 ```
 
-#### Method 5: Install from Source
+#### 4. Install from Source
 
-1. Clone this repository:
+```bash
+# Clone the repository
+git clone https://github.com/AeyeOps/mgit.git
+cd mgit
+
+# Install in development mode
+pip install -r requirements.txt
+pip install -e .
+
+# Run mgit
+mgit --version
+```
+
+### Post-Installation Setup
+
+1. **Verify Installation**
    ```bash
-   git clone https://github.com/AeyeOps/mgit.git
-   cd mgit
+   mgit --version
+   mgit --help
    ```
 
-2. Install dependencies:
+2. **Optional: Add to PATH**
    ```bash
-   pip install -r requirements.txt
-   pip install -e .  # Development installation
+   # For downloaded binaries
+   sudo mv mgit-v0.2.1-linux-x64 /usr/local/bin/mgit
    ```
 
-3. Run the tool:
+3. **Configure Authentication**
    ```bash
-   python -m mgit --version
+   # Set up credentials for your providers
+   mgit login --provider github --token YOUR_TOKEN --store
+   mgit login --provider azuredevops --org https://dev.azure.com/your-org --token YOUR_PAT --store
+   mgit login --provider bitbucket --username YOUR_USER --token YOUR_APP_PASSWORD --store
    ```
-
-### Installation Method Comparison
-
-| Method | Prerequisites | Pros | Cons | Best For | Available Now? |
-|--------|--------------|------|------|---------|----------------|
-| **GitHub pip** | Python 3.7+, pip | • Works NOW!<br>• Easy install<br>• Automatic dependencies | • Manual version specification | Anyone needing pip install TODAY | ✅ YES |
-| **PyPI** | Python 3.7+, pip | • Easy updates<br>• Standard Python workflow<br>• Automatic dependencies | • Requires Python environment | Regular users, Python developers | ❌ Coming Soon |
-| **GitHub Binary** | None | • No dependencies<br>• Fast startup<br>• Single file | • Manual updates<br>• Platform-specific | CI/CD, users without Python | ✅ YES |
-| **Docker** | Docker | • Fully isolated<br>• Consistent environment<br>• No local dependencies | • Requires Docker<br>• Slightly slower startup | Containers, isolated environments | ✅ YES |
-| **Source** | Python 3.7+, Git | • Latest features<br>• Can modify code<br>• Development mode | • Manual updates<br>• Requires Git | Contributors, developers | ✅ YES |
-
-For detailed installation instructions and troubleshooting, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md).
-
-### 🎯 Working Installation Methods Summary
-
-**All of these methods are available and working RIGHT NOW:**
-
-1. **pip from GitHub** (Recommended for Python users):
-   ```bash
-   pip install https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
-   ```
-
-2. **Binary Download** (No Python required):
-   - [Linux](https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-linux-x64)
-   - [macOS](https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-macos-x64)
-   - [Windows](https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-windows-x64.exe)
-
-3. **Docker** (Fully isolated):
-   ```bash
-   docker pull ghcr.io/aeyeops/mgit:latest
-   ```
-
-4. **From Source** (For developers):
-   ```bash
-   git clone https://github.com/AeyeOps/mgit.git && cd mgit
-   pip install -r requirements.txt && pip install -e .
-   ```
-
-See [WORKING_INSTALLATION_METHODS.md](WORKING_INSTALLATION_METHODS.md) for quick installation instructions.
 
 ## Quick Start
 
@@ -404,59 +368,106 @@ Show help for any command.
 mgit [command] --help
 ```
 
-## Configuration
+## 🕹️ Configuration (Totally Rad Edition)
 
-The tool uses a hierarchical configuration system:
+```
+╔═══════════════════════════════════════════════════════════════╗
+║  ░▒▓█ CONFIGURATION HIERARCHY █▓▒░  (Like a High Score List) ║
+╠═══════════════════════════════════════════════════════════════╣
+║  1. 🏆 Environment Variables    [HIGHEST PRIORITY]            ║
+║  2. 💾 Config File              [~/.config/mgit/config]       ║  
+║  3. 📼 Default Values           [Built-in defaults]           ║
+╚═══════════════════════════════════════════════════════════════╝
+```
 
-1. **Environment variables** (highest priority)
-2. **Global config** in `~/.config/mgit/config` (second priority)
-3. **Default values** in code (lowest priority)
+### 🎮 Dual Configuration System
 
-### Provider-Specific Configuration
+mgit supports **BOTH** environment variables AND config file settings! Mix and match like your favorite 80s mixtape! 🎵
 
-#### Azure DevOps
-- `AZURE_DEVOPS_ORG_URL`: Organization URL (e.g., https://dev.azure.com/myorg)
-- `AZURE_DEVOPS_EXT_PAT`: Personal Access Token
-- `AZUREDEVOPS_USERNAME`: Username (optional)
+### 📊 Configuration Reference Table
 
-#### GitHub
-- `GITHUB_PAT`: Personal Access Token
-- `GITHUB_ORG`: Default organization (optional)
-- `GITHUB_ENTERPRISE_URL`: GitHub Enterprise URL (optional)
-- `GITHUB_USERNAME`: Username (optional)
+| Environment Variable | Config File Key | Default | What It Does | Required? |
+|---------------------|-----------------|---------|--------------|----------|
+| **🌐 Global Settings** |||||
+| `DEFAULT_CONCURRENCY` | `DEFAULT_CONCURRENCY` | `4` | Max parallel git operations (like multi-ball in pinball!) | No |
+| `DEFAULT_UPDATE_MODE` | `DEFAULT_UPDATE_MODE` | `skip` | How to handle existing repos: `skip`/`pull`/`force` | No |
+| `LOG_FILENAME` | `LOG_FILENAME` | `mgit.log` | Where to save your high scores... err, logs | No |
+| `LOG_LEVEL` | `LOG_LEVEL` | `DEBUG` | File log verbosity: `DEBUG`/`INFO`/`WARNING`/`ERROR` | No |
+| `CON_LEVEL` | `CON_LEVEL` | `INFO` | Console output level (your CRT monitor display) | No |
+| **🔷 Azure DevOps** |||||
+| `AZURE_DEVOPS_ORG_URL` | `AZURE_DEVOPS_ORG_URL` | - | Your Azure DevOps org URL | Yes* |
+| `AZURE_DEVOPS_EXT_PAT` | `AZURE_DEVOPS_EXT_PAT` | - | Personal Access Token (your secret code!) | Yes* |
+| `AZURE_DEVOPS_USERNAME` | `AZURE_DEVOPS_USERNAME` | - | Username (optional player name) | No |
+| **🐙 GitHub** |||||
+| `GITHUB_PAT` | `GITHUB_PAT` | - | GitHub Personal Access Token | Yes* |
+| `GITHUB_ORG` | `GITHUB_ORG` | - | Default organization to clone from | No |
+| `GITHUB_ENTERPRISE_URL` | `GITHUB_ENTERPRISE_URL` | - | GitHub Enterprise URL (for corporate arcade) | No |
+| `GITHUB_USERNAME` | `GITHUB_USERNAME` | - | Your GitHub username | No |
+| **🪣 BitBucket** |||||
+| `BITBUCKET_WORKSPACE` | `BITBUCKET_WORKSPACE` | - | BitBucket workspace name | Yes* |
+| `BITBUCKET_USERNAME` | `BITBUCKET_USERNAME` | - | BitBucket username | Yes* |
+| `BITBUCKET_APP_PASSWORD` | `BITBUCKET_APP_PASSWORD` | - | BitBucket app password | Yes* |
+| `BITBUCKET_SERVER_URL` | `BITBUCKET_SERVER_URL` | - | BitBucket Server URL (self-hosted) | No |
 
-#### BitBucket
-- `BITBUCKET_WORKSPACE`: Default workspace
-- `BITBUCKET_USERNAME`: Username (required)
-- `BITBUCKET_APP_PASSWORD`: App Password
-- `BITBUCKET_SERVER_URL`: BitBucket Server URL (optional)
+*Required only when using that specific provider
 
-### Global Settings
-- `DEFAULT_CONCURRENCY`: Number of concurrent operations (default: 4)
-- `DEFAULT_UPDATE_MODE`: Default update mode (skip, pull, force)
+### 💿 Example Configurations
 
-### Example Configuration File
-
+#### Environment Variables (Bash/Zsh)
 ```bash
-# ~/.config/mgit/config
+# 🎯 Azure DevOps Setup
+export AZURE_DEVOPS_ORG_URL="https://dev.azure.com/radical-corp"
+export AZURE_DEVOPS_EXT_PAT="your-gnarly-token-here"
 
-# Global settings
+# 🐙 GitHub Setup  
+export GITHUB_PAT="ghp_totallyTubularToken1234567890"
+export GITHUB_ORG="awesome-sauce-inc"
+
+# 🎮 Performance Tuning
+export DEFAULT_CONCURRENCY="10"  # TURBO MODE!
+export DEFAULT_UPDATE_MODE="pull"
+```
+
+#### Config File (~/.config/mgit/config)
+```ini
+# ╔════════════════════════════════════╗
+# ║   mgit Configuration File v0.2.1   ║
+# ║   「 RADICAL CONFIG 」              ║
+# ╚════════════════════════════════════╝
+
+# Global Settings - Crank it to 11!
 DEFAULT_CONCURRENCY=8
 DEFAULT_UPDATE_MODE=pull
+LOG_LEVEL=INFO
+CON_LEVEL=INFO
 
-# Azure DevOps
-AZURE_DEVOPS_ORG_URL=https://dev.azure.com/mycompany
-AZURE_DEVOPS_EXT_PAT=mytoken123
+# Azure DevOps - The Corporate Arcade
+AZURE_DEVOPS_ORG_URL=https://dev.azure.com/bigcorp
+AZURE_DEVOPS_EXT_PAT=secret-token-dont-share
 
-# GitHub
-GITHUB_PAT=ghp_xxxxxxxxxxxx
-GITHUB_ORG=my-github-org
+# GitHub - Where the Cool Kids Hang
+GITHUB_PAT=ghp_xxxxxxxxxxxxxxxxxxxx
+GITHUB_ORG=rad-startup
 
-# BitBucket  
-BITBUCKET_WORKSPACE=myworkspace
-BITBUCKET_USERNAME=myusername
-BITBUCKET_APP_PASSWORD=myapppassword
+# BitBucket - The Underground Scene
+BITBUCKET_WORKSPACE=elite-hackers
+BITBUCKET_USERNAME=zerocool
+BITBUCKET_APP_PASSWORD=hack-the-planet
 ```
+
+### 🎯 Pro Tips
+
+1. **Mix & Match**: Use env vars for secrets, config file for defaults
+2. **Override on the Fly**: `DEFAULT_CONCURRENCY=20 mgit clone-all ...`
+3. **Check Your Config**: `mgit config --show` displays the final merged config
+4. **Provider Auto-Detection**: mgit is smart enough to figure out which provider you're using from URLs!
+
+### 🔐 Security Best Practices
+
+- 🚫 Never commit tokens to version control (that's a Game Over, man!)
+- 🔒 Config file is created with 0600 permissions (owner-only access)
+- 🎭 All tokens are masked in logs and console output
+- 💾 Use environment variables in CI/CD for maximum security
 
 ## Practical Examples
 
@@ -522,7 +533,7 @@ The tool handles sensitive information securely:
 
 ## For Developers
 
-For technical implementation details, architecture diagrams, and future improvement plans, please see [ARCHITECTURE.md](ARCHITECTURE.md).
+For technical implementation details, see the [documentation](docs/) directory and [CLAUDE.md](CLAUDE.md) for codebase guidance.
 
 ### Provider Implementation Status
 

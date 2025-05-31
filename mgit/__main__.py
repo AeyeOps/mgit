@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse, urlunparse, unquote
 
-from dotenv import dotenv_values, load_dotenv
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress
@@ -31,7 +30,7 @@ from azure.devops.exceptions import ClientRequestError, AzureDevOpsAuthenticatio
 # Local imports - Sprint 3A integrations
 from mgit.git import GitManager, embed_pat_in_url, sanitize_repo_name
 from mgit.utils import AsyncExecutor
-from mgit.providers.manager import ProviderManager
+from mgit.providers.manager_v2 import ProviderManager
 from mgit.exceptions import (
     MgitError,
     ConfigurationError,
@@ -60,10 +59,9 @@ from mgit.providers import (
     PermissionError,
     APIError,
 )
-from mgit.providers.manager import ProviderManager
-from mgit.legacy.azdevops_manager import AzDevOpsManager
+from mgit.providers.manager_v2 import ProviderManager
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 # Default values used if environment variables and config file don't provide values
 DEFAULT_VALUES = {
@@ -75,43 +73,47 @@ DEFAULT_VALUES = {
     "DEFAULT_UPDATE_MODE": "skip",
 }
 
-# Configuration loading order:
-# 1. Environment variables (highest priority)
-# 2. Global config file in ~/.config/mgit/config
-# 3. Default values (lowest priority)
-
-# First load environment variables
-load_dotenv(
-    dotenv_path=None,
-    verbose=True,
-    override=True,
+# Import YAML configuration system
+from mgit.config.yaml_manager import (
+    get_global_setting, migrate_from_dotenv,
+    CONFIG_DIR
 )
 
-# Load global config file if environment variables are not set
-CONFIG_DIR = Path.home() / ".config" / "mgit"
-CONFIG_FILE = CONFIG_DIR / "config"
 # Ensure config directory exists before setting up file logging
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
-# Fix type hint for default_value
+# Migrate old dotenv configuration if it exists
+migrate_from_dotenv()
+
+# Configuration loading with YAML system
 def get_config_value(key: str, default_value: Optional[str] = None) -> str:
     """
     Get a configuration value with the following priority:
-    1. Environment variable
-    2. Global config file
-    3. Default value
+    1. Environment variable (highest priority)
+    2. Global YAML configuration
+    3. Default value (lowest priority)
     """
     # First check environment
     env_value = os.environ.get(key)
     if env_value:
         return env_value
-
-    # Then check config file
-    if CONFIG_FILE.exists():
-        config_values = dotenv_values(dotenv_path=str(CONFIG_FILE))
-        if key in config_values and config_values[key]:
-            return config_values[key]
-
+    
+    # Map old keys to new YAML keys
+    key_mapping = {
+        "LOG_FILENAME": "log_filename",
+        "LOG_LEVEL": "log_level", 
+        "CON_LEVEL": "console_level",
+        "DEFAULT_CONCURRENCY": "default_concurrency",
+        "DEFAULT_UPDATE_MODE": "default_update_mode",
+    }
+    
+    # Get from YAML config
+    yaml_key = key_mapping.get(key, key.lower())
+    yaml_value = get_global_setting(yaml_key)
+    
+    if yaml_value is not None:
+        return str(yaml_value)
+    
     # Finally use default
     return default_value or DEFAULT_VALUES.get(key, "")
 
@@ -377,16 +379,17 @@ def clone_all(
     rel_path: str = typer.Argument(
         ..., help="Relative path to clone into."
     ),
-    url: Optional[str] = typer.Argument(
+    config: Optional[str] = typer.Option(
         None,
-        help="Organization URL (auto-detects provider if provided, "
-        f"defaults to {DEFAULT_VALUES['AZURE_DEVOPS_ORG_URL']} for backward compatibility).",
+        "--config",
+        "-cfg",
+        help="Named provider configuration (e.g., 'ado_pdidev', 'github_personal'). Uses default if not specified.",
     ),
-    provider: Optional[str] = typer.Option(
+    url: Optional[str] = typer.Option(
         None,
-        "--provider",
-        "-p",
-        help="Git provider (azuredevops, github, bitbucket). Auto-detected from URL if not specified.",
+        "--url",
+        "-u",
+        help="Organization URL (auto-detects provider if provided, overrides --config).",
     ),
     concurrency: int = typer.Option(
         int(get_config_value("DEFAULT_CONCURRENCY", "4")),
@@ -397,7 +400,7 @@ def clone_all(
     update_mode: UpdateMode = typer.Option(
         get_config_value("DEFAULT_UPDATE_MODE", "skip"),
         "--update-mode",
-        "-u",
+        "-um",
         help=(
             "How to handle existing folders: "
             "'skip' => do nothing if folder exists, "
@@ -413,18 +416,18 @@ def clone_all(
     Provider is auto-detected from URL or can be specified explicitly.
     """
 
-    # Initialize provider manager with provider selection
+    # Initialize provider manager with named configuration support
     try:
-        # Auto-detect or use explicit provider
-        if provider:
-            provider_manager = ProviderManager(provider_type=provider)
-        elif url:
+        # Priority: URL auto-detection > named config > default
+        if url:
             provider_manager = ProviderManager(auto_detect_url=url)
+        elif config:
+            provider_manager = ProviderManager(provider_name=config)
         else:
-            # Default to Azure DevOps for backward compatibility
-            provider_manager = ProviderManager(provider_type="azuredevops")
+            # Use default provider from config
+            provider_manager = ProviderManager()
             
-        logger.debug(f"Using provider: {provider_manager.provider_type}")
+        logger.debug(f"Using provider '{provider_manager.provider_name}' of type '{provider_manager.provider_type}'")
         
         # Check if provider is supported
         if not provider_manager.supports_provider():
@@ -592,13 +595,8 @@ def clone_all(
                     # - Folder didn't exist OR
                     # - Force mode was confirmed AND removal succeeded
                     progress.update(repo_task_id, description=f"[cyan]Cloning: {display_name}...", visible=True)
-                    # Get PAT from provider manager for URL embedding
-                    if provider_manager.provider_type == "azuredevops":
-                        legacy_manager = provider_manager.get_legacy_manager()
-                        pat_url = embed_pat_in_url(repo_url, legacy_manager.ado_pat) if legacy_manager else repo_url
-                    else:
-                        # For other providers, use the clone URL as-is (PAT should be in config)
-                        pat_url = repo_url
+                    # Get authenticated URL from provider manager
+                    pat_url = provider_manager.get_authenticated_clone_url(repo)
                     try:
                         # Use the sanitized name for the directory argument
                         await git_manager.git_clone(pat_url, target_path, sanitized_name)
@@ -648,11 +646,11 @@ def pull_all(
     rel_path: str = typer.Argument(
         ..., help="Relative path where repositories exist."
     ),
-    provider: Optional[str] = typer.Option(
+    config: Optional[str] = typer.Option(
         None,
-        "--provider",
-        "-p",
-        help="Git provider (azuredevops, github, bitbucket). Defaults to azuredevops for backward compatibility.",
+        "--config",
+        "-cfg",
+        help="Named provider configuration (e.g., 'ado_pdidev', 'github_personal'). Uses default if not specified.",
     ),
     concurrency: int = typer.Option(
         int(get_config_value("DEFAULT_CONCURRENCY", "4")),
@@ -663,7 +661,7 @@ def pull_all(
     update_mode: UpdateMode = typer.Option(
         get_config_value("DEFAULT_UPDATE_MODE", "skip"),
         "--update-mode",
-        "-u",
+        "-um",
         help=(
             "How to handle existing folders: "
             "'skip' => do nothing if folder exists, "
@@ -679,12 +677,15 @@ def pull_all(
     Provider is auto-detected from URL or can be specified explicitly.
     """
 
-    # Initialize provider manager with provider selection
+    # Initialize provider manager with named configuration support
     try:
-        # Use explicit provider
-        provider_manager = ProviderManager(provider_type=provider or "azuredevops")
+        # Use named config or default
+        if config:
+            provider_manager = ProviderManager(provider_name=config)
+        else:
+            provider_manager = ProviderManager()
             
-        logger.debug(f"Using provider: {provider_manager.provider_type}")
+        logger.debug(f"Using provider '{provider_manager.provider_name}' of type '{provider_manager.provider_type}'")
         
         # Check if provider is supported
         if not provider_manager.supports_provider():
@@ -858,13 +859,8 @@ def pull_all(
                     # - Folder didn't exist OR
                     # - Force mode was confirmed AND removal succeeded
                     progress.update(repo_task_id, description=f"[cyan]Cloning: {display_name}...", visible=True)
-                    # Get PAT from provider manager for URL embedding
-                    if provider_manager.provider_type == "azuredevops":
-                        legacy_manager = provider_manager.get_legacy_manager()
-                        pat_url = embed_pat_in_url(repo_url, legacy_manager.ado_pat) if legacy_manager else repo_url
-                    else:
-                        # For other providers, use the clone URL as-is (PAT should be in config)
-                        pat_url = repo_url
+                    # Get authenticated URL from provider manager
+                    pat_url = provider_manager.get_authenticated_clone_url(repo)
                     try:
                         # Use the sanitized name for the directory argument
                         await git_manager.git_clone(pat_url, target_path, sanitized_name)
@@ -978,209 +974,258 @@ def gen_env():
 # -----------------------------------------------------------------------------
 @app.command(help="Login to git provider and validate credentials. Supports Azure DevOps, GitHub, and BitBucket.")
 def login(
-    provider: Optional[str] = typer.Option(
-        "azuredevops", "--provider", "-p", help="Git provider (azuredevops, github, bitbucket)."
+    config: Optional[str] = typer.Option(
+        None,
+        "--config",
+        "-cfg",
+        help="Named provider configuration to test (e.g., 'ado_pdidev', 'github_personal').",
+    ),
+    provider_type: Optional[str] = typer.Option(
+        None, "--provider", "-p", help="Provider type for new configuration (azuredevops, github, bitbucket)."
+    ),
+    name: Optional[str] = typer.Option(
+        None, "--name", "-n", help="Name for new provider configuration (e.g., 'my_github')."
     ),
     organization: Optional[str] = typer.Option(
-        None, "--org", "-o", help="Provider organization/workspace URL (optional, uses config/env if not provided)."
+        None, "--org", "-o", help="Provider organization/workspace URL for new configuration."
     ),
     token: Optional[str] = typer.Option(
-        None, "--token", "-t", help="Access token (PAT/API token, optional, uses config/env if not provided)."
+        None, "--token", "-t", help="Access token (PAT/API token) for new configuration."
     ),
     store: bool = typer.Option(
-        False, # Default to False for explicit login command
+        True,
         "--store/--no-store",
-        help="Store provided credentials in global config file (~/.config/mgit/config)."
+        help="Store new configuration in global config file (~/.config/mgit/config.yaml)."
     )
 ):
     """
-    Validate git provider credentials and optionally store them.
-
-    Tests connection using credentials from arguments, environment variables,
-    or global config file. If --store is used, saves the provided
-    (or discovered) credentials to the global config.
+    Login and validate provider credentials using YAML configuration system.
+    
+    Supports testing existing configurations or creating new ones.
     """
-    # Create provider manager for selected provider
-    provider_config = {}
-    if organization:
-        provider_config["organization_url"] = organization
-    if token:
-        provider_config["pat"] = token
-    
-    provider_manager = ProviderManager(
-        provider_type=provider,
-        config=provider_config
+    from mgit.config.yaml_manager import (
+        add_provider_config, get_provider_configs, 
+        list_provider_names, ConfigurationManager
     )
-
-    # Check if provider is supported, fallback to legacy for Azure DevOps
-    try:
-        provider_supported = provider_manager.supports_provider()
-    except Exception as e:
-        # Configuration error or other validation issue
-        console.print(f"[red]✗[/red] Provider configuration error: {e}")
-        raise typer.Exit(code=1)
-        
-    if not provider_supported:
-        if provider == "azuredevops":
-            # Use legacy Azure DevOps manager
-            ado = AzDevOpsManager(organization_url=organization, pat=token)
-            
-            # Prompt if still missing after checking args/config/env
-            if not ado.ado_org:
-                ado.ado_org = typer.prompt(
-                    "Enter Azure DevOps organization URL",
-                    default=DEFAULT_VALUES["AZURE_DEVOPS_ORG_URL"]
-                )
-                # Re-initialize if org was prompted
-                ado = AzDevOpsManager(organization_url=ado.ado_org, pat=ado.ado_pat)
-            
-            if not ado.ado_pat:
-                ado.ado_pat = typer.prompt(
-                    "Enter Personal Access Token (PAT)",
-                    hide_input=True
-                )
-                # Re-initialize if PAT was prompted
-                ado = AzDevOpsManager(organization_url=ado.ado_org, pat=ado.ado_pat)
-            
-            # Ensure URL format is correct after potential prompt
-            if ado.ado_org and not ado.ado_org.startswith(("http://", "https://")):
-                ado.ado_org = f"https://{ado.ado_org}"
-                # Re-initialize if URL format changed
-                ado = AzDevOpsManager(organization_url=ado.ado_org, pat=ado.ado_pat)
-            
-            # Test the connection
-            if ado.test_connection():
-                console.print(f"[green]✓[/green] Successfully connected to Azure DevOps organization: {ado.ado_org}")
-                
-                # Store credentials if requested and if they were provided/discovered
-                if store and ado.ado_org and ado.ado_pat:
-                    should_store = True
-                    if CONFIG_FILE.exists():
-                        # Ask for confirmation before overwriting
-                        should_store = Confirm.ask(f"Overwrite existing credentials in {CONFIG_FILE}?", default=False)
-                    if should_store:
-                        # Use the potentially prompted/formatted values
-                        store_credentials(ado.ado_org, ado.ado_pat)
-                    else:
-                        console.print("[yellow]Credentials not stored.[/yellow]")
-                elif store:
-                    logger.warning("Could not store credentials as organization URL or PAT was missing.")
-            else:
-                console.print(f"[red]✗[/red] Failed to connect/authenticate to {ado.ado_org}. Please check URL and PAT.")
-                raise typer.Exit(code=1)
-            return
-        else:
-            console.print(f"[red]✗[/red] Provider '{provider}' is not yet fully implemented.")
-            console.print(f"[yellow]Available providers: {', '.join(provider_manager.list_supported_providers())}[/yellow]")
-            raise typer.Exit(code=1)
     
-    # Use new provider system
-    try:
-        # Test connection with the provider
-        if provider_manager.test_connection():
-            console.print(f"[green]✓[/green] Successfully connected to {provider} provider")
-            
-            # TODO: Implement credential storage for multi-provider
-            if store:
-                console.print(f"[yellow]Credential storage for {provider} provider not yet implemented.[/yellow]")
-        else:
-            console.print(f"[red]✗[/red] Failed to connect/authenticate to {provider} provider. Please check credentials.")
+    # Case 1: Test existing named configuration
+    if config:
+        try:
+            provider_manager = ProviderManager(provider_name=config)
+            if provider_manager.test_connection():
+                console.print(f"[green]✓[/green] Successfully connected using configuration '{config}'")
+                console.print(f"   Provider type: {provider_manager.provider_type}")
+            else:
+                console.print(f"[red]✗[/red] Failed to connect using configuration '{config}'")
+                raise typer.Exit(code=1)
+        except Exception as e:
+            console.print(f"[red]✗[/red] Error testing configuration '{config}': {e}")
             raise typer.Exit(code=1)
+        return
+    
+    # Case 2: Create new configuration
+    if not name:
+        name = typer.prompt("Enter name for this provider configuration")
+    
+    if not provider_type:
+        console.print("[yellow]Available provider types: azuredevops, github, bitbucket[/yellow]")
+        provider_type = typer.prompt("Enter provider type")
+    
+    # Collect provider-specific configuration
+    provider_config = {}
+    
+    if provider_type == "azuredevops":
+        if not organization:
+            organization = typer.prompt("Enter Azure DevOps organization URL")
+        if not token:
+            token = typer.prompt("Enter Personal Access Token (PAT)", hide_input=True)
+        
+        # Ensure URL format
+        if not organization.startswith(("http://", "https://")):
+            organization = f"https://{organization}"
+            
+        provider_config = {
+            "org_url": organization,
+            "pat": token
+        }
+        
+    elif provider_type == "github":
+        if not token:
+            token = typer.prompt("Enter GitHub token", hide_input=True)
+        provider_config = {"token": token}
+        
+    elif provider_type == "bitbucket":
+        if not organization:
+            organization = typer.prompt("Enter BitBucket username")
+        if not token:
+            token = typer.prompt("Enter BitBucket app password", hide_input=True)
+        provider_config = {
+            "username": organization,
+            "app_password": token
+        }
+    else:
+        console.print(f"[red]✗[/red] Unknown provider type: {provider_type}")
+        raise typer.Exit(code=1)
+    
+    # Test the configuration
+    console.print(f"[blue]Testing connection to {provider_type}...[/blue]")
+    try:
+        # Create temporary config to test
+        from mgit.config.yaml_manager import ConfigurationManager
+        temp_config = ConfigurationManager()
+        temp_config._config_cache = {
+            'providers': {name: provider_config}, 
+            'global': {}
+        }
+        
+        # Create provider manager with temporary config
+        provider_manager = ProviderManager(provider_name=name)
+        provider_manager._config = provider_config
+        provider_manager._provider_type = provider_type
+        provider_manager.provider_name = name
+        
+        if provider_manager.test_connection():
+            console.print(f"[green]✓[/green] Successfully connected to {provider_type}")
+            
+            if store:
+                add_provider_config(name, provider_config)
+                console.print(f"[green]✓[/green] Stored configuration '{name}' in ~/.config/mgit/config.yaml")
+                
+                # Ask if this should be the default
+                if Confirm.ask(f"Set '{name}' as the default provider?", default=True):
+                    from mgit.config.yaml_manager import set_default_provider
+                    set_default_provider(name)
+                    console.print(f"[green]✓[/green] Set '{name}' as default provider")
+            else:
+                console.print("[yellow]Configuration tested but not saved (use --store to save)[/yellow]")
+        else:
+            console.print(f"[red]✗[/red] Failed to connect to {provider_type}. Please check your credentials.")
+            raise typer.Exit(code=1)
+            
     except Exception as e:
-        console.print(f"[red]✗[/red] Error testing {provider} provider connection: {e}")
+        console.print(f"[red]✗[/red] Error testing {provider_type} connection: {e}")
         raise typer.Exit(code=1)
 
 
-def store_credentials(organization: str, pat: str):
-    """Store credentials in global config file for future use."""
-    # Create config directory if it doesn't exist
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Read existing config if available
-    config_values = {}
-    if CONFIG_FILE.exists():
-        config_values = dotenv_values(dotenv_path=str(CONFIG_FILE))
-
-    # Update with new values
-    config_values["AZURE_DEVOPS_ORG_URL"] = organization
-    config_values["AZURE_DEVOPS_EXT_PAT"] = pat
-
-    # Write back to config file
-    with CONFIG_FILE.open("w", encoding="utf-8") as f:
-        for k, v in config_values.items():
-            f.write(f"{k}={v}\n")
-
-    console.print(f"[green]✓[/green] Credentials stored in {CONFIG_FILE}")
-    os.chmod(CONFIG_FILE, 0o600)  # Set secure permissions
+# store_credentials function removed - using YAML configuration system instead
 
 
 # -----------------------------------------------------------------------------
 # config Command
 # -----------------------------------------------------------------------------
-@app.command(help="Set or view global configuration settings for mgit.")
+@app.command(help="Manage provider configurations and global settings.")
 def config(
-    show: bool = typer.Option(False, "--show", help="Show current global configuration and exit."),
-    organization: Optional[str] = typer.Option(
-        None, "--org", help="Default organization/workspace URL (provider-specific)."
-    ),
-    concurrency: Optional[int] = typer.Option(
-        None, "--concurrency", help="Default concurrency for clone operations."
-    ),
-    update_mode: Optional[UpdateMode] = typer.Option(
-        None, "--update-mode", help="Default update mode (skip, pull, force)."
-    ),
+    list_providers: bool = typer.Option(False, "--list", "-l", help="List all configured providers."),
+    show_provider: Optional[str] = typer.Option(None, "--show", "-s", help="Show details for a specific provider."),
+    set_default: Optional[str] = typer.Option(None, "--set-default", "-d", help="Set the default provider."),
+    remove_provider: Optional[str] = typer.Option(None, "--remove", "-r", help="Remove a provider configuration."),
+    global_settings: bool = typer.Option(False, "--global", "-g", help="Show global settings."),
 ):
     """
-    Configure global settings for mgit.
-
-    This command allows you to set default values for common parameters
-    that will be used across all invocations of mgit.
+    Manage provider configurations and global settings using YAML config.
+    
+    Examples:
+      mgit config --list                    # List all providers
+      mgit config --show ado_pdidev         # Show provider details
+      mgit config --set-default github_personal  # Set default provider
+      mgit config --remove old_config       # Remove provider
+      mgit config --global                  # Show global settings
     """
-    # Create config directory if it doesn't exist
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Read existing config if available
-    config_values: Dict[str, Any] = {}
-    if CONFIG_FILE.exists():
-        config_values = dotenv_values(dotenv_path=str(CONFIG_FILE))
-
-    # If show option is specified, display current config and exit
-    if show:
-        console.print("[bold]Current global configuration:[/bold]")
-        if config_values:
-            for key, value in config_values.items():
-                # Mask the PAT token when displaying
-                if key == "AZURE_DEVOPS_EXT_PAT":
-                    masked_value = value[:4] + "*" * (len(value) - 8) + value[-4:] if len(value) > 8 else "*" * len(value)
-                    console.print(f"  {key}={masked_value}")
-                else:
-                    console.print(f"  {key}={value}")
-        else:
-            console.print("  No global configuration set.")
+    from mgit.config.yaml_manager import (
+        list_provider_names, get_provider_config, get_default_provider_name,
+        detect_provider_type, set_default_provider, remove_provider_config,
+        get_global_config
+    )
+    
+    # List all providers
+    if list_providers:
+        providers = list_provider_names()
+        if not providers:
+            console.print("[yellow]No provider configurations found.[/yellow]")
+            console.print("Use 'mgit login' to create your first provider configuration.")
+            return
+            
+        default_provider = get_default_provider_name()
+        console.print("[bold]Configured Providers:[/bold]")
+        
+        for name in providers:
+            try:
+                provider_type = detect_provider_type(name)
+                default_marker = " [green](default)[/green]" if name == default_provider else ""
+                console.print(f"  [blue]{name}[/blue] ({provider_type}){default_marker}")
+            except Exception as e:
+                console.print(f"  [yellow]{name}[/yellow] (type detection failed: {e})")
+        
+        console.print(f"\nConfig file: ~/.config/mgit/config.yaml")
         return
-
-    # Update config values with provided options
-    if organization:
-        # Ensure URL format is correct
-        if not organization.startswith(("http://", "https://")):
-            organization = f"https://{organization}"
-        config_values["AZURE_DEVOPS_ORG_URL"] = organization
-
-    if concurrency is not None:
-        config_values["DEFAULT_CONCURRENCY"] = str(concurrency)
-
-    if update_mode is not None:
-        config_values["DEFAULT_UPDATE_MODE"] = update_mode.value # Store enum value
-
-    # Write updated config
-    with CONFIG_FILE.open("w", encoding="utf-8") as f:
-        for k, v in config_values.items():
-            f.write(f"{k}={v}\n")
-
-    # Set secure permissions on config file
-    os.chmod(CONFIG_FILE, 0o600)
-
-    console.print(f"[green]✓[/green] Configuration updated successfully in {CONFIG_FILE}")
+    
+    # Show specific provider
+    if show_provider:
+        try:
+            config = get_provider_config(show_provider)
+            provider_type = detect_provider_type(show_provider)
+            
+            console.print(f"[bold]Provider Configuration: {show_provider}[/bold]")
+            console.print(f"  Type: {provider_type}")
+            
+            # Mask sensitive fields
+            for key, value in config.items():
+                if key in ['pat', 'token', 'app_password']:
+                    masked_value = value[:4] + "*" * (len(value) - 8) + value[-4:] if len(value) > 8 else "*" * len(value)
+                    console.print(f"  {key}: {masked_value}")
+                else:
+                    console.print(f"  {key}: {value}")
+                    
+        except Exception as e:
+            console.print(f"[red]✗[/red] Error showing provider '{show_provider}': {e}")
+            raise typer.Exit(code=1)
+        return
+    
+    # Set default provider
+    if set_default:
+        try:
+            set_default_provider(set_default)
+            console.print(f"[green]✓[/green] Set '{set_default}' as default provider")
+        except Exception as e:
+            console.print(f"[red]✗[/red] Error setting default provider: {e}")
+            raise typer.Exit(code=1)
+        return
+    
+    # Remove provider
+    if remove_provider:
+        try:
+            remove_provider_config(remove_provider)
+            console.print(f"[green]✓[/green] Removed provider configuration '{remove_provider}'")
+        except Exception as e:
+            console.print(f"[red]✗[/red] Error removing provider: {e}")
+            raise typer.Exit(code=1)
+        return
+    
+    # Show global settings
+    if global_settings:
+        try:
+            global_config = get_global_config()
+            console.print("[bold]Global Settings:[/bold]")
+            
+            if global_config:
+                for key, value in global_config.items():
+                    console.print(f"  {key}: {value}")
+            else:
+                console.print("  No global settings configured.")
+                
+        except Exception as e:
+            console.print(f"[red]✗[/red] Error showing global settings: {e}")
+            raise typer.Exit(code=1)
+        return
+    
+    # Default behavior - show help
+    console.print("Use one of the options to manage configurations:")
+    console.print("  --list           List all providers")  
+    console.print("  --show NAME      Show provider details")
+    console.print("  --set-default    Set default provider")
+    console.print("  --remove NAME    Remove provider")
+    console.print("  --global         Show global settings")
+    console.print("\nRun 'mgit config --help' for more details.")
 
 
 # The callback is no longer needed since we're using Typer's built-in help

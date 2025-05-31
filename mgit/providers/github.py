@@ -117,6 +117,26 @@ class GitHubProvider(GitProvider):
                 raise ConfigurationError("OAuth token is required for OAuth authentication", self.PROVIDER_NAME)
         else:
             raise ConfigurationError(f"Unsupported auth method: {self.auth_method}", self.PROVIDER_NAME)
+    
+    async def _ensure_session(self) -> None:
+        """Ensure we have a valid session for the current event loop."""
+        import asyncio
+        
+        try:
+            current_loop = asyncio.get_running_loop()
+            
+            # Check if we need a new session
+            if not self._session or self._session.closed:
+                self._session = aiohttp.ClientSession()
+            else:
+                # Check if session belongs to current loop
+                if hasattr(self._session, '_loop') and self._session._loop != current_loop:
+                    # Close old session and create new one
+                    await self._session.close()
+                    self._session = aiohttp.ClientSession()
+        except Exception as e:
+            logger.debug(f"Session creation error: {e}")
+            self._session = aiohttp.ClientSession()
         
     async def authenticate(self) -> bool:
         """Authenticate with GitHub.
@@ -133,9 +153,7 @@ class GitHubProvider(GitProvider):
         organization = self.base_url  # Use base_url as organization identifier
         
         try:
-            # Initialize session if needed
-            if not self._session:
-                self._session = aiohttp.ClientSession()
+            await self._ensure_session()
                 
             # Set up authentication headers
             if self.auth_method == 'pat':
@@ -270,9 +288,7 @@ class GitHubProvider(GitProvider):
         except Exception as e:
             logger.error("Unexpected error during GitHub connection test: %s", e)
             return False
-        finally:
-            # Clean up session after test
-            await self.cleanup()
+        # Don't cleanup here - the session will be reused for subsequent operations
     
     async def cleanup(self) -> None:
         """Clean up resources."""
@@ -387,6 +403,7 @@ class GitHubProvider(GitProvider):
         if not await self.authenticate():
             return
             
+        await self._ensure_session()
         try:
             # Build URL and query parameters
             url = f"{self.base_url}/orgs/{organization}/repos"

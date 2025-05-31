@@ -24,6 +24,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Nothing yet.
 
+## [0.2.2] - 2025-05-30
+
+### Changed
+- **Documentation Overhaul**: Massive cleanup and reorganization of project documentation
+  - Consolidated installation instructions into README.md
+  - Added comprehensive 80s-themed configuration reference table
+  - Removed 62+ transitional development artifacts
+  - Streamlined root directory from 40+ files to 10 essential files
+- **Improved Configuration Documentation**: Added clear dual-configuration system explanation
+  - Environment variables vs config file precedence clearly documented
+  - Complete reference table showing all configuration options
+  - Fixed incorrect MGIT_ prefix references in migration guide
+- **Project Structure**: Cleaned and organized for professional release
+  - Removed unnecessary Docker orchestration files (kept only essential Dockerfile)
+  - Archived all MAWEP sprint artifacts and internal development docs
+  - Removed test artifacts and development scripts from root
+
+### Removed
+- Redundant installation documentation files (INSTALLATION_GUIDE.md, INSTALLATION_FROM_GITHUB.md)
+- Docker Compose files and Helm charts (overkill for CLI tool)
+- Development/release automation scripts (moved to archive)
+- MAWEP workspace and sprint management artifacts
+- Test environment and artifacts from root directory
+- Migration guide for v0.2.0 to v0.2.1 (historical)
+- Internal demo/example scripts with mock credentials
+
+### Fixed
+- Configuration documentation now correctly shows actual environment variable names
+- Simplified .gitignore from 189 lines to 58 lines (removed irrelevant entries)
+- README.md broken links to archived documentation
+
 ## [0.2.1] - 2025-01-29
 
 ### Added

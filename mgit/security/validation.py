@@ -26,8 +26,8 @@ class SecurityValidator:
         r'\\\.\.',          # Windows parent directory at start
         r'~/',              # Home directory expansion
         r'\$\{',            # Variable expansion
-        r'%[0-9a-fA-F]{2}', # URL encoded characters
-        r'[<>:"|?*]',       # Windows forbidden characters
+        # Removed URL encoding pattern - too restrictive for legitimate URLs
+        r'[<>"|*]',         # Windows forbidden characters (removed : and ? which are valid in URLs)
     ]
     
     # Allowed repository name patterns

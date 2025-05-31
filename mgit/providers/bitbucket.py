@@ -116,6 +116,26 @@ class BitBucketProvider(GitProvider):
         else:
             raise ConfigurationError(f"Unsupported auth method: {self.auth_method}")
         
+    async def _ensure_session(self) -> None:
+        """Ensure we have a valid session for the current event loop."""
+        import asyncio
+        
+        try:
+            current_loop = asyncio.get_running_loop()
+            
+            # Check if we need a new session
+            if not self._session or self._session.closed:
+                self._session = aiohttp.ClientSession()
+            else:
+                # Check if session belongs to current loop
+                if hasattr(self._session, '_loop') and self._session._loop != current_loop:
+                    # Close old session and create new one
+                    await self._session.close()
+                    self._session = aiohttp.ClientSession()
+        except Exception as e:
+            self.logger.debug(f"Session creation error: {e}")
+            self._session = aiohttp.ClientSession()
+    
     async def authenticate(self) -> bool:
         """Authenticate with BitBucket.
         
@@ -129,8 +149,7 @@ class BitBucketProvider(GitProvider):
             return True
             
         try:
-            if not self._session:
-                self._session = aiohttp.ClientSession()
+            await self._ensure_session()
                 
             # Test authentication with GET /user
             headers = self._get_auth_headers()
@@ -168,9 +187,7 @@ class BitBucketProvider(GitProvider):
         except Exception as e:
             self.logger.error(f"Connection test failed: {e}")
             return False
-        finally:
-            # Clean up session after test
-            await self.cleanup()
+        # Don't cleanup here - the session will be reused for subsequent operations
     
     async def cleanup(self) -> None:
         """Clean up resources."""
@@ -191,6 +208,7 @@ class BitBucketProvider(GitProvider):
         if not await self.authenticate():
             raise AuthenticationError("Authentication required")
             
+        await self._ensure_session()
         headers = self._get_auth_headers()
         url = f"{self.base_url}/workspaces"
         organizations = []
@@ -242,6 +260,7 @@ class BitBucketProvider(GitProvider):
         if not await self.authenticate():
             raise AuthenticationError("Authentication required")
             
+        await self._ensure_session()
         headers = self._get_auth_headers()
         url = f"{self.base_url}/workspaces/{organization}/projects"
         projects = []
@@ -306,6 +325,7 @@ class BitBucketProvider(GitProvider):
         if not await self.authenticate():
             raise AuthenticationError("Authentication required")
             
+        await self._ensure_session()
         headers = self._get_auth_headers()
         url = f"{self.base_url}/repositories/{organization}"
         
@@ -365,6 +385,7 @@ class BitBucketProvider(GitProvider):
         if not await self.authenticate():
             raise AuthenticationError("Authentication required")
             
+        await self._ensure_session()
         headers = self._get_auth_headers()
         url = f"{self.base_url}/repositories/{organization}/{repository}"
         
