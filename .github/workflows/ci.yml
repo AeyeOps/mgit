@@ -1,12 +1,13 @@
 name: Continuous Integration
 
 on:
-  # Called by release workflow for main/develop builds
+  # Called by release workflow for main/develop builds and tag pushes
   workflow_call:
     
   # Independent runs for feature branches
   push:
     branches: [ 'feature/*', 'bugfix/*', 'hotfix/*' ]
+    tags: [ 'v*' ]
     
   # PR validation (but not for main/develop - handled by release workflow)
   pull_request:
