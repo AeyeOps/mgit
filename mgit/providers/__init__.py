@@ -88,7 +88,7 @@ __all__ = [
     # Exceptions
     "ProviderError",
     "AuthenticationError",
-    "ConfigurationError", 
+    "ConfigurationError",
     "ConnectionError",
     "RateLimitError",
     "ProviderNotFoundError",
