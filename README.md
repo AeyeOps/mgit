@@ -1,552 +1,365 @@
 # mgit - Multi-Provider Git CLI Tool 🚀
 
 [![GitHub Release](https://img.shields.io/github/release/AeyeOps/mgit.svg)](https://github.com/AeyeOps/mgit/releases/latest)
-[![Install from GitHub](https://img.shields.io/badge/pip%20install-GitHub%20Release-brightgreen)](https://github.com/AeyeOps/mgit/releases/latest)
-[![Docker Image](https://img.shields.io/docker/v/aeyeops/mgit?label=docker)](https://ghcr.io/aeyeops/mgit)
-[![Security](https://img.shields.io/badge/Security-AES--256-green)](docs/security)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Security](https://img.shields.io/badge/Security-Enterprise_Grade-green)](docs/security)
 
-A powerful **enterprise-grade** command-line tool for managing repositories across multiple git platforms. Clone entire projects, update multiple repositories, and automate your git workflows with support for:
+**The modern CLI for DevOps teams managing repositories across Azure DevOps, GitHub, and BitBucket.**
 
-✅ **Azure DevOps** - Full feature support with organizations and projects  
-✅ **GitHub** - Complete integration for organizations and users  
-✅ **BitBucket** - Full workspace and repository management  
+Discover, clone, and manage hundreds of repositories with powerful query patterns, enhanced progress tracking, and enterprise-grade configuration management.
 
-**All providers have feature parity** - login, clone-all, pull-all, and configuration work identically across platforms.
+## ✨ What Makes mgit Special
 
-Ready for production deployment with comprehensive security, monitoring, and automation capabilities.
+🔍 **Smart Repository Discovery** - Find repositories across providers using powerful query patterns like `"pdidev/*/*"` or `"*/*/payment*"`
 
-## Provider Comparison
+📊 **Professional Progress Tracking** - Multi-level progress bars show real-time discovery and operation status
 
-| Feature | Azure DevOps | GitHub | BitBucket |
-|---------|--------------|--------|-----------|
-| **Authentication** | Personal Access Token (PAT) | Personal Access Token | App Password |
-| **Repository Scope** | Projects | Organizations/Users | Workspaces |
-| **API Support** | Full REST API v7.1 | Full REST API v3 | Full REST API v2.0 |
-| **Concurrent Operations** | 4 (default) | 10 (default) | 5 (default) |
-| **Enterprise Support** | Yes | Yes (GitHub Enterprise) | Yes (BitBucket Server) |
-| **Disabled Repo Handling** | ✅ Auto-skip | ✅ Auto-skip | ✅ Auto-skip |
-| **Clone Methods** | HTTPS/SSH | HTTPS/SSH | HTTPS/SSH |
-| **Rate Limiting** | Generous | 5000/hour (authenticated) | 1000/hour |
+🏢 **Enterprise Configuration** - YAML-based config system with named provider profiles and secure credential management
 
-## Overview
+⚡ **Blazing Fast Operations** - Async operations with intelligent concurrency limits optimized per provider
 
-mgit simplifies repository management across multiple git providers:
-- Clone all repositories from any supported git provider with a single command
-- Pull updates for multiple repositories simultaneously across different platforms
-- Configure provider-specific settings with a unified interface
-- Manage authentication credentials securely for all providers
-- Automatically handle disabled repositories with clear reporting
-- Auto-detect providers from URLs or specify explicitly
-
-Built with Python using modern package structure, leveraging asynchronous operations for speed and providing rich console output for better visibility.
-
-## Project Structure
-
-```
-mgit/
-├── mgit/                    # Main package
-│   ├── __main__.py         # Entry point
-│   ├── cli/                # CLI components  
-│   ├── config/             # Configuration management
-│   ├── git/                # Git operations
-│   └── utils/              # Utility functions
-├── docs/                   # Comprehensive documentation
-│   ├── architecture/       # Technical design docs
-│   └── configuration/      # Config system docs
-└── scripts/               # Automation scripts
-```
-
-## Installation
-
-### Prerequisites
-
-- **Git** (required for all installation methods)
-- **Python 3.8+** (for pip and source installation)
-- **Docker** (for containerized installation)
-
-### Installation Methods
-
-#### 1. Install from GitHub Release (Recommended)
-
-```bash
-# Install the latest release
-pip install https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-0.2.1-py3-none-any.whl
-
-# Verify installation
-mgit --version
-```
-
-#### 2. Download Pre-built Binary (No Python Required)
-
-Download the standalone executable for your platform from the [latest release](https://github.com/AeyeOps/mgit/releases/latest):
-
-```bash
-# Linux
-wget https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-linux-x64
-chmod +x mgit-v0.2.1-linux-x64
-./mgit-v0.2.1-linux-x64 --version
-
-# macOS
-curl -L https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-macos-x64 -o mgit
-chmod +x mgit
-./mgit --version
-
-# Windows (PowerShell)
-Invoke-WebRequest -Uri https://github.com/AeyeOps/mgit/releases/download/v0.2.1/mgit-v0.2.1-windows-x64.exe -OutFile mgit.exe
-.\mgit.exe --version
-```
-
-#### 3. Use Docker
-
-```bash
-# Pull the latest image
-docker pull ghcr.io/aeyeops/mgit:latest
-
-# Run mgit
-docker run --rm ghcr.io/aeyeops/mgit:latest --version
-
-# Create an alias for convenience
-alias mgit='docker run --rm -v $(pwd):/workspace -v ~/.config/mgit:/root/.config/mgit ghcr.io/aeyeops/mgit:latest'
-```
-
-#### 4. Install from Source
-
-```bash
-# Clone the repository
-git clone https://github.com/AeyeOps/mgit.git
-cd mgit
-
-# Install in development mode
-pip install -r requirements.txt
-pip install -e .
-
-# Run mgit
-mgit --version
-```
-
-### Post-Installation Setup
-
-1. **Verify Installation**
-   ```bash
-   mgit --version
-   mgit --help
-   ```
-
-2. **Optional: Add to PATH**
-   ```bash
-   # For downloaded binaries
-   sudo mv mgit-v0.2.1-linux-x64 /usr/local/bin/mgit
-   ```
-
-3. **Configure Authentication**
-   ```bash
-   # Set up credentials for your providers
-   mgit login --provider github --token YOUR_TOKEN --store
-   mgit login --provider azuredevops --org https://dev.azure.com/your-org --token YOUR_PAT --store
-   mgit login --provider bitbucket --username YOUR_USER --token YOUR_APP_PASSWORD --store
-   ```
+🎯 **Provider Agnostic** - Identical commands work across Azure DevOps, GitHub, and BitBucket
 
 ## Quick Start
 
-### Basic Operations
-
-Get the current version:
 ```bash
-# If installed via pip
-mgit --version
+# 1. Install mgit
+pip install https://github.com/AeyeOps/mgit/releases/download/v0.2.3/mgit-0.2.3-py3-none-any.whl
 
-# If using Docker
-docker run --rm ghcr.io/aeyeops/mgit:latest --version
+# 2. Set up your first provider
+mgit login --provider azuredevops --name work_ado
 
-# If running from source
-python -m mgit --version
+# 3. Discover repositories
+mgit list "pdidev/*/*"
+
+# 4. Clone everything from a project
+mgit clone-all "pdidev/PDIOperations/*" ./my-repos
 ```
 
-### Authentication
+## 🔍 Repository Discovery
 
-Authenticate with your git provider:
+The `mgit list` command provides powerful repository discovery across all your providers:
 
-#### Azure DevOps
 ```bash
-# Interactive login (using pip-installed version)
-mgit login --provider azuredevops
+# Find all repositories everywhere
+mgit list "*/*/*"
 
-# Or specify credentials directly
-mgit login --provider azuredevops --org https://dev.azure.com/your-org --token your-pat
+# Find all repos in specific organization
+mgit list "myorg/*/*" 
 
-# Using Docker (credentials saved in mounted volume)
-docker run --rm -v ~/.config/mgit:/root/.config/mgit ghcr.io/aeyeops/mgit:latest login --provider azuredevops --store
+# Find all payment-related repos
+mgit list "*/*/pay*"
+
+# Find repos in specific project  
+mgit list "myorg/backend/*"
+
+# Output as JSON for automation
+mgit list "*/*/*" --format json --limit 100
 ```
 
-#### GitHub
-```bash
-# Personal or organization repositories
-mgit login --provider github --token your-github-pat
+**Features:**
+- 🌐 Cross-provider search with single command
+- 📈 Real-time progress with live repository counters
+- 🎯 Flexible pattern matching (wildcards supported)
+- 📋 Rich table output or JSON for automation
+- ⚡ Async discovery for maximum speed
 
-# GitHub Enterprise
-mgit login --provider github --org https://github.enterprise.com --token your-pat
-```
-
-#### BitBucket
-```bash
-# BitBucket Cloud with app password
-mgit login --provider bitbucket --org your-workspace --token your-app-password
-```
-
-Note: Use `--store` flag to save credentials to config file (~/.config/mgit/config)
+## 🚀 Bulk Operations
 
 ### Clone All Repositories
 
-Clone all repositories from a project/organization/workspace:
-
-#### Auto-detect provider from URL
 ```bash
-# Azure DevOps
-mgit clone-all my-project ./repos https://dev.azure.com/my-org
+# Clone from specific provider configuration
+mgit clone-all "myorg/backend/*" ./repos --config work_ado
 
-# GitHub  
-mgit clone-all my-org ./repos https://github.com
+# Auto-detect provider from URL  
+mgit clone-all myproject ./repos --url https://dev.azure.com/myorg
 
-# BitBucket
-mgit clone-all my-workspace ./repos https://bitbucket.org
+# High-speed cloning with custom concurrency
+mgit clone-all myorg ./repos --concurrency 10
 
-# Using Docker
-docker run --rm -v $(pwd):/workspace ghcr.io/aeyeops/mgit:latest clone-all my-org /workspace/repos https://github.com
+# Force mode with confirmation prompts
+mgit clone-all myproject ./repos --update-mode force
 ```
 
-#### Explicit provider selection
-```bash
-# Azure DevOps project
-mgit clone-all my-project ./repos --provider azuredevops
+### Bulk Updates
 
-# GitHub organization or user
-mgit clone-all octocat ./repos --provider github
+```bash
+# Pull all repositories in a directory
+mgit pull-all myproject ./repos
+
+# Update with specific provider
+mgit pull-all myorg ./repos --config github_personal
+```
+
+## 🏢 Provider Management
+
+### Authentication & Setup
+
+```bash
+# Interactive setup for Azure DevOps
+mgit login --provider azuredevops --name company_ado
+
+# GitHub with Personal Access Token  
+mgit login --provider github --name personal_gh --token ghp_xxxxx
 
 # BitBucket workspace
-mgit clone-all my-workspace ./repos --provider bitbucket
+mgit login --provider bitbucket --name team_bb --username myuser
+
+# Test existing configuration
+mgit login --config work_ado
 ```
 
-#### With custom options
+### Configuration Management
+
 ```bash
-# Clone with 8 concurrent operations and force mode
-mgit clone-all my-project ./repos -c 8 -u force --provider azuredevops
+# List all configured providers
+mgit config --list
 
-# GitHub with higher concurrency (supports more connections)
-mgit clone-all my-org ./repos -c 20 --provider github
+# Show provider details (tokens masked)
+mgit config --show work_ado
 
-# Docker with environment variables for auth
-docker run --rm \
-  -e GITHUB_PAT=your-token \
-  -v $(pwd):/workspace \
-  ghcr.io/aeyeops/mgit:latest \
-  clone-all my-org /workspace/repos -c 20 --provider github
+# Set default provider
+mgit config --set-default personal_gh
+
+# Remove old configuration
+mgit config --remove old_config
+
+# View global settings
+mgit config --global
 ```
 
-### Update All Repositories
+## 📊 Enhanced Progress Tracking
 
-Pull the latest changes for all repositories:
+mgit v0.2.3 features professional-grade progress tracking:
 
-```bash
-# Auto-detect provider from existing repo remotes
-mgit pull-all my-project ./repos
-
-# Or specify provider explicitly
-mgit pull-all my-org ./repos --provider github
-mgit pull-all my-workspace ./repos --provider bitbucket
-
-# Using Docker
-docker run --rm -v $(pwd):/workspace ghcr.io/aeyeops/mgit:latest pull-all my-project /workspace/repos
+```
+⠋ Processing organizations (1/3) • 1,247 repos found
+  └─ Scanning myorg
+      └─ backend-services: 45 repos
+      └─ frontend-apps: 23 repos
+      └─ devops-tools: 12 repos
 ```
 
-### Global Configuration
+**Features:**
+- 🔄 Real-time discovery progress
+- 📈 Live repository counters  
+- 🌳 Hierarchical display (Organizations → Projects → Repositories)
+- ⏱️ Non-blocking progress updates
+- 🎯 Per-project and per-organization tracking
 
-View or set global configuration:
+## 💻 Installation
+
+### Option 1: Install from GitHub Release (Recommended)
 
 ```bash
-# Show current settings for all providers
-mgit config --show
+# Latest stable release
+pip install https://github.com/AeyeOps/mgit/releases/download/v0.2.3/mgit-0.2.3-py3-none-any.whl
 
-# Set default values
-mgit config --concurrency 16 --update-mode pull
-
-# Set provider-specific configuration
-mgit config --provider azuredevops --org https://dev.azure.com/your-org
-mgit config --provider github --org your-github-org  
-mgit config --provider bitbucket --workspace your-workspace
+# Verify installation
+mgit --version  # Should show: mgit version: 0.2.3
 ```
 
-## Commands Reference
+### Option 2: Pre-built Binaries (No Python Required)
 
-Run without arguments to see available commands:
+Download standalone executables from [releases](https://github.com/AeyeOps/mgit/releases/latest):
 
 ```bash
-mgit
+# Linux
+wget https://github.com/AeyeOps/mgit/releases/download/v0.2.3/mgit-linux-x64
+chmod +x mgit-linux-x64
+./mgit-linux-x64 --version
 
-# Or with Docker
-docker run --rm ghcr.io/aeyeops/mgit:latest
+# macOS  
+curl -L https://github.com/AeyeOps/mgit/releases/download/v0.2.3/mgit-macos-x64 -o mgit
+chmod +x mgit && ./mgit --version
+
+# Windows
+# Download mgit-windows-x64.exe from releases page
 ```
 
-### Core Git Commands
-
-#### login
-
-Authenticate with a git provider using appropriate credentials.
+### Option 3: Docker
 
 ```bash
-mgit login [--provider PROVIDER] [--org URL] [--token TOKEN] [--store/--no-store]
+# Pull and run
+docker pull ghcr.io/aeyeops/mgit:v0.2.3
+docker run --rm ghcr.io/aeyeops/mgit:v0.2.3 --version
+
+# Create convenient alias
+alias mgit='docker run --rm -v $(pwd):/workspace -v ~/.config/mgit:/root/.config/mgit ghcr.io/aeyeops/mgit:v0.2.3'
 ```
 
-Options:
-- `--provider`: Git provider (azuredevops, github, bitbucket) - defaults to azuredevops
-- `--org`: Organization/workspace URL (provider-specific)
-- `--token`: Access token (PAT for Azure DevOps/GitHub, App Password for BitBucket)
-- `--store`: Save credentials to config file
-
-#### clone-all
-
-Clone all repositories from a provider project/organization/workspace.
+### Option 4: From Source
 
 ```bash
-mgit clone-all PROJECT DESTINATION [URL] [--provider PROVIDER] [--concurrency N] [--update-mode MODE]
-```
-
-Arguments:
-- `PROJECT`: Project name (Azure DevOps), organization/user (GitHub), or workspace (BitBucket)
-- `DESTINATION`: Local directory to clone into
-- `URL`: Optional organization URL (auto-detects provider)
-
-Options:
-- `--provider`: Explicitly specify provider (azuredevops, github, bitbucket)
-- `--concurrency`: Number of concurrent operations (default: 4)
-- `--update-mode`: How to handle existing directories:
-  - `skip`: Skip existing directories (default)
-  - `pull`: Try to git pull if it's a valid repository
-  - `force`: Remove existing directories and clone fresh
-
-#### pull-all
-
-Pull updates for all repositories in a directory.
-
-```bash
-mgit pull-all PROJECT REPOSITORY_PATH [--provider PROVIDER]
-```
-
-The provider is usually auto-detected from the git remotes, but can be specified explicitly.
-
-#### config
-
-View or set global configuration settings.
-
-```bash
-mgit config [--show] [--org URL] [--concurrency N] [--update-mode MODE]
-```
-
-#### generate-env
-
-Generate a sample environment file with configuration options.
-
-```bash
-mgit generate-env
-```
-
-### Global Options
-
-#### --version
-
-Show the application's version and exit.
-
-```bash
+git clone https://github.com/AeyeOps/mgit.git
+cd mgit
+pip install -r requirements.txt
+pip install -e .
 mgit --version
 ```
 
-#### --help
+## 🔧 Configuration
 
-Show help for any command.
+mgit uses a modern YAML-based configuration system with named provider profiles:
+
+### Configuration File Location
+- **Linux/macOS**: `~/.config/mgit/config.yaml`
+- **Windows**: `%APPDATA%\mgit\config.yaml`
+
+### Example Configuration
+
+```yaml
+# ~/.config/mgit/config.yaml
+global:
+  default_provider: work_ado
+  default_concurrency: 8
+  default_update_mode: pull
+  log_level: INFO
+
+providers:
+  work_ado:
+    org_url: https://dev.azure.com/mycompany
+    pat: your-azure-devops-pat
+    
+  personal_gh:
+    token: ghp_your-github-token
+    
+  team_bb:
+    username: myuser
+    app_password: your-bitbucket-app-password
+```
+
+### Environment Variable Override
+
+Any setting can be overridden with environment variables:
 
 ```bash
-mgit [command] --help
+export MGIT_DEFAULT_CONCURRENCY=16
+export AZURE_DEVOPS_EXT_PAT=your-token
+export GITHUB_TOKEN=your-token
+export BITBUCKET_APP_PASSWORD=your-password
 ```
 
-## 🕹️ Configuration (Totally Rad Edition)
+## 📚 Command Reference
 
-```
-╔═══════════════════════════════════════════════════════════════╗
-║  ░▒▓█ CONFIGURATION HIERARCHY █▓▒░  (Like a High Score List) ║
-╠═══════════════════════════════════════════════════════════════╣
-║  1. 🏆 Environment Variables    [HIGHEST PRIORITY]            ║
-║  2. 💾 Config File              [~/.config/mgit/config]       ║  
-║  3. 📼 Default Values           [Built-in defaults]           ║
-╚═══════════════════════════════════════════════════════════════╝
-```
+### Repository Discovery
 
-### 🎮 Dual Configuration System
+| Command | Description |
+|---------|-------------|
+| `mgit list "org/proj/repo"` | Find repositories matching pattern |
+| `mgit list "*/*/*" --format json` | Output all repos as JSON |
+| `mgit list "*/*/*" --limit 50` | Limit results to 50 repositories |
 
-mgit supports **BOTH** environment variables AND config file settings! Mix and match like your favorite 80s mixtape! 🎵
+### Bulk Operations  
 
-### 📊 Configuration Reference Table
+| Command | Description |
+|---------|-------------|
+| `mgit clone-all "pattern" ./dir` | Clone matching repositories |
+| `mgit pull-all project ./dir` | Update all repos in directory |
 
-| Environment Variable | Config File Key | Default | What It Does | Required? |
-|---------------------|-----------------|---------|--------------|----------|
-| **🌐 Global Settings** |||||
-| `DEFAULT_CONCURRENCY` | `DEFAULT_CONCURRENCY` | `4` | Max parallel git operations (like multi-ball in pinball!) | No |
-| `DEFAULT_UPDATE_MODE` | `DEFAULT_UPDATE_MODE` | `skip` | How to handle existing repos: `skip`/`pull`/`force` | No |
-| `LOG_FILENAME` | `LOG_FILENAME` | `mgit.log` | Where to save your high scores... err, logs | No |
-| `LOG_LEVEL` | `LOG_LEVEL` | `DEBUG` | File log verbosity: `DEBUG`/`INFO`/`WARNING`/`ERROR` | No |
-| `CON_LEVEL` | `CON_LEVEL` | `INFO` | Console output level (your CRT monitor display) | No |
-| **🔷 Azure DevOps** |||||
-| `AZURE_DEVOPS_ORG_URL` | `AZURE_DEVOPS_ORG_URL` | - | Your Azure DevOps org URL | Yes* |
-| `AZURE_DEVOPS_EXT_PAT` | `AZURE_DEVOPS_EXT_PAT` | - | Personal Access Token (your secret code!) | Yes* |
-| `AZURE_DEVOPS_USERNAME` | `AZURE_DEVOPS_USERNAME` | - | Username (optional player name) | No |
-| **🐙 GitHub** |||||
-| `GITHUB_PAT` | `GITHUB_PAT` | - | GitHub Personal Access Token | Yes* |
-| `GITHUB_ORG` | `GITHUB_ORG` | - | Default organization to clone from | No |
-| `GITHUB_ENTERPRISE_URL` | `GITHUB_ENTERPRISE_URL` | - | GitHub Enterprise URL (for corporate arcade) | No |
-| `GITHUB_USERNAME` | `GITHUB_USERNAME` | - | Your GitHub username | No |
-| **🪣 BitBucket** |||||
-| `BITBUCKET_WORKSPACE` | `BITBUCKET_WORKSPACE` | - | BitBucket workspace name | Yes* |
-| `BITBUCKET_USERNAME` | `BITBUCKET_USERNAME` | - | BitBucket username | Yes* |
-| `BITBUCKET_APP_PASSWORD` | `BITBUCKET_APP_PASSWORD` | - | BitBucket app password | Yes* |
-| `BITBUCKET_SERVER_URL` | `BITBUCKET_SERVER_URL` | - | BitBucket Server URL (self-hosted) | No |
+### Provider Management
 
-*Required only when using that specific provider
+| Command | Description |
+|---------|-------------|
+| `mgit login --provider TYPE --name NAME` | Set up new provider configuration |
+| `mgit config --list` | List all configured providers |
+| `mgit config --show NAME` | Show provider details |
+| `mgit config --set-default NAME` | Set default provider |
 
-### 💿 Example Configurations
+### Options
 
-#### Environment Variables (Bash/Zsh)
-```bash
-# 🎯 Azure DevOps Setup
-export AZURE_DEVOPS_ORG_URL="https://dev.azure.com/radical-corp"
-export AZURE_DEVOPS_EXT_PAT="your-gnarly-token-here"
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--config NAME` | Use specific provider configuration | Default provider |
+| `--concurrency N` | Concurrent operations | 4 |
+| `--update-mode MODE` | Handle existing dirs: skip/pull/force | skip |
+| `--format FORMAT` | Output format: table/json | table |
 
-# 🐙 GitHub Setup  
-export GITHUB_PAT="ghp_totallyTubularToken1234567890"
-export GITHUB_ORG="awesome-sauce-inc"
+## 🎯 Query Patterns
 
-# 🎮 Performance Tuning
-export DEFAULT_CONCURRENCY="10"  # TURBO MODE!
-export DEFAULT_UPDATE_MODE="pull"
-```
+mgit supports flexible pattern matching for repository discovery:
 
-#### Config File (~/.config/mgit/config)
-```ini
-# ╔════════════════════════════════════╗
-# ║   mgit Configuration File v0.2.1   ║
-# ║   「 RADICAL CONFIG 」              ║
-# ╚════════════════════════════════════╝
+| Pattern | Matches | Example |
+|---------|---------|---------|
+| `"*/*/*"` | All repos from all orgs/projects | All repositories |
+| `"myorg/*/*"` | All repos in organization | All repos in "myorg" |
+| `"*/backend/*"` | All backend projects | Any org, project named "backend" |
+| `"myorg/*/api*"` | API repos in myorg | Repos starting with "api" |
+| `"*/*/payment*"` | Payment-related repos | Repos starting with "payment" |
 
-# Global Settings - Crank it to 11!
-DEFAULT_CONCURRENCY=8
-DEFAULT_UPDATE_MODE=pull
-LOG_LEVEL=INFO
-CON_LEVEL=INFO
+**Pattern Rules:**
+- Use `*` for wildcards (matches any characters)
+- Three parts: `organization/project/repository` (Azure DevOps)
+- Two parts: `organization/repository` (GitHub, BitBucket)
+- Case-insensitive matching
+- Supports partial matches with wildcards
 
-# Azure DevOps - The Corporate Arcade
-AZURE_DEVOPS_ORG_URL=https://dev.azure.com/bigcorp
-AZURE_DEVOPS_EXT_PAT=secret-token-dont-share
+## 🏢 Provider Support
 
-# GitHub - Where the Cool Kids Hang
-GITHUB_PAT=ghp_xxxxxxxxxxxxxxxxxxxx
-GITHUB_ORG=rad-startup
+| Provider | Authentication | Organization Structure | API Rate Limits |
+|----------|---------------|----------------------|-----------------|
+| **Azure DevOps** | Personal Access Token (PAT) | Organization → Project → Repository | Generous (enterprise) |
+| **GitHub** | Personal Access Token | Organization/User → Repository | 5,000/hour (authenticated) |
+| **BitBucket** | App Password | Workspace → Repository | 1,000/hour |
 
-# BitBucket - The Underground Scene
-BITBUCKET_WORKSPACE=elite-hackers
-BITBUCKET_USERNAME=zerocool
-BITBUCKET_APP_PASSWORD=hack-the-planet
-```
+**All providers support:**
+- ✅ Repository discovery with patterns
+- ✅ Bulk clone operations  
+- ✅ Concurrent operations with provider-optimized limits
+- ✅ Progress tracking and error handling
+- ✅ Secure credential management
 
-### 🎯 Pro Tips
+## 🔐 Security Features
 
-1. **Mix & Match**: Use env vars for secrets, config file for defaults
-2. **Override on the Fly**: `DEFAULT_CONCURRENCY=20 mgit clone-all ...`
-3. **Check Your Config**: `mgit config --show` displays the final merged config
-4. **Provider Auto-Detection**: mgit is smart enough to figure out which provider you're using from URLs!
+- 🔒 **AES-256 Encryption** for stored credentials
+- 🎭 **Token Masking** in all logs and console output  
+- 📁 **Secure File Permissions** (600) for config files
+- 🔑 **Multiple Auth Methods** per provider
+- 🚫 **No Credential Logging** - tokens never appear in logs
+- 🛡️ **Environment Variable Support** for CI/CD security
 
-### 🔐 Security Best Practices
+## 📊 Performance & Scalability
 
-- 🚫 Never commit tokens to version control (that's a Game Over, man!)
-- 🔒 Config file is created with 0600 permissions (owner-only access)
-- 🎭 All tokens are masked in logs and console output
-- 💾 Use environment variables in CI/CD for maximum security
+- ⚡ **Async Operations** - All network calls are non-blocking
+- 🎯 **Provider-Optimized Concurrency** - Respects API rate limits
+- 📈 **Scalable to 1000+ Repositories** - Tested with large enterprise setups
+- 💾 **Minimal Memory Footprint** - Efficient async iteration
+- 🔄 **Intelligent Error Recovery** - Continues on individual repo failures
 
-## Practical Examples
+## 🚧 Migration from v0.1.x
 
-### Managing Multiple Provider Repositories
+If upgrading from mgit v0.1.x:
+
+1. **Configuration Migration**: Old `.env` files are automatically migrated to YAML
+2. **New Commands**: Use `mgit list` instead of manual repository enumeration
+3. **Provider Setup**: Re-run `mgit login` to set up named provider configurations
+4. **Query Patterns**: Update scripts to use new pattern-based discovery
 
 ```bash
-# Clone all repos from different providers into organized folders
-mgit clone-all my-azure-project ./work/azure --provider azuredevops
-mgit clone-all my-github-org ./work/github --provider github
-mgit clone-all my-bb-workspace ./work/bitbucket --provider bitbucket
+# Old way (v0.1.x)
+mgit clone-all myproject ./repos
 
-# Update all repositories across providers
-cd ./work/azure && mgit pull-all my-azure-project .
-cd ./work/github && mgit pull-all my-github-org .
-cd ./work/bitbucket && mgit pull-all my-bb-workspace .
+# New way (v0.2.3)
+mgit clone-all "myorg/myproject/*" ./repos --config work_ado
 ```
 
-### Provider Auto-Detection
+## 🤝 Contributing
 
-```bash
-# mgit automatically detects the provider from the URL
-mgit clone-all tensorflow ./ml-repos https://github.com
-mgit clone-all my-project ./work https://dev.azure.com/company
-mgit clone-all atlassian ./tools https://bitbucket.org
-```
+Contributions welcome! See our [development guide](docs/development.md) for:
 
-### Mixed Provider Workflows
+- Setting up development environment
+- Running tests (`pytest tests/ -v --cov=mgit`)
+- Building binaries (`poe build-linux`)
+- Code style guidelines (Black, Ruff)
 
-```bash
-# Set up authentication for all providers
-mgit login --provider azuredevops --store
-mgit login --provider github --store
-mgit login --provider bitbucket --store
-
-# Clone from multiple providers in one session
-mgit clone-all frontend-team ./repos/frontend https://dev.azure.com/company
-mgit clone-all backend-libs ./repos/backend https://github.com
-mgit clone-all devops-tools ./repos/ops https://bitbucket.org
-```
-
-### Docker Workflows
-
-```bash
-# Create an alias for convenience
-alias mgit-docker='docker run --rm -v $(pwd):/workspace -v ~/.config/mgit:/root/.config/mgit ghcr.io/aeyeops/mgit:latest'
-
-# Use mgit with Docker like normal
-mgit-docker login --provider github --store
-mgit-docker clone-all my-org /workspace/repos
-mgit-docker pull-all my-org /workspace/repos
-```
-
-## Security
-
-The tool handles sensitive information securely:
-- All tokens (PATs, app passwords) are masked in logs and console output
-- Configuration files have secure permissions (0600)
-- Credentials can be stored securely or used only for the current session
-- Provider-specific authentication methods:
-  - **Azure DevOps**: Personal Access Tokens (PAT)
-  - **GitHub**: Personal Access Tokens or GitHub Apps
-  - **BitBucket**: App Passwords (more secure than regular passwords)
-
-## For Developers
-
-For technical implementation details, see the [documentation](docs/) directory and [CLAUDE.md](CLAUDE.md) for codebase guidance.
-
-### Provider Implementation Status
-
-| Provider | Status | Implementation Details |
-|----------|--------|----------------------|
-| Azure DevOps | ✅ Complete | Full API integration using azure-devops SDK |
-| GitHub | ✅ Complete | REST API v3 with PyGithub library |
-| BitBucket | ✅ Complete | REST API v2.0 with atlassian-python-api |
-
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Contributing
+---
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+**Built for DevOps teams who manage repositories at scale.** 🚀
+
+For technical details, see [CLAUDE.md](CLAUDE.md) and the [docs/](docs/) directory.

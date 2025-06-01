@@ -85,12 +85,23 @@ def matches_pattern(text: str, pattern: str, case_sensitive: bool = False) -> bo
         True
         >>> matches_pattern("user-service", "pay*")
         False
+        >>> matches_pattern("pdidev.visualstudio.com", "pdidev")
+        True
     """
     if not case_sensitive:
         text = text.lower()
         pattern = pattern.lower()
     
-    return fnmatch.fnmatch(text, pattern)
+    # First try exact pattern match
+    if fnmatch.fnmatch(text, pattern):
+        return True
+    
+    # If pattern doesn't contain wildcards, try prefix matching for user-friendliness
+    # This allows "pdidev" to match "pdidev.visualstudio.com"
+    if '*' not in pattern and '?' not in pattern:
+        return fnmatch.fnmatch(text, pattern + '*')
+    
+    return False
 
 
 def validate_query(query: str) -> Optional[str]:

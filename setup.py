@@ -8,7 +8,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="mgit",
-    version="0.2.2",
+    version="0.2.3",
     author="Steve Antonakakis",
     author_email="steve.antonakakis@gmail.com",
     description="Multi-provider Git management tool",
