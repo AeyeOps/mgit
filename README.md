@@ -195,9 +195,8 @@ alias mgit='docker run --rm -v $(pwd):/workspace -v ~/.config/mgit:/root/.config
 ```bash
 git clone https://github.com/AeyeOps/mgit.git
 cd mgit
-pip install -r requirements.txt
-pip install -e .
-mgit --version
+poetry install --with dev
+poetry run mgit --version
 ```
 
 ## 🔧 Configuration

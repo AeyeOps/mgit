@@ -55,31 +55,45 @@ When I discover an error I made:
 
 ## Build/Test/Lint Commands
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-pip install -e .  # Development installation
+# Install dependencies (Poetry)
+poetry install --with dev  # Install all dependencies including dev
+poetry install             # Install only production dependencies
 
 # Run the tool
-python -m mgit [command] [arguments]
+poetry run python -m mgit [command] [arguments]
+# OR use the poetry script
+poetry run mgit [command] [arguments]
 
 # Common commands
-python -m mgit login --org https://dev.azure.com/your-org --token your-pat
-python -m mgit clone-all [project-name] [destination-path] [-c concurrency] [-u update-mode]
-python -m mgit pull-all [project-name] [repositories-path]
-python -m mgit config --show
-python -m mgit monitor start  # Start monitoring server
+poetry run mgit login --org https://dev.azure.com/your-org --token your-pat
+poetry run mgit clone-all [project-name] [destination-path] [-c concurrency] [-u update-mode]
+poetry run mgit pull-all [project-name] [repositories-path]
+poetry run mgit config --show
+poetry run mgit monitor start  # Start monitoring server
 
-# Run tests
-python -m pytest tests/ -v --cov=mgit --cov-report=term
-python -m pytest tests/test_file.py::test_function -v  # Single test
+# Run tests using Poe
+poe test                    # Run all tests
+poetry run pytest tests/ -v --cov=mgit --cov-report=term
+poetry run pytest tests/test_file.py::test_function -v  # Single test
 
-# Build executable
-pip install pyinstaller
-pyinstaller --onefile mgit/__main__.py
+# Code quality using Poe
+poe lint                    # Run Ruff linting
+poe format                  # Run Black formatting
+poe format-check            # Check Black formatting without changes
+poetry run mypy mgit/       # Type checking
+
+# Build executables using Poe
+poe build-linux             # Build Linux executable
+poe build-windows           # Build Windows executable  
+poe build-all               # Build all platform executables
+poe clean                   # Clean build artifacts
+
+# Alternative Poetry build
+poetry build                # Build wheel and source distribution
 
 # Quick validation
-python -m mgit --version  # Should display version
-python -m mgit --help     # Should show help
+poetry run mgit --version  # Should display version
+poetry run mgit --help     # Should show help
 ```
 
 ## High-Level Architecture

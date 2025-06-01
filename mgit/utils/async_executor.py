@@ -488,5 +488,3 @@ class SubprocessExecutor(AsyncExecutor):
             item_description=lambda cmd: f"{cmd[0]}: {' '.join(cmd[1][:2])}...",
             show_progress=show_progress,
         )
-
-
