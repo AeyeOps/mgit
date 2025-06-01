@@ -407,15 +407,12 @@ jobs:
         
         if ! python generate_release_notes.py; then
           echo "::warning::AI release notes generation failed. Creating fallback notes."
-          cat > RELEASE_NOTES_${GITHUB_REF_NAME}.md << 'EOF'
-# mgit ${GITHUB_REF_NAME}
-
-Release notes generation failed. See commit history for changes.
-
-## Recent Changes
-$(git log --oneline -n 10)
-
-EOF
+          echo "# mgit ${GITHUB_REF_NAME}" > RELEASE_NOTES_${GITHUB_REF_NAME}.md
+          echo "" >> RELEASE_NOTES_${GITHUB_REF_NAME}.md
+          echo "Release notes generation failed. See commit history for changes." >> RELEASE_NOTES_${GITHUB_REF_NAME}.md
+          echo "" >> RELEASE_NOTES_${GITHUB_REF_NAME}.md
+          echo "## Recent Changes" >> RELEASE_NOTES_${GITHUB_REF_NAME}.md
+          git log --oneline -n 10 >> RELEASE_NOTES_${GITHUB_REF_NAME}.md
         fi
         
     - name: Save release notes path
