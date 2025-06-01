@@ -1,0 +1,317 @@
+name: 🚀 Automated Release - "The Future is Now"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v0.2.4)'
+        required: true
+        type: string
+      release_type:
+        description: 'Type of release'
+        required: true
+        type: choice
+        options:
+          - 'feature'    # Major new functionality
+          - 'performance' # Speed/optimization improvements  
+          - 'bugfix'     # Bug fixes and stability
+          - 'security'   # Security enhancements
+          - 'maintenance' # Dependencies, cleanup
+        default: 'feature'
+      pre_release:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  automated-release:
+    name: 🎮 Release Generation Engine
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    
+    steps:
+      - name: 📼 Checkout Code (Like Rewinding a VHS)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git analysis
+          
+      - name: 🖥️ Setup Python (Commodore 64 Would Be Jealous)
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      - name: 📀 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install build pyinstaller openai
+          
+      - name: 🔍 Analyze Git Differential (CSI: Repository Edition)
+        id: git-analysis
+        run: |
+          # Get version from input or tag
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          
+          # Get last release tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          echo "last_tag=${LAST_TAG}" >> $GITHUB_OUTPUT
+          
+          # Analyze changes since last release
+          if [ -n "$LAST_TAG" ]; then
+            echo "## Commits Since ${LAST_TAG}" > changes.md
+            git log --oneline ${LAST_TAG}..HEAD >> changes.md
+            echo "" >> changes.md
+            
+            echo "## Files Changed" >> changes.md  
+            git diff --name-status ${LAST_TAG}..HEAD >> changes.md
+            echo "" >> changes.md
+            
+            echo "## PR Descriptions" >> changes.md
+            # Get merged PRs since last tag (if available)
+            gh pr list --state merged --base main --limit 20 --json title,body,number | \
+              jq -r '.[] | "PR #\(.number): \(.title)\n\(.body)\n---"' >> changes.md 2>/dev/null || echo "No PR data available" >> changes.md
+          else
+            echo "Initial release - no differential analysis available" > changes.md
+          fi
+          
+          # Count changes for context
+          COMMIT_COUNT=$(git rev-list --count ${LAST_TAG}..HEAD 2>/dev/null || echo "unknown")
+          FILES_CHANGED=$(git diff --name-only ${LAST_TAG}..HEAD 2>/dev/null | wc -l || echo "unknown")
+          echo "commit_count=${COMMIT_COUNT}" >> $GITHUB_OUTPUT
+          echo "files_changed=${FILES_CHANGED}" >> $GITHUB_OUTPUT
+          
+      - name: 🤖 Generate Release Notes (Max Headroom Mode)
+        id: ai-generation
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          cat > generate_release_notes.py << 'EOF'
+          import os
+          import json
+          import openai
+          from pathlib import Path
+          
+          # Initialize OpenAI client
+          client = openai.OpenAI(api_key=os.environ['OPENAI_API_KEY'])
+          
+          # Read git analysis
+          changes_content = Path('changes.md').read_text()
+          version = "${{ steps.git-analysis.outputs.version }}"
+          release_type = "${{ github.event.inputs.release_type || 'feature' }}"
+          commit_count = "${{ steps.git-analysis.outputs.commit_count }}"
+          files_changed = "${{ steps.git-analysis.outputs.files_changed }}"
+          
+          # Enhanced system prompt with 80s references
+          system_prompt = """You are an expert technical writer creating GitHub release notes for mgit, a multi-provider Git CLI tool for DevOps teams. 
+          
+          Transform the provided git differential into engaging, professional release notes with SUBTLE 80s pop culture references that enhance rather than distract.
+          
+          STYLE REQUIREMENTS:
+          - Professional enterprise tone with nostalgic flair
+          - Strategic emoji use (🚀 🎯 ⚡ 📊 🔍 🏢 💾 🎮 📼 🖥️)
+          - Include practical code examples
+          - Focus on DevOps/enterprise value proposition
+          - Weave 80s references naturally into technical content
+          
+          80S REFERENCE PALETTE:
+          - Movies: Back to the Future (time/speed), Tron (digital), WarGames (automation), Ghostbusters (problem-solving), Top Gun (performance)
+          - Music: MTV era, synthwave, "Video Killed the Radio Star" 
+          - Tech: Commodore 64, Apple II, VHS, Walkman, floppy disks
+          - Games: Pac-Man (consuming data), Space Invaders (handling requests), Asteroids (navigation)
+          - Culture: "Tubular", "radical", neon themes, geometric patterns
+          
+          RELEASE TYPE THEMES:
+          - feature: Back to the Future ("where we're going"), revolutionary tech
+          - performance: Top Gun ("need for speed"), Knight Rider dashboard  
+          - bugfix: Ghostbusters ("who you gonna call"), A-Team problem solving
+          - security: Terminator (protection), Aliens ("game over" for threats)
+          - maintenance: Ferris Bueller ("life moves fast"), spring cleaning
+          
+          STRUCTURE:
+          1. Hero title with movie quote adaptation
+          2. Compelling intro paragraph
+          3. "What's New" section with major features
+          4. Technical improvements
+          5. Installation instructions
+          6. Migration notes (if applicable)
+          7. Fun 80s-themed closing
+          
+          Keep references SUBTLE and NATURAL. Examples:
+          ✅ "Performance that would make KITT jealous"
+          ✅ "Repository discovery faster than you can say 'Bueller'"
+          ✅ "These improvements are absolutely tubular"
+          ❌ "Cowabunga dude! Totally radical to the max!"
+          
+          Generate approximately 400-600 words with proper markdown formatting."""
+          
+          # Create release-type specific user prompt
+          user_prompt = f"""
+          Generate release notes for mgit {version} ({release_type} release).
+          
+          RELEASE CONTEXT:
+          - Version: {version}
+          - Type: {release_type}
+          - Commits: {commit_count}
+          - Files changed: {files_changed}
+          
+          GIT DIFFERENTIAL DATA:
+          {changes_content}
+          
+          Focus on the {release_type} theme and include appropriate 80s references for this type of release.
+          Make it professional yet memorable, with practical value for DevOps teams.
+          """
+          
+          try:
+              response = client.chat.completions.create(
+                  model="gpt-4",
+                  messages=[
+                      {"role": "system", "content": system_prompt},
+                      {"role": "user", "content": user_prompt}
+                  ],
+                  max_tokens=1500,
+                  temperature=0.7
+              )
+              
+              release_notes = response.choices[0].message.content
+              
+              # Save to file
+              Path('release-notes.md').write_text(release_notes)
+              print("✅ Release notes generated successfully!")
+              print(f"📏 Length: {len(release_notes)} characters")
+              
+              # Output for GitHub Actions
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write(f"success=true\n")
+                  f.write(f"notes_length={len(release_notes)}\n")
+                  
+          except Exception as e:
+              print(f"❌ Error generating release notes: {e}")
+              # Fallback to basic template
+              fallback_notes = f"""# 🚀 mgit {version} - The Future is Now
+          
+          ## 🎯 What's New
+          
+          This {release_type} release includes {commit_count} commits across {files_changed} files.
+          
+          ### ⚡ Key Improvements
+          - Enhanced functionality and performance
+          - Bug fixes and stability improvements  
+          - Better developer experience
+          
+          ## 🚀 Installation
+          
+          ```bash
+          pip install https://github.com/AeyeOps/mgit/releases/download/{version}/mgit-{version.lstrip('v')}-py3-none-any.whl
+          ```
+          
+          ## 📋 Full Changes
+          
+          {changes_content}
+          
+          ---
+          
+          **Built for DevOps teams who manage repositories at scale.** 🎮
+          """
+              
+              Path('release-notes.md').write_text(fallback_notes)
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write(f"success=false\n")
+                  f.write(f"notes_length={len(fallback_notes)}\n")
+          EOF
+          
+          python generate_release_notes.py
+          
+      - name: 🔧 Update Version Numbers (Synchronize Watches)
+        run: |
+          VERSION="${{ steps.git-analysis.outputs.version }}"
+          VERSION_NUMBER="${VERSION#v}"  # Remove 'v' prefix
+          
+          # Update pyproject.toml
+          sed -i "s/version = \".*\"/version = \"${VERSION_NUMBER}\"/" pyproject.toml
+          
+          # Update setup.py  
+          sed -i "s/version=\".*\"/version=\"${VERSION_NUMBER}\"/" setup.py
+          
+          # Update __main__.py
+          sed -i "s/version: .*/version: ${VERSION_NUMBER}/" mgit/__main__.py
+          
+          echo "✅ Updated version to ${VERSION_NUMBER}"
+          
+      - name: 🏗️ Build Packages (Assembly Line Production)
+        run: |
+          # Build Python wheel
+          python -m build --wheel
+          
+          # Build Linux binary  
+          pyinstaller --onefile --name mgit-${{ steps.git-analysis.outputs.version }}-linux-x64 mgit/__main__.py
+          
+          # Verify builds
+          ls -la dist/
+          python -c "import mgit; print(f'✅ Package imports successfully')"
+          
+      - name: 🧪 Quick Validation (Quality Assurance)
+        run: |
+          # Test wheel installation
+          pip install dist/*.whl
+          mgit --version
+          mgit --help
+          echo "✅ Wheel package validated"
+          
+      - name: 📦 Create GitHub Release (Launch Sequence)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.git-analysis.outputs.version }}"
+          PRERELEASE_FLAG=""
+          
+          if [ "${{ github.event.inputs.pre_release }}" = "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          
+          # Create release
+          gh release create "${VERSION}" \
+            --title "$(head -1 release-notes.md | sed 's/^# //')" \
+            --notes-file release-notes.md \
+            ${PRERELEASE_FLAG} \
+            dist/*.whl \
+            dist/mgit-*-linux-x64
+            
+          echo "🚀 Release ${VERSION} created successfully!"
+          echo "📍 URL: https://github.com/${{ github.repository }}/releases/tag/${VERSION}"
+          
+      - name: 🎊 Success Notification (Victory Dance)
+        if: success()
+        run: |
+          echo "🎉 Release pipeline completed successfully!"
+          echo "🕹️ Game Over - You Win!"
+          echo "📺 Your release is ready for prime time!"
+          echo ""
+          echo "📊 Release Stats:"
+          echo "   Version: ${{ steps.git-analysis.outputs.version }}"
+          echo "   Type: ${{ github.event.inputs.release_type || 'feature' }}"
+          echo "   Commits: ${{ steps.git-analysis.outputs.commit_count }}"
+          echo "   Files: ${{ steps.git-analysis.outputs.files_changed }}"
+          echo "   AI Notes: ${{ steps.ai-generation.outputs.notes_length }} chars"
+          
+      - name: 💥 Error Handling (Game Over Screen)
+        if: failure()
+        run: |
+          echo "❌ Houston, we have a problem!"
+          echo "🚨 Release pipeline encountered an error"
+          echo "🔍 Check the logs above for troubleshooting"
+          echo "💡 Common issues:"
+          echo "   - OpenAI API key missing or invalid"
+          echo "   - Version format incorrect (use v0.2.4)"
+          echo "   - Build dependencies missing"
+          echo "   - GitHub token permissions insufficient"
