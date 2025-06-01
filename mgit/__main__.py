@@ -18,11 +18,10 @@ from rich.prompt import Confirm  # Added import
 
 from mgit.commands.listing import format_results, list_repositories
 from mgit.config.yaml_manager import CONFIG_DIR, get_global_setting, migrate_from_dotenv
+from mgit import __version__
 from mgit.exceptions import MgitError
 from mgit.git import GitManager, sanitize_repo_name
 from mgit.providers.manager_v2 import ProviderManager
-
-__version__ = "0.2.3"
 
 # Default values used if environment variables and config file don't provide values
 DEFAULT_VALUES = {
