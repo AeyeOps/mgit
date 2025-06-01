@@ -320,8 +320,8 @@ jobs:
         key_improvements = Path("key-improvements.txt").read_text() if Path("key-improvements.txt").exists() else ""
         
         # Enhanced system prompt with your custom style
-        system_prompt = f"""You are a technical writer creating release notes for mgit with a touch of personality.
-        
+        system_prompt = f"""You are an expert technical writer creating GitHub release notes for mgit, a multi-provider Git CLI tool. Your task is to transform git commit data into engaging, professional release notes with subtle 80s pop culture references.
+
         CODEBASE CONTEXT:
         {codebase_context}
         
@@ -330,15 +330,31 @@ jobs:
         - Never mention CI/CD, pipelines, or automation features
         - Focus on actual repository management improvements
         - Be factual and specific about changes
-        - Include a few 80s pop culture references throughout the releases and always end with a quote
-        - Keep the reference light and professional
         
-        GOOD 80s pop culture TOUCHES (use sparingly):
-        - movie references
-        - music references
-        - sitcom references
-        - games (video and other)
-        - commercials and pop culture
+        STYLE GUIDELINES:
+        - Professional tone with subtle 80s nostalgia
+        - Use emojis strategically (🚀 🎯 ⚡ 📊 🔍 🏢 💾 🎮)
+        - Include practical code examples where relevant
+        - Focus on enterprise DevOps value
+        - Weave in 80s references naturally (movies, music, games, tech, commercials)
+        - Always end with a memorable 80s quote
+        
+        80S REFERENCE BANK:
+        Movies: Back to the Future, Blade Runner, Tron, WarGames, Ghostbusters, E.T., Raiders of the Lost Ark, The Terminator, Aliens, Ferris Bueller's Day Off, Top Gun, The Breakfast Club
+        Music: Synthwave, New Wave, MTV era, Kraftwerk, Devo, Duran Duran, "Video Killed the Radio Star"
+        Games: Pac-Man, Space Invaders, Asteroids, Donkey Kong, Centipede, Frogger, Defender
+        Tech: Commodore 64, Apple II, IBM PC, Walkman, VHS, Rubik's Cube, Laser Discs
+        TV/Commercials: "Where's the beef?", "I want my MTV", Max Headroom, Miami Vice, Knight Rider
+        Culture: Neon colors, geometric patterns, "tubular", "radical", "gnarly"
+        
+        REFERENCE INTEGRATION EXAMPLES:
+        - "Performance improvements that are absolutely tubular"
+        - "Where's the performance? Right here in v{structured_changes['version']}"
+        - "Time-traveling through your repositories faster than a DeLorean"
+        - "Your repositories will be back online faster than the Terminator"
+        - "Missing repositories? Not with mgit's discovery engine"
+        
+        Keep references SUBTLE and NATURAL - they should enhance, not distract from the technical content.
         """
         
         # User prompt with structured changes
@@ -355,6 +371,15 @@ jobs:
         
         PULL REQUESTS:
         {json.dumps(structured_changes['pull_requests'], indent=2)}
+        
+        REQUIRED STRUCTURE:
+        1. Catchy version title with 80s reference
+        2. Opening paragraph with theme
+        3. "🎯 What's New" section with major features
+        4. "⚡ Performance & Technical Improvements" section
+        5. "🔧 Bug Fixes" section (if applicable)
+        6. "📦 Installation" section with pip install command
+        7. Memorable closing with 80s quote
         
         Create clear, accurate release notes that explain what changed and why it matters for users managing multiple git repositories.
         """
