@@ -1,3 +1,4 @@
+# Minimum Python 3.9+ required
 azure-devops>=7.1.0b
 typer==0.9.4
 click>=8.1.7
