@@ -49,14 +49,12 @@ mgit = "mgit.__main__:entrypoint"
 
 [tool.poe.tasks]
 [tool.poe.tasks.build-linux]
-help = "Build Linux executable mgit and copy to /opt/bin"
-sequence = [
-    {cmd = "pyinstaller --onefile --hidden-import=azure --hidden-import=azure.devops --hidden-import=azure.devops.connection --hidden-import=azure.devops.v6_0 --hidden-import=azure.devops.v6_0.core --hidden-import=azure.devops.v6_0.core.models --hidden-import=azure.devops.v6_0.git --hidden-import=azure.devops.v6_0.git.models --hidden-import=azure.devops.v7_0 --hidden-import=azure.devops.v7_0.core --hidden-import=azure.devops.v7_0.core.models --hidden-import=azure.devops.v7_0.git --hidden-import=azure.devops.v7_0.git.models --hidden-import=azure.core --hidden-import=azure.core.credentials --hidden-import=azure.identity --hidden-import=msrest --hidden-import=msrest.authentication --hidden-import=msrest.serialization --hidden-import=msrest.exceptions --hidden-import=aiohttp --hidden-import=yarl --hidden-import=multidict --hidden-import=async_timeout --hidden-import=attrs mgit/__main__.py --name mgit"},
-    {cmd = "python scripts/copy_linux_binary.py"}
-]
+help = "Build Linux executable mgit"
+cmd = "pyinstaller mgit.spec --clean"
 
 [tool.poe.tasks.build-windows]
-cmd = "pyinstaller --onefile mgit/__main__.py --name mgit-windows"
+help = "Build Windows executable mgit.exe"
+cmd = "pyinstaller mgit.spec --clean"
 
 [tool.poe.tasks.build-all]
 sequence = ["build-linux", "build-windows"]
@@ -75,6 +73,31 @@ cmd = "black ."
 
 [tool.poe.tasks.format-check]
 cmd = "black --check --diff ."
+
+[tool.poe.tasks.version-sync]
+cmd = "python scripts/update_version.py"
+help = "Sync version across all project files"
+
+[tool.poe.tasks.bump-patch]
+sequence = [
+    {cmd = "poetry version patch"},
+    {cmd = "python scripts/update_version.py"}
+]
+help = "Bump patch version and sync across files"
+
+[tool.poe.tasks.bump-minor]
+sequence = [
+    {cmd = "poetry version minor"},
+    {cmd = "python scripts/update_version.py"}
+]
+help = "Bump minor version and sync across files"
+
+[tool.poe.tasks.bump-major]
+sequence = [
+    {cmd = "poetry version major"},
+    {cmd = "python scripts/update_version.py"}
+]
+help = "Bump major version and sync across files"
 
 [tool.black]
 line-length = 88

@@ -596,13 +596,14 @@ EOF
     - name: Build executable
       shell: bash
       run: |
-        # Hidden imports required for Azure DevOps and async operations
-        HIDDEN_IMPORTS="--hidden-import=azure --hidden-import=azure.devops --hidden-import=azure.devops.connection --hidden-import=azure.devops.v7_0 --hidden-import=azure.devops.v7_0.core --hidden-import=azure.devops.v7_0.git --hidden-import=aiohttp --hidden-import=yarl --hidden-import=multidict --hidden-import=async_timeout --hidden-import=charset_normalizer"
+        # Build using Poetry and spec file
+        poetry run pyinstaller mgit.spec --distpath dist --workpath build --clean
         
+        # Rename output to include version and platform
         if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-          poetry run pyinstaller --onefile $HIDDEN_IMPORTS --name "mgit-${{ github.ref_name }}-${{ matrix.platform }}.exe" mgit/__main__.py
+          mv dist/mgit.exe "dist/mgit-${{ github.ref_name }}-${{ matrix.platform }}.exe"
         else
-          poetry run pyinstaller --onefile $HIDDEN_IMPORTS --name "mgit-${{ github.ref_name }}-${{ matrix.platform }}" mgit/__main__.py
+          mv dist/mgit "dist/mgit-${{ github.ref_name }}-${{ matrix.platform }}"
         fi
         
     - name: Upload build artifacts

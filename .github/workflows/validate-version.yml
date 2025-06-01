@@ -1,0 +1,55 @@
+name: Validate Version
+
+on:
+  pull_request:
+    paths:
+      - 'pyproject.toml'
+      - 'mgit/__init__.py'
+      - 'mgit/version.txt'
+
+jobs:
+  validate-version:
+    name: Validate Version Consistency
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+    
+    - name: Check version consistency
+      run: |
+        # Get Poetry version
+        POETRY_VERSION=$(poetry version -s)
+        echo "Poetry version: $POETRY_VERSION"
+        
+        # Get version.txt version
+        VERSION_FILE=$(cat mgit/version.txt)
+        echo "version.txt: $VERSION_FILE"
+        
+        # Get fallback version from __init__.py
+        INIT_VERSION=$(grep -E 'return "[0-9.]+"' mgit/__init__.py | grep -oE '[0-9.]+' | tail -1)
+        echo "__init__.py fallback: $INIT_VERSION"
+        
+        # Validate all versions match
+        if [[ "$POETRY_VERSION" != "$VERSION_FILE" ]]; then
+          echo "ERROR: Poetry version ($POETRY_VERSION) doesn't match version.txt ($VERSION_FILE)"
+          echo "Run: poetry run poe version-sync"
+          exit 1
+        fi
+        
+        if [[ "$POETRY_VERSION" != "$INIT_VERSION" ]]; then
+          echo "ERROR: Poetry version ($POETRY_VERSION) doesn't match __init__.py fallback ($INIT_VERSION)"
+          echo "Run: poetry run poe version-sync"
+          exit 1
+        fi
+        
+        echo "✅ All versions are consistent!"
