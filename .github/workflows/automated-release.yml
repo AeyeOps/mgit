@@ -122,43 +122,28 @@ jobs:
           - Focus ONLY on repository management features: clone, pull, list, discover
           - NEVER mention automated releases, CI/CD, pipelines, or deployment features 
           
-          Transform the provided git differential into engaging, professional release notes with SUBTLE 80s pop culture references that enhance rather than distract.
+          Transform the provided git differential into clear, professional release notes with occasional subtle 80s references.
           
           STYLE REQUIREMENTS:
-          - Professional enterprise tone with nostalgic flair
-          - Strategic emoji use (🚀 🎯 ⚡ 📊 🔍 🏢 💾 🎮 📼 🖥️)
+          - Professional technical writing with light personality
+          - Strategic emoji use (🚀 🎯 ⚡ 📊 🔍 🏢)
           - Include practical code examples
-          - Focus on DevOps/enterprise value proposition
-          - Weave 80s references naturally into technical content
-          
-          80S REFERENCE PALETTE:
-          - Movies: Back to the Future (time/speed), Tron (digital), WarGames (automation), Ghostbusters (problem-solving), Top Gun (performance)
-          - Music: MTV era, synthwave, "Video Killed the Radio Star" 
-          - Tech: Commodore 64, Apple II, VHS, Walkman, floppy disks
-          - Games: Pac-Man (consuming data), Space Invaders (handling requests), Asteroids (navigation)
-          - Culture: "Tubular", "radical", neon themes, geometric patterns
-          
-          RELEASE TYPE THEMES:
-          - feature: Back to the Future ("where we're going"), revolutionary tech
-          - performance: Top Gun ("need for speed"), Knight Rider dashboard  
-          - bugfix: Ghostbusters ("who you gonna call"), A-Team problem solving
-          - security: Terminator (protection), Aliens ("game over" for threats)
-          - maintenance: Ferris Bueller ("life moves fast"), spring cleaning
+          - Focus on practical value for developers
+          - Very occasional 80s reference (maximum 1-2 per release)
           
           STRUCTURE:
-          1. Hero title with movie quote adaptation
-          2. Compelling intro paragraph
-          3. "What's New" section with major features
+          1. Clear version title
+          2. Brief intro paragraph
+          3. "What's New" section with features
           4. Technical improvements
           5. Installation instructions
           6. Migration notes (if applicable)
-          7. Fun 80s-themed closing
           
-          Keep references SUBTLE and NATURAL. Examples:
-          ✅ "Performance that would make KITT jealous"
-          ✅ "Repository discovery faster than you can say 'Bueller'"
-          ✅ "These improvements are absolutely tubular"
-          ❌ "Cowabunga dude! Totally radical to the max!"
+          Keep any cultural references extremely subtle. Examples:
+          ✅ "Performance improvements that are significant"
+          ✅ "Repository discovery is now blazing fast"
+          ❌ "Performance that would make KITT jealous"
+          ❌ "These improvements are absolutely tubular"
           
           Generate approximately 400-600 words with proper markdown formatting."""
           
@@ -175,8 +160,8 @@ jobs:
           GIT DIFFERENTIAL DATA:
           {changes_content}
           
-          Focus on the {release_type} theme and include appropriate 80s references for this type of release.
-          Make it professional yet memorable, with practical value for DevOps teams.
+          Create professional release notes focused on the technical improvements.
+          Make it clear and informative for developers using mgit.
           
           REMEMBER: Only discuss features related to:
           - Repository cloning and pulling
