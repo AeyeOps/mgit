@@ -1,0 +1,64 @@
+name: 'Setup Poetry'
+description: 'Install and configure Poetry with caching support'
+inputs:
+  poetry-version:
+    description: 'Poetry version to install'
+    required: false
+    default: '1.7.1'
+  python-version:
+    description: 'Python version for cache key'
+    required: false
+    default: '3.11'
+outputs:
+  poetry-version:
+    description: 'Installed Poetry version'
+    value: ${{ steps.poetry-version.outputs.version }}
+  cache-hit:
+    description: 'Whether Poetry cache was restored'
+    value: ${{ steps.cache.outputs.cache-hit }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cache Poetry installation
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.local/bin/poetry
+          ~/.cache/pypoetry
+          ~/.cache/pip
+          .venv
+        key: ${{ runner.os }}-poetry-${{ inputs.poetry-version }}-py${{ inputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-poetry-${{ inputs.poetry-version }}-py${{ inputs.python-version }}-
+          ${{ runner.os }}-poetry-${{ inputs.poetry-version }}-
+          ${{ runner.os }}-poetry-
+    
+    - name: Install Poetry (Unix)
+      if: runner.os != 'Windows' && steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 - --version ${{ inputs.poetry-version }}
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+    
+    - name: Install Poetry (Windows)
+      if: runner.os == 'Windows' && steps.cache.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python - --version ${{ inputs.poetry-version }}
+        echo "$env:APPDATA\Python\Scripts" >> $env:GITHUB_PATH
+    
+    - name: Verify Poetry installation
+      id: poetry-version
+      shell: bash
+      run: |
+        poetry --version
+        echo "version=$(poetry --version | cut -d' ' -f3)" >> $GITHUB_OUTPUT
+    
+    - name: Configure Poetry
+      shell: bash
+      run: |
+        poetry config virtualenvs.in-project true
+        poetry config virtualenvs.create true
+        poetry config installer.max-workers 4

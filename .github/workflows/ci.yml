@@ -19,6 +19,7 @@ on:
 
 env:
   PYTHON_DEFAULT_VERSION: "3.11"
+  POETRY_VERSION: "1.7.1"
 
 jobs:
   # Code quality and linting
@@ -48,15 +49,17 @@ jobs:
     - name: Install Poetry (Unix)
       if: runner.os != 'Windows'
       run: |
-        curl -sSL https://install.python-poetry.org | python3 -
+        curl -sSL https://install.python-poetry.org | python3 - --version ${{ env.POETRY_VERSION }}
         echo "$HOME/.local/bin" >> $GITHUB_PATH
+        poetry --version
         
     - name: Install Poetry (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python - --version ${{ env.POETRY_VERSION }}
         echo "$env:APPDATA\Python\Scripts" >> $env:GITHUB_PATH
+        poetry --version
         
     - name: Configure Poetry
       run: |
@@ -107,15 +110,17 @@ jobs:
     - name: Install Poetry (Unix)
       if: runner.os != 'Windows'
       run: |
-        curl -sSL https://install.python-poetry.org | python3 -
+        curl -sSL https://install.python-poetry.org | python3 - --version ${{ env.POETRY_VERSION }}
         echo "$HOME/.local/bin" >> $GITHUB_PATH
+        poetry --version
         
     - name: Install Poetry (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python - --version ${{ env.POETRY_VERSION }}
         echo "$env:APPDATA\Python\Scripts" >> $env:GITHUB_PATH
+        poetry --version
         
     - name: Configure Poetry
       run: |
@@ -184,15 +189,17 @@ jobs:
     - name: Install Poetry (Unix)
       if: runner.os != 'Windows'
       run: |
-        curl -sSL https://install.python-poetry.org | python3 -
+        curl -sSL https://install.python-poetry.org | python3 - --version ${{ env.POETRY_VERSION }}
         echo "$HOME/.local/bin" >> $GITHUB_PATH
+        poetry --version
         
     - name: Install Poetry (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python - --version ${{ env.POETRY_VERSION }}
         echo "$env:APPDATA\Python\Scripts" >> $env:GITHUB_PATH
+        poetry --version
         
     - name: Configure Poetry
       run: |
@@ -259,15 +266,17 @@ jobs:
     - name: Install Poetry (Unix)
       if: runner.os != 'Windows'
       run: |
-        curl -sSL https://install.python-poetry.org | python3 -
+        curl -sSL https://install.python-poetry.org | python3 - --version ${{ env.POETRY_VERSION }}
         echo "$HOME/.local/bin" >> $GITHUB_PATH
+        poetry --version
         
     - name: Install Poetry (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python - --version ${{ env.POETRY_VERSION }}
         echo "$env:APPDATA\Python\Scripts" >> $env:GITHUB_PATH
+        poetry --version
         
     - name: Configure Poetry
       run: |
