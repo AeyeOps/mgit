@@ -17,23 +17,29 @@ class TestHelperFunctions:
         """Test embedding PAT in HTTPS URL."""
         url = "https://dev.azure.com/org/project/_git/repo"
         pat = "test-pat-token"
-        
+
         result = embed_pat_in_url(url, pat)
-        assert result == "https://PersonalAccessToken:test-pat-token@dev.azure.com/org/project/_git/repo"
+        assert (
+            result
+            == "https://PersonalAccessToken:test-pat-token@dev.azure.com/org/project/_git/repo"
+        )
 
     def test_embed_pat_in_url_already_has_auth(self):
         """Test embedding PAT when URL already has authentication."""
         url = "https://user:pass@dev.azure.com/org/project/_git/repo"
         pat = "test-pat-token"
-        
+
         result = embed_pat_in_url(url, pat)
-        assert result == "https://PersonalAccessToken:test-pat-token@dev.azure.com/org/project/_git/repo"
+        assert (
+            result
+            == "https://PersonalAccessToken:test-pat-token@dev.azure.com/org/project/_git/repo"
+        )
 
     def test_embed_pat_in_url_ssh(self):
         """Test that SSH URLs are not modified."""
         url = "git@github.com:user/repo.git"
         pat = "test-pat-token"
-        
+
         result = embed_pat_in_url(url, pat)
         assert result == url  # SSH URLs should not be modified
 
@@ -73,17 +79,20 @@ class TestHelperFunctions:
         assert sanitize_repo_name("my---repo") == "my-repo"
         assert sanitize_repo_name("--my-repo--") == "my-repo"
 
-    @pytest.mark.parametrize("name,expected", [
-        ("", "repo"),  # Empty name gets default
-        (".", "repo"),  # Just dots gets default
-        ("-", "repo"),  # Just dashes gets default
-        ("CON", "CON_"),  # Windows reserved name
-        ("PRN", "PRN_"),  # Windows reserved name
-        ("AUX", "AUX_"),  # Windows reserved name
-        ("NUL", "NUL_"),  # Windows reserved name
-        ("COM1", "COM1_"),  # Windows reserved name
-        ("LPT1", "LPT1_"),  # Windows reserved name
-    ])
+    @pytest.mark.parametrize(
+        "name,expected",
+        [
+            ("", "repo"),  # Empty name gets default
+            (".", "repo"),  # Just dots gets default
+            ("-", "repo"),  # Just dashes gets default
+            ("CON", "CON_"),  # Windows reserved name
+            ("PRN", "PRN_"),  # Windows reserved name
+            ("AUX", "AUX_"),  # Windows reserved name
+            ("NUL", "NUL_"),  # Windows reserved name
+            ("COM1", "COM1_"),  # Windows reserved name
+            ("LPT1", "LPT1_"),  # Windows reserved name
+        ],
+    )
     def test_sanitize_repo_name_edge_cases(self, name, expected):
         """Test edge cases for repository name sanitization."""
         assert sanitize_repo_name(name) == expected
@@ -97,53 +106,46 @@ class TestAsyncHelpers:
         """Test async executor with successful tasks."""
         # Placeholder for async executor tests
         import asyncio
-        
+
         async def sample_task(n):
             await asyncio.sleep(0.1)
             return n * 2
-        
-        results = await asyncio.gather(
-            sample_task(1),
-            sample_task(2),
-            sample_task(3)
-        )
-        
+
+        results = await asyncio.gather(sample_task(1), sample_task(2), sample_task(3))
+
         assert results == [2, 4, 6]
 
     @pytest.mark.asyncio
     async def test_async_executor_with_semaphore(self):
         """Test async executor with concurrency limit."""
         import asyncio
-        
+
         semaphore = asyncio.Semaphore(2)  # Limit to 2 concurrent tasks
-        
+
         async def limited_task(n, sem):
             async with sem:
                 await asyncio.sleep(0.1)
                 return n * 2
-        
+
         tasks = [limited_task(i, semaphore) for i in range(5)]
         results = await asyncio.gather(*tasks)
-        
+
         assert results == [0, 2, 4, 6, 8]
 
     @pytest.mark.asyncio
     async def test_async_executor_error_handling(self):
         """Test async executor error handling."""
+
         async def failing_task():
             await asyncio.sleep(0.1)
             raise ValueError("Test error")
-        
+
         async def successful_task():
             await asyncio.sleep(0.1)
             return "success"
-        
+
         with pytest.raises(ValueError):
-            await asyncio.gather(
-                successful_task(),
-                failing_task(),
-                successful_task()
-            )
+            await asyncio.gather(successful_task(), failing_task(), successful_task())
 
 
 class TestPathUtilities:
@@ -153,7 +155,7 @@ class TestPathUtilities:
         """Test ensuring a path exists."""
         new_path = temp_dir / "subdir" / "nested"
         assert not new_path.exists()
-        
+
         new_path.mkdir(parents=True)
         assert new_path.exists()
         assert new_path.is_dir()
@@ -162,7 +164,7 @@ class TestPathUtilities:
         """Test resolving relative paths."""
         base = Path("/home/user/projects")
         relative = Path("../documents/file.txt")
-        
+
         resolved = (base / relative).resolve()
         assert str(resolved) == "/home/user/documents/file.txt"
 
@@ -174,7 +176,7 @@ class TestPathUtilities:
             "./projects/repo",
             "../parent/projects/repo",
         ]
-        
+
         for path_str in paths:
             path = Path(path_str).expanduser()
             # Path should be expanded correctly
@@ -190,24 +192,19 @@ class TestConfigurationHelpers:
         base_config = {
             "org": "https://dev.azure.com/base",
             "pat": "base-pat",
-            "git": {
-                "depth": 1,
-                "branch": "main"
-            }
+            "git": {"depth": 1, "branch": "main"},
         }
-        
+
         override_config = {
             "pat": "override-pat",
-            "git": {
-                "depth": 10
-            },
-            "new_key": "new_value"
+            "git": {"depth": 10},
+            "new_key": "new_value",
         }
-        
+
         # Simple merge simulation
         merged = {**base_config, **override_config}
         merged["git"] = {**base_config["git"], **override_config["git"]}
-        
+
         assert merged["org"] == "https://dev.azure.com/base"
         assert merged["pat"] == "override-pat"
         assert merged["git"]["depth"] == 10
@@ -222,7 +219,7 @@ class TestConfigurationHelpers:
             "http://localhost:8080",
             "https://bitbucket.org/workspace/repo",
         ]
-        
+
         invalid_urls = [
             "not-a-url",
             "ftp://invalid-protocol.com",
@@ -230,10 +227,10 @@ class TestConfigurationHelpers:
             "",
             None,
         ]
-        
+
         for url in valid_urls:
             assert url.startswith(("http://", "https://"))
-        
+
         for url in invalid_urls:
             if url:
                 assert not url.startswith(("http://", "https://"))

@@ -27,10 +27,10 @@ class GitManager:
         display_url = repo_url
         if len(display_url) > 60:
             parsed = urlparse(display_url)
-            path_parts = parsed.path.split('/')
+            path_parts = parsed.path.split("/")
             if len(path_parts) > 2:
                 # Show just the end of the path (organization/project/repo)
-                short_path = '/'.join(path_parts[-3:])
+                short_path = "/".join(path_parts[-3:])
                 display_url = f"{parsed.scheme}://{parsed.netloc}/.../{short_path}"
 
         if dir_name:
@@ -38,14 +38,10 @@ class GitManager:
             if len(display_dir) > 40:
                 display_dir = display_dir[:37] + "..."
 
-            logger.info(
-                f"Cloning: [bold blue]{display_dir}[/bold blue]"
-            )
+            logger.info(f"Cloning: [bold blue]{display_dir}[/bold blue]")
             cmd = [self.GIT_EXECUTABLE, "clone", repo_url, dir_name]
         else:
-            logger.info(
-                f"Cloning repository: {display_url} into {output_dir}"
-            )
+            logger.info(f"Cloning repository: {display_url} into {output_dir}")
             cmd = [self.GIT_EXECUTABLE, "clone", repo_url]
 
         await self._run_subprocess(cmd, cwd=output_dir)
@@ -87,14 +83,21 @@ class GitManager:
             return_code = process.returncode
             if return_code is None:
                 # This case should ideally not happen after communicate()
-                logger.error(f"Command '{' '.join(cmd)}' finished but return code is None. Assuming error.")
-                return_code = 1 # Assign a default error code
+                logger.error(
+                    f"Command '{' '.join(cmd)}' finished but return code is None. Assuming error."
+                )
+                return_code = 1  # Assign a default error code
 
             logger.error(
-                f"Command '{' '.join(cmd)}' failed "
-                f"with return code {return_code}."
+                f"Command '{' '.join(cmd)}' failed " f"with return code {return_code}."
             )
             # Raise the specific error for the caller to handle
             # Ensure stderr is bytes if stdout is bytes for CalledProcessError
-            stderr_bytes = stderr if isinstance(stderr, bytes) else stderr.encode('utf-8', errors='replace')
-            raise subprocess.CalledProcessError(return_code, cmd, output=stdout, stderr=stderr_bytes)
+            stderr_bytes = (
+                stderr
+                if isinstance(stderr, bytes)
+                else stderr.encode("utf-8", errors="replace")
+            )
+            raise subprocess.CalledProcessError(
+                return_code, cmd, output=stdout, stderr=stderr_bytes
+            )

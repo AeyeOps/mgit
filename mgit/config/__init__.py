@@ -1,6 +1,6 @@
 """Configuration management package for mgit.
 
-This package provides YAML-based configuration management functionality 
+This package provides YAML-based configuration management functionality
 for both global settings and provider-specific configurations.
 """
 
@@ -26,7 +26,7 @@ from .yaml_manager import (
 __all__ = [
     # Provider config
     "get_provider_configs",
-    "get_provider_config", 
+    "get_provider_config",
     "get_default_provider_config",
     "get_default_provider_name",
     "list_provider_names",

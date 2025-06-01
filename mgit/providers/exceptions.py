@@ -22,10 +22,12 @@ from mgit.exceptions import (
 # Additional provider-specific exceptions
 class RateLimitError(BaseProviderError):
     """Rate limit exceeded."""
-    
-    def __init__(self, message: str, provider: str, reset_time: Optional[datetime] = None):
+
+    def __init__(
+        self, message: str, provider: str, reset_time: Optional[datetime] = None
+    ):
         """Initialize rate limit error.
-        
+
         Args:
             message: Error message
             provider: The provider that hit the rate limit
@@ -39,10 +41,10 @@ class RateLimitError(BaseProviderError):
 
 class ProviderNotFoundError(BaseProviderError):
     """Provider type not found."""
-    
+
     def __init__(self, provider_type: str):
         """Initialize provider not found error.
-        
+
         Args:
             provider_type: The requested provider type
         """
@@ -52,10 +54,10 @@ class ProviderNotFoundError(BaseProviderError):
 
 class RepositoryNotFoundError(BaseProviderError):
     """Repository not found."""
-    
+
     def __init__(self, repository: str, provider: str):
         """Initialize repository not found error.
-        
+
         Args:
             repository: The repository name/path
             provider: The provider being used
@@ -67,10 +69,10 @@ class RepositoryNotFoundError(BaseProviderError):
 
 class PermissionError(BaseProviderError):
     """Insufficient permissions."""
-    
+
     def __init__(self, message: str, provider: str, resource: Optional[str] = None):
         """Initialize permission error.
-        
+
         Args:
             message: Error message
             provider: The provider where permission was denied
@@ -83,10 +85,10 @@ class PermissionError(BaseProviderError):
 
 class APIError(BaseProviderError):
     """Generic API error from provider."""
-    
+
     def __init__(self, message: str, provider: str, status_code: Optional[int] = None):
         """Initialize API error.
-        
+
         Args:
             message: Error message
             provider: The provider that returned the error

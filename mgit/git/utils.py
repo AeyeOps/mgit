@@ -37,7 +37,7 @@ def sanitize_repo_name(repo_url: str) -> str:
     """
     # Extract repo name from URL
     parsed = urlparse(repo_url)
-    path_parts = parsed.path.split('/')
+    path_parts = parsed.path.split("/")
     # The repo name is typically the last part of the path after _git
     repo_name = ""
     for i, part in enumerate(path_parts):
@@ -54,6 +54,6 @@ def sanitize_repo_name(repo_url: str) -> str:
 
     # Replace spaces and special characters with underscores
     # Keep alphanumeric, underscore, hyphen, and period
-    repo_name = re.sub(r'[^\w\-\.]', '_', repo_name)
+    repo_name = re.sub(r"[^\w\-\.]", "_", repo_name)
 
     return repo_name
