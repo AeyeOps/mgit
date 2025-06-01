@@ -24,6 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Nothing yet.
 
+## [0.2.9] - 2025-06-01
+
+### Added
+- Enhanced AI-powered release notes generation with richer 80s pop culture references
+- Structured release notes format with emojis and sections
+
+### Fixed
+- Restored full GenAI release content generation system
+- Fixed workflow issues preventing automated releases
+
 ## [0.2.2] - 2025-05-30
 
 ### Changed
