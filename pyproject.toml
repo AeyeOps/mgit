@@ -38,6 +38,11 @@ ruff = "^0.1.0"
 mypy = "^1.0.0"
 pyinstaller = "^6.0"
 poethepoet = "^0.24.0"
+bandit = {extras = ["toml"], version = "^1.8.0", python = ">=3.9"}
+safety = "^3.0.0"
+pip-audit = {version = "^2.9.0", python = ">=3.9"}
+pytest-benchmark = "^4.0.0"
+memory-profiler = "^0.61.0"
 
 [tool.poetry.scripts]
 mgit = "mgit.__main__:entrypoint"
