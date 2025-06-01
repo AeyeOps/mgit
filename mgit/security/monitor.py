@@ -4,15 +4,15 @@ This module provides security monitoring capabilities including
 event logging, anomaly detection, and security audit trails.
 """
 
-import time
+import json
 import logging
 import threading
-from typing import Any, Dict, List, Optional, Set
+import time
 from collections import defaultdict, deque
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from dataclasses import dataclass, field
 from pathlib import Path
-import json
+from typing import Any, Dict, List, Optional
 
 from .logging import SecurityLogger
 

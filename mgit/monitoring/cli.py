@@ -5,11 +5,11 @@ metrics collection, and health checks.
 """
 
 import asyncio
-import sys
-import signal
-from typing import Optional
-from pathlib import Path
 import json
+import signal
+import sys
+from pathlib import Path
+from typing import Optional
 
 try:
     import typer
@@ -18,13 +18,12 @@ try:
 except ImportError:
     TYPER_AVAILABLE = False
 
-from .server import start_monitoring_server, start_simple_monitoring_server
-from .metrics import get_metrics_collector, setup_metrics
-from .health import get_health_checker
-from .logger import setup_structured_logging, get_structured_logger
 from .dashboard import create_monitoring_configuration
+from .health import get_health_checker
+from .logger import get_structured_logger, setup_structured_logging
+from .metrics import get_metrics_collector, setup_metrics
 from .performance import get_performance_monitor
-
+from .server import start_monitoring_server, start_simple_monitoring_server
 
 # Create CLI app if typer is available
 if TYPER_AVAILABLE:
@@ -157,11 +156,11 @@ def health_check_command(detailed: bool = False, json_output: bool = False) -> N
                 print(f"Healthy Checks: {health_data['summary']['healthy_checks']}")
 
                 if health_data["issues"]:
-                    print(f"\nIssues:")
+                    print("\nIssues:")
                     for issue in health_data["issues"]:
                         print(f"  - {issue}")
 
-                print(f"\nCheck Details:")
+                print("\nCheck Details:")
                 for check_name, check_result in health_data["checks"].items():
                     status_icon = "✓" if check_result["status"] == "healthy" else "✗"
                     print(f"  {status_icon} {check_name}: {check_result['message']}")

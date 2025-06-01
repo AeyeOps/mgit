@@ -1,8 +1,7 @@
 """Unit tests for utility functions."""
 
-import os
+import asyncio
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 

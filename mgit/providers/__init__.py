@@ -5,51 +5,50 @@ for implementing multi-provider support in mgit.
 """
 
 # Base classes and data structures
+# Import and register providers
+from .azdevops import AzureDevOpsProvider
 from .base import (
+    AuthMethod,
     GitProvider,
-    Repository,
     Organization,
     Project,
-    AuthMethod,
+    Repository,
+)
+from .bitbucket import BitBucketProvider
+
+# Exceptions
+from .exceptions import (
+    APIError,
+    AuthenticationError,
+    ConfigurationError,
+    ConnectionError,
+    OrganizationNotFoundError,
+    PermissionError,
+    ProjectNotFoundError,
+    ProviderError,
+    ProviderNotFoundError,
+    RateLimitError,
+    RepositoryNotFoundError,
 )
 
 # Factory pattern
 from .factory import ProviderFactory
+from .github import GitHubProvider
 
 # Registry pattern
 from .registry import (
     ProviderRegistry,
-    register_provider,
+    auto_discover,
+    clear,
+    detect_provider_by_url,
     get_provider,
     get_provider_by_url,
-    list_providers,
     get_provider_info,
-    auto_discover,
-    detect_provider_by_url,
     is_registered,
+    list_providers,
+    register_provider,
     unregister_provider,
-    clear,
 )
-
-# Exceptions
-from .exceptions import (
-    ProviderError,
-    AuthenticationError,
-    ConfigurationError,
-    ConnectionError,
-    RateLimitError,
-    ProviderNotFoundError,
-    RepositoryNotFoundError,
-    OrganizationNotFoundError,
-    ProjectNotFoundError,
-    PermissionError,
-    APIError,
-)
-
-# Import and register providers
-from .azdevops import AzureDevOpsProvider
-from .github import GitHubProvider
-from .bitbucket import BitBucketProvider
 
 # Register available providers (Factory pattern)
 ProviderFactory.register_provider("azuredevops", AzureDevOpsProvider)

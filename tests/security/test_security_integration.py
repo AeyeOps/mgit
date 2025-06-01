@@ -4,22 +4,22 @@ This module tests the security hardening implementation to ensure
 proper credential masking, input validation, and security monitoring.
 """
 
-import pytest
-import logging
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
+import pytest
+
+from mgit.security.config import SecurityConfig
 from mgit.security.credentials import (
     CredentialMasker,
-    validate_github_pat,
     is_credential_exposed,
+    validate_github_pat,
 )
-from mgit.security.validation import SecurityValidator, sanitize_path, validate_input
+from mgit.security.integration import SecurityIntegration
 from mgit.security.logging import SecurityLogger, mask_log_message
-from mgit.security.config import SecurityConfig, get_security_settings
-from mgit.security.monitor import SecurityMonitor, SecurityEvent
-from mgit.security.integration import SecurityIntegration, initialize_security
+from mgit.security.monitor import SecurityMonitor
+from mgit.security.validation import SecurityValidator, sanitize_path, validate_input
 
 
 class TestCredentialMasking:

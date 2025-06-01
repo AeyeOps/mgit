@@ -9,11 +9,11 @@ import logging
 import sys
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional, Union
 from pathlib import Path
+from typing import Any, Dict, Optional, Union
 
-from .correlation import get_correlation_id, get_correlation_context
 from ..security.credentials import CredentialMasker
+from .correlation import get_correlation_context, get_correlation_id
 
 
 class StructuredFormatter(logging.Formatter):

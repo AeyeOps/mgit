@@ -4,19 +4,17 @@ This module provides performance monitoring capabilities including
 operation timing, resource usage tracking, and performance analytics.
 """
 
-import time
-import threading
-import asyncio
-from typing import Dict, List, Optional, Any, Callable, TypeVar, Union
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from contextlib import contextmanager, asynccontextmanager
-from functools import wraps
 import statistics
+import threading
+import time
+from contextlib import asynccontextmanager, contextmanager
+from dataclasses import dataclass, field
+from functools import wraps
+from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar
 
+from .correlation import get_correlation_id
 from .logger import get_structured_logger
 from .metrics import get_metrics_collector
-from .correlation import get_correlation_id
 
 T = TypeVar("T")
 

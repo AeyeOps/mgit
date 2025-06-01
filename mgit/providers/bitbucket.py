@@ -4,30 +4,28 @@ This module provides the BitBucket provider for mgit, supporting repository
 operations through the BitBucket API.
 """
 
-from typing import List, Optional, Dict, Any, AsyncIterator
-from urllib.parse import urlparse
-import re
 import asyncio
 import base64
-import logging
+import re
+from typing import Any, AsyncIterator, Dict, List, Optional
+
 import aiohttp
 
-from .base import GitProvider, Repository, Organization, Project, AuthMethod
-from .exceptions import (
-    AuthenticationError,
-    ConfigurationError,
-    ConnectionError,
-    RateLimitError,
-    RepositoryNotFoundError,
-    PermissionError,
-    APIError,
-)
+from ..security.credentials import mask_sensitive_data, validate_bitbucket_app_password
 
 # Security imports
 from ..security.logging import SecurityLogger
-from ..security.credentials import validate_bitbucket_app_password, mask_sensitive_data
-from ..security.validation import SecurityValidator
 from ..security.monitor import get_security_monitor
+from ..security.validation import SecurityValidator
+from .base import AuthMethod, GitProvider, Organization, Project, Repository
+from .exceptions import (
+    APIError,
+    AuthenticationError,
+    ConfigurationError,
+    ConnectionError,
+    PermissionError,
+    RepositoryNotFoundError,
+)
 
 
 class BitBucketProvider(GitProvider):
@@ -132,7 +130,6 @@ class BitBucketProvider(GitProvider):
 
     async def _ensure_session(self) -> None:
         """Ensure we have a valid session for the current event loop."""
-        import asyncio
 
         try:
             current_loop = asyncio.get_running_loop()

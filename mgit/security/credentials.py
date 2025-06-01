@@ -4,11 +4,11 @@ This module provides secure credential management, masking, and validation
 to prevent credential exposure in logs, error messages, and API responses.
 """
 
-import re
 import logging
-from typing import Any, Dict, List, Optional, Pattern, Union
+import re
 from functools import wraps
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from typing import Any, Dict
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 

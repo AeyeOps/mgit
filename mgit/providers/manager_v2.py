@@ -5,19 +5,20 @@ named configurations and supports multiple providers of the same type.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
-from .factory import ProviderFactory
-from .base import GitProvider
-from .exceptions import ProviderNotFoundError, ConfigurationError
 from mgit.config.yaml_manager import (
-    get_provider_config,
+    detect_provider_type,
     get_default_provider_config,
     get_default_provider_name,
-    detect_provider_type,
+    get_provider_config,
     list_provider_names,
 )
+
+from .base import GitProvider
+from .exceptions import ConfigurationError, ProviderNotFoundError
+from .factory import ProviderFactory
 
 logger = logging.getLogger(__name__)
 

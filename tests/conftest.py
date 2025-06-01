@@ -6,18 +6,14 @@ This module contains fixtures that are available to all tests in the test suite.
 
 import asyncio
 import json
-import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, Dict, Generator, List
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from typer.testing import CliRunner
-
-from mgit.__main__ import app
-
 
 # --- Pytest Configuration ---
 

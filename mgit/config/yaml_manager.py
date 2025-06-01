@@ -4,11 +4,12 @@ This module provides a clean YAML-based configuration system that uses
 ~/.config/mgit/config.yaml as the single source of truth.
 """
 
-import os
-import yaml
-from pathlib import Path
-from typing import Dict, Any, Optional, List
 import logging
+import os
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import yaml
 
 logger = logging.getLogger(__name__)
 

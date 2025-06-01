@@ -4,13 +4,12 @@ This module provides metrics collection and exposition in Prometheus format
 for monitoring operation performance, success rates, and system health.
 """
 
-import time
-import threading
-from typing import Dict, List, Optional, Any, Tuple
-from collections import defaultdict, Counter
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 import json
+import threading
+import time
+from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
 
 
 @dataclass

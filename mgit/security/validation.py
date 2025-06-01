@@ -5,12 +5,11 @@ security vulnerabilities including path traversal, injection attacks,
 and malformed input handling.
 """
 
-import os
-import re
 import logging
+import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
-from urllib.parse import urlparse, quote, unquote
+from typing import Any, List, Optional, Union
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 

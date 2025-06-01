@@ -1,65 +1,25 @@
 #!/usr/bin/env python3
 
 import asyncio
-import json
 import logging
 import os
-import re
 import shutil
 import subprocess  # Needed for CalledProcessError exception
-import sys
 from enum import Enum
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, Dict, Optional
-from urllib.parse import urlparse, urlunparse, unquote
+from typing import Optional
 
+import typer
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress
 from rich.prompt import Confirm  # Added import
-import typer
 
-# Azure DevOps SDK imports
-from azure.devops.connection import Connection
-from msrest.authentication import BasicAuthentication
-from azure.devops.v7_1.git import GitClient, GitRepository
-from azure.devops.v7_1.core import CoreClient, TeamProjectReference
-from azure.devops.exceptions import ClientRequestError, AzureDevOpsAuthenticationError
-
-# Local imports - Sprint 3A integrations
-from mgit.git import GitManager, embed_pat_in_url, sanitize_repo_name
-from mgit.utils import AsyncExecutor
-from mgit.providers.manager_v2 import ProviderManager
-from mgit.commands.listing import list_repositories, format_results
-from mgit.exceptions import (
-    MgitError,
-    ConfigurationError,
-    AuthenticationError,
-    ConnectionError,
-    RepositoryOperationError,
-    ProjectNotFoundError,
-    OrganizationNotFoundError,
-    ValidationError,
-    FileSystemError,
-    CLIError,
-    error_handler,
-    async_error_handler,
-    retry_with_backoff,
-    error_context,
-    validate_url,
-    validate_path,
-)
-from mgit.providers import (
-    GitProvider,
-    ProviderFactory,
-    ProviderError,
-    RateLimitError,
-    ProviderNotFoundError,
-    RepositoryNotFoundError,
-    PermissionError,
-    APIError,
-)
+from mgit.commands.listing import format_results, list_repositories
+from mgit.config.yaml_manager import CONFIG_DIR, get_global_setting, migrate_from_dotenv
+from mgit.exceptions import MgitError
+from mgit.git import GitManager, sanitize_repo_name
 from mgit.providers.manager_v2 import ProviderManager
 
 __version__ = "0.2.3"
@@ -73,9 +33,6 @@ DEFAULT_VALUES = {
     "DEFAULT_CONCURRENCY": "4",
     "DEFAULT_UPDATE_MODE": "skip",
 }
-
-# Import YAML configuration system
-from mgit.config.yaml_manager import get_global_setting, migrate_from_dotenv, CONFIG_DIR
 
 # Ensure config directory exists before setting up file logging
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -280,99 +237,8 @@ def main_options(
 
 
 # -----------------------------------------------------------------------------
-# Git Manager
+# Git Manager is now imported from mgit.git module
 # -----------------------------------------------------------------------------
-class GitManager:
-    GIT_EXECUTABLE = "git"
-
-    # Fix type hint for dir_name
-    async def git_clone(
-        self, repo_url: str, output_dir: Path, dir_name: Optional[str] = None
-    ):
-        """
-        Use 'git clone' for the given repo_url, in output_dir.
-        Optionally specify a directory name to clone into.
-        Raises typer.Exit if the command fails.
-        """
-        # Format the message for better display in the console
-        # Truncate long URLs to prevent log line truncation
-        display_url = repo_url
-        if len(display_url) > 60:
-            parsed = urlparse(display_url)
-            path_parts = parsed.path.split("/")
-            if len(path_parts) > 2:
-                # Show just the end of the path (organization/project/repo)
-                short_path = "/".join(path_parts[-3:])
-                display_url = f"{parsed.scheme}://{parsed.netloc}/.../{short_path}"
-
-        if dir_name:
-            display_dir = dir_name
-            if len(display_dir) > 40:
-                display_dir = display_dir[:37] + "..."
-
-            logger.info(f"Cloning: [bold blue]{display_dir}[/bold blue]")
-            cmd = [self.GIT_EXECUTABLE, "clone", repo_url, dir_name]
-        else:
-            logger.info(f"Cloning repository: {display_url} into {output_dir}")
-            cmd = [self.GIT_EXECUTABLE, "clone", repo_url]
-
-        await self._run_subprocess(cmd, cwd=output_dir)
-
-    async def git_pull(self, repo_dir: Path):
-        """
-        Use 'git pull' for the existing repo in repo_dir.
-        """
-        # Extract repo name from path for nicer logging
-        repo_name = repo_dir.name
-
-        # Format the output with consistent width to prevent truncation
-        # Limit the repo name to 40 characters if it's longer
-        display_name = repo_name
-        if len(display_name) > 40:
-            display_name = display_name[:37] + "..."
-
-        logger.info(f"Pulling: [bold green]{display_name}[/bold green]")
-        cmd = [self.GIT_EXECUTABLE, "pull"]
-        await self._run_subprocess(cmd, cwd=repo_dir)
-
-    @staticmethod
-    async def _run_subprocess(cmd: list, cwd: Path):
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=str(cwd),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await process.communicate()
-        if stdout:
-            for line in stdout.decode().splitlines():
-                logger.debug(f"[stdout] {line}")
-        if stderr:
-            for line in stderr.decode().splitlines():
-                logger.debug(f"[stderr] {line}")
-        if process.returncode != 0:
-            # Ensure returncode is an int for CalledProcessError
-            return_code = process.returncode
-            if return_code is None:
-                # This case should ideally not happen after communicate()
-                logger.error(
-                    f"Command '{' '.join(cmd)}' finished but return code is None. Assuming error."
-                )
-                return_code = 1  # Assign a default error code
-
-            logger.error(
-                f"Command '{' '.join(cmd)}' failed " f"with return code {return_code}."
-            )
-            # Raise the specific error for the caller to handle
-            # Ensure stderr is bytes if stdout is bytes for CalledProcessError
-            stderr_bytes = (
-                stderr
-                if isinstance(stderr, bytes)
-                else stderr.encode("utf-8", errors="replace")
-            )
-            raise subprocess.CalledProcessError(
-                return_code, cmd, output=stdout, stderr=stderr_bytes
-            )
 
 
 class UpdateMode(str, Enum):
@@ -675,7 +541,7 @@ def clone_all(
                             description=f"[green]Cloned: {display_name}[/green]",
                             completed=1,
                         )
-                    except subprocess.CalledProcessError as e:
+                    except subprocess.CalledProcessError:
                         # Use the sanitized name for the directory argument
                         await git_manager.git_clone(
                             pat_url, target_path, sanitized_name
@@ -1173,10 +1039,8 @@ def login(
     Supports testing existing configurations or creating new ones.
     """
     from mgit.config.yaml_manager import (
-        add_provider_config,
-        get_provider_configs,
-        list_provider_names,
         ConfigurationManager,
+        add_provider_config,
     )
 
     # Case 1: Test existing named configuration
@@ -1318,13 +1182,13 @@ def config(
       mgit config --global                  # Show global settings
     """
     from mgit.config.yaml_manager import (
-        list_provider_names,
-        get_provider_config,
-        get_default_provider_name,
         detect_provider_type,
-        set_default_provider,
-        remove_provider_config,
+        get_default_provider_name,
         get_global_config,
+        get_provider_config,
+        list_provider_names,
+        remove_provider_config,
+        set_default_provider,
     )
 
     # List all providers
@@ -1352,7 +1216,7 @@ def config(
             except Exception as e:
                 console.print(f"  [yellow]{name}[/yellow] (type detection failed: {e})")
 
-        console.print(f"\nConfig file: ~/.config/mgit/config.yaml")
+        console.print("\nConfig file: ~/.config/mgit/config.yaml")
         return
 
     # Show specific provider

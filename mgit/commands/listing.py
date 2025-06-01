@@ -3,25 +3,24 @@
 Provides repository discovery across providers using query patterns.
 """
 
-import asyncio
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
+
 from rich.console import Console
-from rich.table import Table
 from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
     Progress,
     SpinnerColumn,
-    TextColumn,
-    BarColumn,
     TaskProgressColumn,
-    MofNCompleteColumn,
+    TextColumn,
 )
+from rich.table import Table
 
-from ..utils.query_parser import parse_query, matches_pattern, validate_query
-from ..providers.manager_v2 import ProviderManager
-from ..providers.base import Repository, Organization, Project
 from ..exceptions import MgitError
-
+from ..providers.base import Repository
+from ..providers.manager_v2 import ProviderManager
+from ..utils.query_parser import matches_pattern, parse_query, validate_query
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -83,12 +82,12 @@ async def list_repositories(
         provider = provider_manager.get_provider()
         if not provider:
             raise MgitError(
-                f"No provider available. Use 'mgit config list' to see configured providers."
+                "No provider available. Use 'mgit config list' to see configured providers."
             )
 
         # Authenticate provider
         if not await provider.authenticate():
-            raise MgitError(f"Failed to authenticate with provider")
+            raise MgitError("Failed to authenticate with provider")
 
         logger.debug(f"Using provider: {provider.PROVIDER_NAME}")
 

@@ -8,7 +8,6 @@ and user-friendly error messages.
 import asyncio
 import functools
 import logging
-import sys
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -738,7 +737,7 @@ def validate_path(path: Union[str, Path], must_exist: bool = False) -> Path:
         raise ValidationError(f"Invalid path: {e}", field="path")
 
     if must_exist and not path_obj.exists():
-        raise FileSystemError(f"Path does not exist", path=str(path_obj))
+        raise FileSystemError("Path does not exist", path=str(path_obj))
 
     return path_obj
 

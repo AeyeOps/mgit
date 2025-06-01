@@ -10,11 +10,11 @@ import inspect
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Type, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple, Type
 from urllib.parse import urlparse
 
 from .base import GitProvider
-from .exceptions import ProviderNotFoundError, ConfigurationError
+from .exceptions import ConfigurationError, ProviderNotFoundError
 
 logger = logging.getLogger(__name__)
 

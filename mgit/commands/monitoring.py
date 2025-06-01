@@ -6,8 +6,8 @@ integrated into the main mgit CLI.
 
 import asyncio
 import sys
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 try:
     import typer
@@ -16,13 +16,13 @@ try:
 except ImportError:
     TYPER_AVAILABLE = False
 
-from ..monitoring.server import start_monitoring_server, start_simple_monitoring_server
+from ..monitoring.dashboard import create_monitoring_configuration
 from ..monitoring.health import get_health_checker
+from ..monitoring.integration import setup_monitoring_integration
+from ..monitoring.logger import get_structured_logger, setup_structured_logging
 from ..monitoring.metrics import get_metrics_collector
 from ..monitoring.performance import get_performance_monitor
-from ..monitoring.dashboard import create_monitoring_configuration
-from ..monitoring.integration import setup_monitoring_integration
-from ..monitoring.logger import setup_structured_logging, get_structured_logger
+from ..monitoring.server import start_monitoring_server, start_simple_monitoring_server
 
 
 def start_monitoring_server_command(
@@ -132,11 +132,11 @@ def health_check_command(
                 print(f"Healthy Checks: {health_data['summary']['healthy_checks']}")
 
                 if health_data["issues"]:
-                    print(f"\nIssues:")
+                    print("\nIssues:")
                     for issue in health_data["issues"]:
                         print(f"  - {issue}")
 
-                print(f"\nCheck Details:")
+                print("\nCheck Details:")
                 for check_name, check_result in health_data["checks"].items():
                     status_icon = "✓" if check_result["status"] == "healthy" else "✗"
                     print(f"  {status_icon} {check_name}: {check_result['message']}")

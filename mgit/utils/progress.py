@@ -9,22 +9,20 @@ nested progress contexts, and common operation patterns.
 import asyncio
 from contextlib import contextmanager
 from enum import Enum
-from typing import Any, Callable, Dict, Iterable, List, Optional, TypeVar, Union
+from typing import Callable, Dict, Iterable, List, Optional, TypeVar, Union
 
 from rich.console import Console
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
     Progress,
+    ProgressColumn,
     SpinnerColumn,
     TaskID,
     TextColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
-    ProgressColumn,
 )
-from rich.table import Column
-
 
 # Type variable for generic operations
 T = TypeVar("T")

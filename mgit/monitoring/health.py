@@ -4,17 +4,15 @@ This module provides comprehensive health checks including dependency
 checks, readiness and liveness probes for Kubernetes deployments.
 """
 
-import time
 import asyncio
-import subprocess
+import os
 import socket
-from typing import Dict, List, Optional, Any, Callable, Awaitable
+import subprocess
+import tempfile
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from pathlib import Path
-import json
-import tempfile
-import os
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 from .logger import get_structured_logger
 from .metrics import get_metrics_collector
