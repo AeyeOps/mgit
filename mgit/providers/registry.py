@@ -363,7 +363,6 @@ class ProviderRegistry:
                         and hasattr(obj, "PROVIDER_NAME")
                         and obj.PROVIDER_NAME
                     ):
-
                         provider_name = obj.PROVIDER_NAME.lower()
 
                         # Skip if already registered (manual registration takes precedence)

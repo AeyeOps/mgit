@@ -21,7 +21,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = ">=3.8,<3.13"
 aiohttp = "^3.9.0"
 azure-devops = "^7.1.0b1"
 python-dotenv = "^1.0.0"
@@ -67,6 +67,9 @@ cmd = "ruff check ."
 
 [tool.poe.tasks.format]
 cmd = "black ."
+
+[tool.poe.tasks.format-check]
+cmd = "black --check --diff ."
 
 [tool.black]
 line-length = 88

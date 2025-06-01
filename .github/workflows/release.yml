@@ -10,7 +10,7 @@ on:
       - 'Dockerfile*'
       - 'docker/**'
       - 'pyproject.toml'
-      - 'requirements.txt'
+      - 'poetry.lock'
       - '.github/workflows/release.yml'
   pull_request:
     branches: [ main ]
@@ -303,7 +303,7 @@ jobs:
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: |
-        pip install openai
+        python -m pip install openai
         
         cat > generate_release_notes.py << 'EOF'
         import openai
@@ -536,22 +536,28 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
+        cache: 'poetry'
+    
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
     
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install build setuptools wheel
-        pip install -r requirements.txt
-        pip install pyinstaller
+        poetry install --with dev
+        poetry add --group dev pyinstaller
     
     - name: Build packages (Linux only)
       if: matrix.os == 'ubuntu-latest'
       run: |
-        python -m build
+        poetry build
         
     - name: Build executable
       run: |
-        ${{ matrix.os == 'windows-latest' && 'pyinstaller --onefile --name mgit-${GITHUB_REF_NAME}-${{ matrix.platform }}.exe mgit/__main__.py' || format('pyinstaller --onefile --name mgit-{0}-{1} mgit/__main__.py', github.ref_name, matrix.platform) }}
+        ${{ matrix.os == 'windows-latest' && 'poetry run pyinstaller --onefile --name mgit-${GITHUB_REF_NAME}-${{ matrix.platform }}.exe mgit/__main__.py' || format('poetry run pyinstaller --onefile --name mgit-{0}-{1} mgit/__main__.py', github.ref_name, matrix.platform) }}
         
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4

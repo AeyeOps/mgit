@@ -107,7 +107,6 @@ async def list_repositories(
             console=console,
             transient=False,
         ) as progress:
-
             # Step 1: List organizations
             discovery_task = progress.add_task(
                 "Discovering organizations...", total=None, repos_found=0
