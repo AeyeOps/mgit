@@ -1,4 +1,4 @@
-name: "🚀 Automated Release - The Future is Now"
+name: Automated Release with AI
 
 on:
   workflow_dispatch:
@@ -12,11 +12,11 @@ on:
         required: true
         type: choice
         options:
-          - 'feature'    # Major new functionality
-          - 'performance' # Speed/optimization improvements  
-          - 'bugfix'     # Bug fixes and stability
-          - 'security'   # Security enhancements
-          - 'maintenance' # Dependencies, cleanup
+          - 'feature'
+          - 'performance'
+          - 'bugfix'
+          - 'security'
+          - 'maintenance'
         default: 'feature'
       pre_release:
         description: 'Mark as pre-release'
@@ -32,31 +32,31 @@ env:
 
 jobs:
   automated-release:
-    name: 🎮 Release Generation Engine
+    name: Generate and Publish Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: read
     
     steps:
-      - name: 📼 Checkout Code (Like Rewinding a VHS)
+      - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for git analysis
+          fetch-depth: 0
           
-      - name: 🖥️ Setup Python (Commodore 64 Would Be Jealous)
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
           
-      - name: 📀 Install Dependencies
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install build pyinstaller openai
           
-      - name: 🔍 Analyze Git Differential (CSI: Repository Edition)
+      - name: Analyze Git Differential
         id: git-analysis
         run: |
           # Get version from input or tag
@@ -91,7 +91,7 @@ jobs:
           echo "commit_count=${COMMIT_COUNT}" >> $GITHUB_OUTPUT
           echo "files_changed=${FILES_CHANGED}" >> $GITHUB_OUTPUT
           
-      - name: 🤖 Generate Release Notes (Max Headroom Mode)
+      - name: Generate AI Release Notes
         id: ai-generation
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -232,7 +232,7 @@ jobs:
           
           python generate_release_notes.py
           
-      - name: 🔧 Update Version Numbers (Synchronize Watches)
+      - name: Update Version Numbers
         run: |
           VERSION="${{ steps.git-analysis.outputs.version }}"
           VERSION_NUMBER="${VERSION#v}"  # Remove 'v' prefix
@@ -248,7 +248,7 @@ jobs:
           
           echo "✅ Updated version to ${VERSION_NUMBER}"
           
-      - name: 🏗️ Build Packages (Assembly Line Production)
+      - name: Build Packages
         run: |
           # Build Python wheel
           python -m build --wheel
@@ -260,7 +260,7 @@ jobs:
           ls -la dist/
           python -c "import mgit; print(f'✅ Package imports successfully')"
           
-      - name: 🧪 Quick Validation (Quality Assurance)
+      - name: Quick Validation
         run: |
           # Test wheel installation
           pip install dist/*.whl
@@ -268,7 +268,7 @@ jobs:
           mgit --help
           echo "✅ Wheel package validated"
           
-      - name: 📦 Create GitHub Release (Launch Sequence)
+      - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -281,7 +281,7 @@ jobs:
           
           # Create release
           gh release create "${VERSION}" \
-            --title "$(head -1 release-notes.md | sed 's/^# //')" \
+            --title "mgit ${VERSION} - $(head -1 release-notes.md | sed 's/^# //' | sed 's/mgit [^ ]* - //')" \
             --notes-file release-notes.md \
             ${PRERELEASE_FLAG} \
             dist/*.whl \
@@ -290,7 +290,7 @@ jobs:
           echo "🚀 Release ${VERSION} created successfully!"
           echo "📍 URL: https://github.com/${{ github.repository }}/releases/tag/${VERSION}"
           
-      - name: 🎊 Success Notification (Victory Dance)
+      - name: Success Notification
         if: success()
         run: |
           echo "🎉 Release pipeline completed successfully!"
@@ -304,7 +304,7 @@ jobs:
           echo "   Files: ${{ steps.git-analysis.outputs.files_changed }}"
           echo "   AI Notes: ${{ steps.ai-generation.outputs.notes_length }} chars"
           
-      - name: 💥 Error Handling (Game Over Screen)
+      - name: Error Handling
         if: failure()
         run: |
           echo "❌ Houston, we have a problem!"

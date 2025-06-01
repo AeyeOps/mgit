@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "mgit"
-version = "0.2.2"
+version = "0.2.3"
 description = "Multi-provider Git management tool"
 authors = ["Steve Antonakakis <steve.antonakakis@gmail.com>"]
 readme = "README.md"

@@ -31,6 +31,7 @@ from azure.devops.exceptions import ClientRequestError, AzureDevOpsAuthenticatio
 from mgit.git import GitManager, embed_pat_in_url, sanitize_repo_name
 from mgit.utils import AsyncExecutor
 from mgit.providers.manager_v2 import ProviderManager
+from mgit.commands.listing import list_repositories, format_results
 from mgit.exceptions import (
     MgitError,
     ConfigurationError,
@@ -61,7 +62,7 @@ from mgit.providers import (
 )
 from mgit.providers.manager_v2 import ProviderManager
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 # Default values used if environment variables and config file don't provide values
 DEFAULT_VALUES = {
@@ -1226,6 +1227,36 @@ def config(
     console.print("  --remove NAME    Remove provider")
     console.print("  --global         Show global settings")
     console.print("\nRun 'mgit config --help' for more details.")
+
+
+# -----------------------------------------------------------------------------
+# list Command
+# -----------------------------------------------------------------------------
+@app.command(name="list")
+def list_command(
+    query: str = typer.Argument(..., help="Query pattern (org/project/repo)"),
+    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Provider configuration name"),
+    format_type: str = typer.Option("table", "--format", "-f", help="Output format (table, json)"),
+    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Maximum results to return")
+):
+    """
+    List repositories matching query pattern across providers.
+    
+    Examples:
+      mgit list "*/*/*"                    # List all repos from all providers
+      mgit list "pdidev/*/*"               # List all repos from pdidev org
+      mgit list "*/*/pay*"                 # List repos ending in 'pay' from any org
+      mgit list "pdidev/PDIOperations/*"   # List all repos in specific project
+    """
+    async def do_list():
+        try:
+            results = await list_repositories(query, provider, format_type, limit)
+            format_results(results, format_type)
+        except MgitError as e:
+            console.print(f"[red]Error: {e}[/red]")
+            raise typer.Exit(1)
+    
+    asyncio.run(do_list())
 
 
 # The callback is no longer needed since we're using Typer's built-in help
