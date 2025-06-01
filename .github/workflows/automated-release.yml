@@ -1,4 +1,4 @@
-name: 🚀 Automated Release - "The Future is Now"
+name: "🚀 Automated Release - The Future is Now"
 
 on:
   workflow_dispatch:
