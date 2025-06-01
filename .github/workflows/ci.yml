@@ -12,10 +12,10 @@ on:
   pull_request:
     branches: [ 'feature/*', 'bugfix/*', 'hotfix/*' ]
     
-  # Scheduled runs for continuous monitoring
-  schedule:
-    # Run tests every day at 2 AM UTC
-    - cron: '0 2 * * *'
+  # # Scheduled runs for continuous monitoring
+  # schedule:
+  #   # Run tests every day at 2 AM UTC
+  #   - cron: '0 2 * * *'
 
 env:
   PYTHON_DEFAULT_VERSION: "3.11"

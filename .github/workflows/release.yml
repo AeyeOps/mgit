@@ -13,9 +13,9 @@ on:
       - 'pyproject.toml'
       - 'poetry.lock'
       - '.github/workflows/release.yml'
-  schedule:
-    # Rebuild images weekly on Sundays at 3 AM UTC for security updates
-    - cron: '0 3 * * 0'
+  # schedule:
+  #   # Rebuild images weekly on Sundays at 3 AM UTC for security updates
+  #   - cron: '0 3 * * 0'
   workflow_dispatch:
     inputs:
       platforms:
