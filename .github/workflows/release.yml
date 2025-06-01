@@ -3,8 +3,9 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*'
-    branches: [ main, develop ]
+      - 'v*'  # ONLY trigger on version tags for releases
+  pull_request:
+    branches: [ main ]
     paths:
       - 'mgit/**'
       - 'Dockerfile*'
@@ -12,12 +13,6 @@ on:
       - 'pyproject.toml'
       - 'poetry.lock'
       - '.github/workflows/release.yml'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'mgit/**'
-      - 'Dockerfile*'
-      - 'docker/**'
   schedule:
     # Rebuild images weekly on Sundays at 3 AM UTC for security updates
     - cron: '0 3 * * 0'
