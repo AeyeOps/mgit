@@ -1,4 +1,4 @@
-# AI Release Notes Generation Prompt System
+# AI Release Notes Generation Prompt System (Updated)
 
 ## System Prompt Template
 
