@@ -25,8 +25,7 @@ class TestGitOperations:
             "asyncio.create_subprocess_exec", return_value=async_mock_subprocess
         ):
             # Mock implementation
-            repo_url = "https://dev.azure.com/test-org/_git/test-repo"
-            destination = temp_dir / "test-repo"
+            temp_dir / "test-repo"
 
             # Simulate git clone
             async_mock_subprocess.returncode = 0
@@ -46,8 +45,7 @@ class TestGitOperations:
             "asyncio.create_subprocess_exec", return_value=async_mock_subprocess
         ):
             # Mock implementation
-            repo_url = "https://dev.azure.com/test-org/_git/test-repo"
-            destination = temp_dir / "test-repo"
+            temp_dir / "test-repo"
 
             # Simulate git clone failure
             async_mock_subprocess.returncode = 1
@@ -68,7 +66,7 @@ class TestGitOperations:
             "asyncio.create_subprocess_exec", return_value=async_mock_subprocess
         ):
             # Mock implementation
-            repo_path = mock_git_repo["path"]
+            mock_git_repo["path"]
 
             # Simulate successful pull
             async_mock_subprocess.returncode = 0
@@ -212,7 +210,7 @@ class TestGitBranchOperations:
         with patch(
             "asyncio.create_subprocess_exec", return_value=async_mock_subprocess
         ):
-            repo_path = mock_git_repo["path"]
+            mock_git_repo["path"]
 
             # Mock branch output
             async_mock_subprocess.communicate = AsyncMock(return_value=(b"main\n", b""))
@@ -230,7 +228,7 @@ class TestGitBranchOperations:
         with patch(
             "asyncio.create_subprocess_exec", return_value=async_mock_subprocess
         ):
-            repo_path = mock_git_repo["path"]
+            mock_git_repo["path"]
 
             # Mock successful checkout
             async_mock_subprocess.returncode = 0
@@ -263,10 +261,6 @@ class TestGitManager:
     async def test_git_manager_clone_all(self, git_manager, temp_dir):
         """Test GitManager clone_all method."""
         # Mock repository list
-        repos = [
-            {"name": "repo1", "url": "https://dev.azure.com/org/_git/repo1"},
-            {"name": "repo2", "url": "https://dev.azure.com/org/_git/repo2"},
-        ]
 
         # In real implementation:
         # results = await git_manager.clone_all(repos, temp_dir)

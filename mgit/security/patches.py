@@ -32,8 +32,6 @@ def secure_provider_method(func: F) -> F:
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        masker = CredentialMasker()
-        validator = SecurityValidator()
         monitor = get_security_monitor()
 
         # Get method info
@@ -102,7 +100,6 @@ def secure_provider_method(func: F) -> F:
 
 def secure_logging_patch():
     """Patch logging to automatically mask credentials."""
-    original_handlers = {}
 
     def patch_handler(handler):
         """Patch a logging handler to mask credentials."""
@@ -382,7 +379,6 @@ def validate_and_sanitize_input(input_type: str):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            validator = SecurityValidator()
             monitor = get_security_monitor()
 
             # Validate based on input type and parameter names

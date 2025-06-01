@@ -465,8 +465,6 @@ class SecurityMonitor:
 
     def _check_anomalies(self, event: SecurityEvent) -> None:
         """Check for anomalous patterns in events."""
-        current_time = time.time()
-
         for pattern_name, config in self.suspicious_patterns.items():
             threshold = config["threshold"]
             window = config["window"]

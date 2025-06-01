@@ -17,13 +17,6 @@ class TestProviderAbstraction:
     def test_provider_interface(self):
         """Test that provider interface defines required methods."""
         # Expected interface methods:
-        required_methods = [
-            "authenticate",
-            "list_repositories",
-            "get_repository",
-            "clone_repository",
-            "get_default_branch",
-        ]
 
         # This will be tested once BaseProvider is implemented
         # for method in required_methods:
@@ -33,11 +26,6 @@ class TestProviderAbstraction:
     def test_provider_registry(self):
         """Test provider registration and lookup."""
         # Test cases for provider registry
-        providers = {
-            "azure": "AzureDevOpsProvider",
-            "github": "GitHubProvider",
-            "bitbucket": "BitbucketProvider",
-        }
 
         # Once implemented:
         # for name, class_name in providers.items():
@@ -59,8 +47,6 @@ class TestAzureDevOpsProvider:
     def test_azure_authentication(self, azure_provider):
         """Test Azure DevOps authentication."""
         # Test authentication with PAT
-        org = "https://dev.azure.com/test-org"
-        pat = "test-pat-token"
 
         # Once implemented:
         # result = azure_provider.authenticate(org, pat)
@@ -92,20 +78,6 @@ class TestAzureDevOpsProvider:
 
     def test_azure_repository_url_formatting(self):
         """Test Azure DevOps URL formatting."""
-        test_cases = [
-            {
-                "org": "https://dev.azure.com/myorg",
-                "project": "myproject",
-                "repo": "myrepo",
-                "expected": "https://dev.azure.com/myorg/myproject/_git/myrepo",
-            },
-            {
-                "org": "https://myorg.visualstudio.com",
-                "project": "myproject",
-                "repo": "myrepo",
-                "expected": "https://myorg.visualstudio.com/myproject/_git/myrepo",
-            },
-        ]
 
         # Once URL formatting is implemented:
         # for case in test_cases:
@@ -125,7 +97,6 @@ class TestGitHubProvider:
 
     def test_github_authentication(self, github_provider):
         """Test GitHub authentication with token."""
-        token = "ghp_test_token"
 
         # Once implemented:
         # result = github_provider.authenticate(token=token)
@@ -150,8 +121,8 @@ class TestGitHubProvider:
     def test_github_pagination(self, github_provider):
         """Test handling GitHub API pagination."""
         # Mock paginated response
-        page1 = [{"name": f"repo{i}"} for i in range(100)]
-        page2 = [{"name": f"repo{i}"} for i in range(100, 150)]
+        [{"name": f"repo{i}"} for i in range(100)]
+        [{"name": f"repo{i}"} for i in range(100, 150)]
 
         # Once implemented:
         # github_provider._get_page = MagicMock(side_effect=[page1, page2, []])
@@ -171,8 +142,6 @@ class TestBitbucketProvider:
 
     def test_bitbucket_authentication(self, bitbucket_provider):
         """Test Bitbucket authentication."""
-        username = "test-user"
-        app_password = "test-app-password"
 
         # Once implemented:
         # result = bitbucket_provider.authenticate(username, app_password)
@@ -214,11 +183,6 @@ class TestProviderFactory:
 
     def test_create_provider_azure(self):
         """Test creating Azure DevOps provider."""
-        config = {
-            "provider": "azure",
-            "organization": "https://dev.azure.com/test-org",
-            "pat": "test-pat",
-        }
 
         # Once implemented:
         # provider = create_provider(config)
@@ -227,10 +191,6 @@ class TestProviderFactory:
 
     def test_create_provider_github(self):
         """Test creating GitHub provider."""
-        config = {
-            "provider": "github",
-            "token": "ghp_test_token",
-        }
 
         # Once implemented:
         # provider = create_provider(config)
@@ -239,9 +199,6 @@ class TestProviderFactory:
 
     def test_create_provider_invalid(self):
         """Test creating provider with invalid type."""
-        config = {
-            "provider": "invalid_provider",
-        }
 
         # Once implemented:
         # with pytest.raises(ValueError, match="Unknown provider"):
@@ -271,11 +228,6 @@ class TestProviderAuthentication:
     def test_authentication_failure_handling(self):
         """Test handling of authentication failures."""
         # Test various authentication failure scenarios
-        failure_cases = [
-            ("azure", {"organization": "https://dev.azure.com/org", "pat": "invalid"}),
-            ("github", {"token": "invalid_token"}),
-            ("bitbucket", {"username": "user", "app_password": "wrong"}),
-        ]
 
         # Once implemented:
         # for provider_type, auth_config in failure_cases:
@@ -290,26 +242,6 @@ class TestProviderURLHandling:
 
     def test_normalize_repository_urls(self):
         """Test normalizing repository URLs for different providers."""
-        test_cases = [
-            # Azure DevOps
-            (
-                "https://dev.azure.com/org/_git/repo",
-                "https://dev.azure.com/org/_git/repo",
-            ),
-            (
-                "https://org@dev.azure.com/org/_git/repo",
-                "https://dev.azure.com/org/_git/repo",
-            ),
-            # GitHub
-            ("https://github.com/org/repo.git", "https://github.com/org/repo.git"),
-            ("git@github.com:org/repo.git", "https://github.com/org/repo.git"),
-            # Bitbucket
-            (
-                "https://bitbucket.org/org/repo.git",
-                "https://bitbucket.org/org/repo.git",
-            ),
-            ("git@bitbucket.org:org/repo.git", "https://bitbucket.org/org/repo.git"),
-        ]
 
         # Once implemented:
         # for input_url, expected in test_cases:
@@ -319,29 +251,6 @@ class TestProviderURLHandling:
 
     def test_extract_repository_info(self):
         """Test extracting repository information from URLs."""
-        test_cases = [
-            {
-                "url": "https://dev.azure.com/myorg/myproject/_git/myrepo",
-                "expected": {
-                    "provider": "azure",
-                    "org": "myorg",
-                    "project": "myproject",
-                    "repo": "myrepo",
-                },
-            },
-            {
-                "url": "https://github.com/myorg/myrepo.git",
-                "expected": {"provider": "github", "org": "myorg", "repo": "myrepo"},
-            },
-            {
-                "url": "https://bitbucket.org/myworkspace/myrepo.git",
-                "expected": {
-                    "provider": "bitbucket",
-                    "workspace": "myworkspace",
-                    "repo": "myrepo",
-                },
-            },
-        ]
 
         # Once implemented:
         # for case in test_cases:
@@ -356,7 +265,6 @@ class TestProviderFeatures:
     def test_azure_project_support(self, azure_provider):
         """Test Azure DevOps project-level operations."""
         # Azure DevOps has projects that contain repositories
-        projects = ["project1", "project2"]
 
         # Once implemented:
         # for project in projects:
@@ -367,7 +275,6 @@ class TestProviderFeatures:
     def test_github_organization_support(self, github_provider):
         """Test GitHub organization-level operations."""
         # GitHub has organizations that contain repositories
-        orgs = ["org1", "org2"]
 
         # Once implemented:
         # for org in orgs:
@@ -378,7 +285,6 @@ class TestProviderFeatures:
     def test_bitbucket_workspace_support(self, bitbucket_provider):
         """Test Bitbucket workspace-level operations."""
         # Bitbucket has workspaces that contain repositories
-        workspaces = ["workspace1", "workspace2"]
 
         # Once implemented:
         # for workspace in workspaces:
