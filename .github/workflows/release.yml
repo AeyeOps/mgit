@@ -441,7 +441,7 @@ jobs:
         tags: |
           type=ref,event=branch
           type=ref,event=pr
-          type=sha,prefix={{branch}}-
+          type=sha,prefix={{branch}}-,enable=${{ github.ref_type != 'tag' }}
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
           type=raw,value=latest,enable={{is_default_branch}},suffix=
@@ -523,6 +523,7 @@ jobs:
     needs: [ci, determine-build-type]
     if: needs.ci.result == 'success' && needs.determine-build-type.outputs.is-release == 'true'
     strategy:
+      fail-fast: false  # Allow other platforms to continue if one fails
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
@@ -553,10 +554,18 @@ jobs:
           .venv
         key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
     
-    - name: Install Poetry
+    - name: Install Poetry (Unix)
+      if: runner.os != 'Windows'
       run: |
         curl -sSL https://install.python-poetry.org | python3 -
         echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+    - name: Install Poetry (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+        echo "$env:APPDATA\Python\Scripts" >> $env:GITHUB_PATH
         
     - name: Configure Poetry
       run: |
