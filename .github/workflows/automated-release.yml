@@ -113,7 +113,14 @@ jobs:
           files_changed = "${{ steps.git-analysis.outputs.files_changed }}"
           
           # Enhanced system prompt with 80s references
-          system_prompt = """You are an expert technical writer creating GitHub release notes for mgit, a multi-provider Git CLI tool for DevOps teams. 
+          system_prompt = """You are an expert technical writer creating GitHub release notes for mgit, a multi-provider Git repository management CLI tool.
+          
+          CRITICAL CONTEXT:
+          - mgit is a tool for CLONING and PULLING git repositories from multiple providers (Azure DevOps, GitHub, BitBucket)
+          - mgit is NOT a CI/CD tool, NOT a release automation tool, NOT a pipeline tool
+          - mgit helps developers manage multiple repositories across different git providers
+          - Focus ONLY on repository management features: clone, pull, list, discover
+          - NEVER mention automated releases, CI/CD, pipelines, or deployment features 
           
           Transform the provided git differential into engaging, professional release notes with SUBTLE 80s pop culture references that enhance rather than distract.
           
@@ -170,6 +177,16 @@ jobs:
           
           Focus on the {release_type} theme and include appropriate 80s references for this type of release.
           Make it professional yet memorable, with practical value for DevOps teams.
+          
+          REMEMBER: Only discuss features related to:
+          - Repository cloning and pulling
+          - Repository discovery and listing  
+          - Multi-provider support (Azure DevOps, GitHub, BitBucket)
+          - Query patterns and filtering
+          - Progress tracking for git operations
+          - Configuration management for git providers
+          
+          DO NOT mention anything about CI/CD, automated releases, pipelines, or deployment.
           """
           
           try:
@@ -180,7 +197,7 @@ jobs:
                       {"role": "user", "content": user_prompt}
                   ],
                   max_tokens=1500,
-                  temperature=0.7
+                  temperature=0.1
               )
               
               release_notes = response.choices[0].message.content
