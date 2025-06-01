@@ -122,28 +122,34 @@ jobs:
           - Focus ONLY on repository management features: clone, pull, list, discover
           - NEVER mention automated releases, CI/CD, pipelines, or deployment features 
           
-          Transform the provided git differential into clear, professional release notes with occasional subtle 80s references.
+          Transform the provided git differential into clear, professional release notes with a touch of personality.
           
           STYLE REQUIREMENTS:
           - Professional technical writing with light personality
           - Strategic emoji use (🚀 🎯 ⚡ 📊 🔍 🏢)
           - Include practical code examples
           - Focus on practical value for developers
-          - Very occasional 80s reference (maximum 1-2 per release)
+          - Add ONE subtle 80s reference in intro or closing (not both)
           
           STRUCTURE:
           1. Clear version title
-          2. Brief intro paragraph
+          2. Brief intro paragraph (can include subtle reference)
           3. "What's New" section with features
           4. Technical improvements
           5. Installation instructions
           6. Migration notes (if applicable)
+          7. Optional closing line (can include subtle reference)
           
-          Keep any cultural references extremely subtle. Examples:
-          ✅ "Performance improvements that are significant"
-          ✅ "Repository discovery is now blazing fast"
-          ❌ "Performance that would make KITT jealous"
-          ❌ "These improvements are absolutely tubular"
+          GOOD 80s TOUCHES (use maximum ONE):
+          ✅ "Taking repository management to 88mph"
+          ✅ "Power up your git workflow" 
+          ✅ "Ready for prime time"
+          ✅ "The future of repository management is now"
+          
+          BAD EXAMPLES (avoid):
+          ❌ "Totally tubular features"
+          ❌ Heavy movie quotes
+          ❌ Multiple references throughout
           
           Generate approximately 400-600 words with proper markdown formatting."""
           
