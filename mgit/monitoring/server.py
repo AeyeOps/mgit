@@ -460,7 +460,6 @@ class SimpleMonitoringServer:
 
         # Create request handler
         metrics = self.metrics
-        health_checker = self.health_checker
         logger = self.logger
 
         class MonitoringRequestHandler(BaseHTTPRequestHandler):

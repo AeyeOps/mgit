@@ -230,7 +230,7 @@ class ProviderManager:
         try:
             # Check if we're in an async context
             try:
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 # We're in an async context
                 logger.warning(
                     "test_connection called from async context - use test_connection_async instead"
@@ -336,7 +336,7 @@ class ProviderManager:
         try:
             # Check if we're in an async context
             try:
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 # We're in an async context
                 logger.warning(
                     "list_repositories called from async context - use list_repositories_async instead"
