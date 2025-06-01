@@ -4,14 +4,11 @@ This module provides integration points to apply security controls
 to existing mgit components.
 """
 
-import logging
-import importlib
-import sys
-from typing import Any, Dict, List, Optional
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from .logging import SecurityLogger, setup_secure_logging
 from .config import get_security_settings, init_security_config
+from .logging import SecurityLogger, setup_secure_logging
 from .monitor import get_security_monitor
 from .patches import apply_security_patches
 

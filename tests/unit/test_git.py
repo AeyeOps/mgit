@@ -5,8 +5,7 @@ This module tests git operations like clone, pull, and repository management.
 """
 
 import asyncio
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 

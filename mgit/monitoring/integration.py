@@ -4,12 +4,11 @@ This module provides integration decorators and utilities to easily
 add monitoring to existing mgit components.
 """
 
-import time
 import functools
-from typing import Any, Callable, Optional, TypeVar, Dict
-import asyncio
+import time
+from typing import Any, Callable, Optional, TypeVar
 
-from .correlation import correlation_context, provider_context, git_operation_context
+from .correlation import correlation_context, git_operation_context
 from .logger import get_structured_logger
 from .metrics import get_metrics_collector
 from .performance import get_performance_monitor
@@ -599,8 +598,8 @@ def setup_monitoring_integration():
     This function should be called during application startup to initialize
     all monitoring components.
     """
-    from .metrics import setup_metrics
     from .logger import setup_structured_logging
+    from .metrics import setup_metrics
 
     # Setup structured logging
     setup_structured_logging(

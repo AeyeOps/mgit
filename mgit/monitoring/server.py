@@ -4,29 +4,27 @@ This module provides a lightweight HTTP server for exposing
 Prometheus metrics and health check endpoints.
 """
 
-import asyncio
 import json
-import logging
-from typing import Optional, Dict, Any, Callable, Awaitable
-from datetime import datetime
 import threading
 import time
+from datetime import datetime
+from typing import Any, Callable, Optional
 
 try:
-    from aiohttp import web, WSMsgType
-    from aiohttp.web import Request, Response, json_response
+    from aiohttp import web
+    from aiohttp.web import Request, Response
 
     AIOHTTP_AVAILABLE = True
 except ImportError:
     AIOHTTP_AVAILABLE = False
 
 # Always import fallback components for SimpleMonitoringServer
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import urlparse
 
-from .metrics import get_metrics_collector
 from .health import get_health_checker
 from .logger import get_structured_logger
+from .metrics import get_metrics_collector
 
 
 class MonitoringServer:

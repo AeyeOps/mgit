@@ -4,26 +4,24 @@ This module implements the Azure DevOps provider that extends the abstract
 GitProvider base class to support Azure DevOps repositories.
 """
 
-import asyncio
 import logging
-from typing import List, Optional, Dict, Any, AsyncIterator
+from typing import Any, AsyncIterator, Dict, List, Optional
 from urllib.parse import urlparse
 
 from azure.devops.connection import Connection
-from msrest.authentication import BasicAuthentication
-from azure.devops.v7_1.git import GitClient, GitRepository
+from azure.devops.exceptions import AzureDevOpsAuthenticationError, ClientRequestError
 from azure.devops.v7_1.core import CoreClient, TeamProjectReference
-from azure.devops.exceptions import ClientRequestError, AzureDevOpsAuthenticationError
+from azure.devops.v7_1.git import GitClient, GitRepository
+from msrest.authentication import BasicAuthentication
 
+from mgit.git.utils import embed_pat_in_url
 from mgit.providers.base import (
+    AuthMethod,
     GitProvider,
-    Repository,
     Organization,
     Project,
-    AuthMethod,
+    Repository,
 )
-from mgit.git.utils import embed_pat_in_url, sanitize_repo_name
-
 
 logger = logging.getLogger(__name__)
 

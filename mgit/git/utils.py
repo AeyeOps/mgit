@@ -1,7 +1,7 @@
 """Git-related utility functions for mgit CLI tool."""
 
 import re
-from urllib.parse import urlparse, urlunparse, unquote
+from urllib.parse import unquote, urlparse, urlunparse
 
 
 def embed_pat_in_url(repo_url: str, pat: str) -> str:

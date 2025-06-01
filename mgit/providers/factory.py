@@ -4,7 +4,8 @@ This module implements the factory pattern for creating provider instances
 based on provider type and configuration.
 """
 
-from typing import Dict, Any, List, Type
+from typing import Any, Dict, List, Type
+
 from .base import GitProvider
 
 

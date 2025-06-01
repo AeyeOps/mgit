@@ -6,8 +6,8 @@ security event tracking.
 
 import logging
 import sys
-from typing import Any, Dict, Optional, Union
 from pathlib import Path
+from typing import Any, Dict, Optional, Union
 
 from .credentials import CredentialMasker, mask_sensitive_data
 

@@ -5,8 +5,8 @@ alerting rules for comprehensive mgit monitoring.
 """
 
 import json
-from typing import Dict, List, Any, Optional
 from pathlib import Path
+from typing import Any, Dict, List
 
 
 def create_grafana_dashboard(

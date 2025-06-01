@@ -7,9 +7,10 @@ progress tracking, and error collection for batch operations.
 
 import asyncio
 import logging
+import subprocess
+from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple, TypeVar, Union
-from enum import Enum
 
 from rich.progress import Progress, TaskID
 
@@ -489,5 +490,3 @@ class SubprocessExecutor(AsyncExecutor):
         )
 
 
-# Import subprocess for the specialized executor
-import subprocess

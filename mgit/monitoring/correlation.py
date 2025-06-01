@@ -4,10 +4,10 @@ This module provides correlation ID functionality to track operations
 across multiple components and log entries.
 """
 
-import uuid
 import threading
-from typing import Optional, Any, Dict
+import uuid
 from contextlib import contextmanager
+from typing import Any, Dict, Optional
 
 
 class CorrelationContext:

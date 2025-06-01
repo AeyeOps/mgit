@@ -6,9 +6,8 @@ that all git providers must implement.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any, AsyncIterator
 from enum import Enum
-import asyncio
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 
 # Common data structures

@@ -4,18 +4,28 @@ This module defines additional provider-specific exceptions that extend
 the main mgit exception hierarchy.
 """
 
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
+from mgit.exceptions import (
+    AuthenticationError as BaseAuthenticationError,
+)
+from mgit.exceptions import (
+    ConfigurationError as BaseConfigurationError,
+)
+from mgit.exceptions import (
+    ConnectionError as BaseConnectionError,
+)
+from mgit.exceptions import (
+    OrganizationNotFoundError as BaseOrganizationNotFoundError,
+)
+from mgit.exceptions import (
+    ProjectNotFoundError as BaseProjectNotFoundError,
+)
 
 # Import base exceptions from main exceptions module
 from mgit.exceptions import (
     ProviderError as BaseProviderError,
-    AuthenticationError as BaseAuthenticationError,
-    ConfigurationError as BaseConfigurationError,
-    ConnectionError as BaseConnectionError,
-    OrganizationNotFoundError as BaseOrganizationNotFoundError,
-    ProjectNotFoundError as BaseProjectNotFoundError,
-    MgitError,
 )
 
 

@@ -5,30 +5,28 @@ operations through the GitHub API.
 """
 
 import asyncio
-import aiohttp
-import logging
-from typing import List, Optional, Dict, Any, AsyncIterator
-from urllib.parse import urlparse, urlencode
 import re
-import json
 from datetime import datetime
+from typing import Any, AsyncIterator, Dict, List, Optional
 
-from .base import GitProvider, Repository, Organization, Project, AuthMethod
-from .exceptions import (
-    AuthenticationError,
-    ConfigurationError,
-    ConnectionError,
-    RateLimitError,
-    RepositoryNotFoundError,
-    PermissionError,
-    APIError,
-)
+import aiohttp
+
+from ..security.credentials import mask_sensitive_data, validate_github_pat
 
 # Security imports
 from ..security.logging import SecurityLogger
-from ..security.credentials import validate_github_pat, mask_sensitive_data
-from ..security.validation import SecurityValidator
 from ..security.monitor import get_security_monitor
+from ..security.validation import SecurityValidator
+from .base import AuthMethod, GitProvider, Organization, Project, Repository
+from .exceptions import (
+    APIError,
+    AuthenticationError,
+    ConfigurationError,
+    ConnectionError,
+    PermissionError,
+    RateLimitError,
+    RepositoryNotFoundError,
+)
 
 logger = SecurityLogger(__name__)
 
@@ -134,7 +132,6 @@ class GitHubProvider(GitProvider):
 
     async def _ensure_session(self) -> None:
         """Ensure we have a valid session for the current event loop."""
-        import asyncio
 
         try:
             current_loop = asyncio.get_running_loop()

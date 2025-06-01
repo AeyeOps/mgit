@@ -4,8 +4,7 @@ Unit tests for provider-related functionality.
 This module tests provider abstraction, authentication, and provider-specific operations.
 """
 
-from unittest.mock import MagicMock, patch, PropertyMock
-from typing import Dict, List
+from unittest.mock import MagicMock
 
 import pytest
 

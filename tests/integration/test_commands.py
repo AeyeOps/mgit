@@ -2,11 +2,9 @@
 
 import json
 import os
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from typer.testing import CliRunner
 
 from mgit.__main__ import app
 

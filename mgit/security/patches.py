@@ -4,15 +4,16 @@ This module provides patches and utilities to retrofit security
 controls into existing code without major refactoring.
 """
 
-import logging
 import functools
-from typing import Any, Callable, Dict, Optional, TypeVar, Union
 import inspect
+import logging
+import time
+from typing import Any, Callable, Dict, TypeVar
 
-from .credentials import CredentialMasker, mask_sensitive_data
-from .validation import SecurityValidator, validate_input
+from .credentials import CredentialMasker
 from .logging import SecurityLogger
 from .monitor import get_security_monitor
+from .validation import SecurityValidator, validate_input
 
 logger = logging.getLogger(__name__)
 
@@ -359,7 +360,7 @@ def secure_api_call(func):
 
             return result
 
-        except Exception as e:
+        except Exception:
             response_time = time.time() - start_time
 
             # Log failed API call
