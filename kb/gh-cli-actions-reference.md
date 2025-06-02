@@ -891,7 +891,11 @@ prepare_release() {
   
   # Trigger release workflow
   echo "Triggering release workflow for version $version..."
-  gh workflow run release.yml -f version="$version" -f draft=true
+  gh workflow run release.yml \
+    -f version="$version" \
+    -f draft=true \
+    -f platforms="linux/amd64,linux/arm64" \
+    -f push_image=true
   
   # Wait for workflow to start
   sleep 5
