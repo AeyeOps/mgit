@@ -711,3 +711,4 @@ jobs:
         echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
         echo "docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest --help" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+    # End of notify job
