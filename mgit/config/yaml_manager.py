@@ -43,18 +43,18 @@ class ConfigurationManager:
         try:
             with CONFIG_FILE.open("r", encoding="utf-8") as f:
                 raw_config = self._yaml.load(f) or self._yaml.map()
-                
+
                 # Keep raw config for saving with comments
                 self._raw_config_cache = raw_config
-                
+
                 # Convert to regular dicts for compatibility
                 def to_dict(obj):
-                    if hasattr(obj, 'items'):
+                    if hasattr(obj, "items"):
                         return {k: to_dict(v) for k, v in obj.items()}
-                    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes)):
+                    elif hasattr(obj, "__iter__") and not isinstance(obj, (str, bytes)):
                         return [to_dict(item) for item in obj]
                     return obj
-                
+
                 config = to_dict(raw_config)
 
                 # Ensure required structure in both versions
@@ -165,12 +165,12 @@ class ConfigurationManager:
                 for section, data in config.items():
                     if section not in self._raw_config_cache:
                         self._raw_config_cache[section] = self._yaml.map()
-                    
+
                     # Clear and update the section
                     self._raw_config_cache[section].clear()
                     for key, value in data.items():
                         self._raw_config_cache[section][key] = value
-                
+
                 # Write the preserved structure
                 with CONFIG_FILE.open("w", encoding="utf-8") as f:
                     self._yaml.dump(self._raw_config_cache, f)

@@ -167,9 +167,7 @@ class CredentialMasker:
                     (
                         self.mask_dict(item)
                         if isinstance(item, dict)
-                        else self.mask_string(item)
-                        if isinstance(item, str)
-                        else item
+                        else self.mask_string(item) if isinstance(item, str) else item
                     )
                     for item in value
                 ]

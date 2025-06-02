@@ -997,10 +997,10 @@ def gen_env():
 def _find_existing_azdevops_config(organization: str) -> Optional[str]:
     """Find existing Azure DevOps configuration for the same organization."""
     from mgit.config.yaml_manager import get_provider_configs, detect_provider_type
-    
+
     try:
         providers = get_provider_configs()
-        
+
         for name, config in providers.items():
             try:
                 # Check if it's an Azure DevOps provider
@@ -1009,27 +1009,27 @@ def _find_existing_azdevops_config(organization: str) -> Optional[str]:
                     # Compare organization URLs (normalize them)
                     config_org = config.get("org_url", "").rstrip("/")
                     input_org = organization.rstrip("/")
-                    
+
                     if config_org == input_org:
                         return name
             except Exception:
                 # Skip providers with detection issues
                 continue
-                
+
     except Exception:
         # If config loading fails, assume no duplicates
         pass
-    
+
     return None
 
 
 def _find_existing_github_config() -> Optional[str]:
     """Find existing GitHub configuration."""
     from mgit.config.yaml_manager import get_provider_configs, detect_provider_type
-    
+
     try:
         providers = get_provider_configs()
-        
+
         for name, config in providers.items():
             try:
                 # Check if it's a GitHub provider
@@ -1039,21 +1039,21 @@ def _find_existing_github_config() -> Optional[str]:
             except Exception:
                 # Skip providers with detection issues
                 continue
-                
+
     except Exception:
         # If config loading fails, assume no duplicates
         pass
-    
+
     return None
 
 
 def _find_existing_bitbucket_config(username: str) -> Optional[str]:
     """Find existing BitBucket configuration for the same username."""
     from mgit.config.yaml_manager import get_provider_configs, detect_provider_type
-    
+
     try:
         providers = get_provider_configs()
-        
+
         for name, config in providers.items():
             try:
                 # Check if it's a BitBucket provider
@@ -1066,26 +1066,28 @@ def _find_existing_bitbucket_config(username: str) -> Optional[str]:
             except Exception:
                 # Skip providers with detection issues
                 continue
-                
+
     except Exception:
         # If config loading fails, assume no duplicates
         pass
-    
+
     return None
 
 
-def _test_provider_connection(provider_type: str, provider_config: Dict[str, Any]) -> bool:
+def _test_provider_connection(
+    provider_type: str, provider_config: Dict[str, Any]
+) -> bool:
     """Test provider connection with the given configuration."""
     try:
         # Create a temporary provider manager instance for testing
         # We'll create a temporary config entry, test it, and remove it
         temp_name = f"_temp_test_{provider_type}"
-        
+
         from mgit.config.yaml_manager import add_provider_config, remove_provider_config
-        
+
         # Temporarily add the config
         add_provider_config(temp_name, provider_config)
-        
+
         try:
             # Test the connection using the temporary config
             test_manager = ProviderManager(provider_name=temp_name)
@@ -1098,7 +1100,7 @@ def _test_provider_connection(provider_type: str, provider_config: Dict[str, Any
             except Exception:
                 # Ignore cleanup errors
                 pass
-                
+
     except Exception as e:
         logger.debug(f"Connection test failed: {e}")
         return False
@@ -1189,7 +1191,7 @@ def login(
     if provider_type == "azuredevops":
         if not organization:
             organization = typer.prompt("Enter Azure DevOps organization URL")
-        
+
         # Ensure URL format
         if not organization.startswith(("http://", "https://")):
             organization = f"https://{organization}"
@@ -1197,30 +1199,36 @@ def login(
         # Check for existing configuration with same organization
         existing_config = _find_existing_azdevops_config(organization)
         if existing_config:
-            console.print(f"[yellow]⚠ Found existing Azure DevOps configuration '{existing_config}' for this organization.[/yellow]")
+            console.print(
+                f"[yellow]⚠ Found existing Azure DevOps configuration '{existing_config}' for this organization.[/yellow]"
+            )
             console.print(f"   Organization: {organization}")
             console.print()
             console.print("Options:")
             console.print(f"  1. Update existing '{existing_config}' configuration")
             console.print("  2. Create new configuration with different name")
             console.print("  3. Cancel")
-            
+
             choice = typer.prompt("Choose option (1/2/3)", type=str)
-            
+
             if choice == "1":
                 name = existing_config
                 console.print(f"[blue]Updating existing configuration '{name}'[/blue]")
             elif choice == "2":
                 if not name:
                     suggested_name = f"ado_{organization.split('/')[-1]}_new"
-                    name = typer.prompt(f"Enter name for new configuration", default=suggested_name)
+                    name = typer.prompt(
+                        f"Enter name for new configuration", default=suggested_name
+                    )
             else:
                 console.print("[yellow]Cancelled.[/yellow]")
                 raise typer.Exit(code=0)
         else:
             if not name:
                 suggested_name = f"ado_{organization.split('/')[-1]}"
-                name = typer.prompt("Enter name for this provider configuration", default=suggested_name)
+                name = typer.prompt(
+                    "Enter name for this provider configuration", default=suggested_name
+                )
 
         if not token:
             token = typer.prompt("Enter Personal Access Token (PAT)", hide_input=True)
@@ -1231,27 +1239,36 @@ def login(
         # Check for existing GitHub configurations
         existing_config = _find_existing_github_config()
         if existing_config:
-            console.print(f"[yellow]⚠ Found existing GitHub configuration '{existing_config}'.[/yellow]")
+            console.print(
+                f"[yellow]⚠ Found existing GitHub configuration '{existing_config}'.[/yellow]"
+            )
             console.print()
             console.print("Options:")
             console.print(f"  1. Update existing '{existing_config}' configuration")
-            console.print("  2. Create new configuration (e.g., for different GitHub account)")
+            console.print(
+                "  2. Create new configuration (e.g., for different GitHub account)"
+            )
             console.print("  3. Cancel")
-            
+
             choice = typer.prompt("Choose option (1/2/3)", type=str)
-            
+
             if choice == "1":
                 name = existing_config
                 console.print(f"[blue]Updating existing configuration '{name}'[/blue]")
             elif choice == "2":
                 if not name:
-                    name = typer.prompt("Enter name for new GitHub configuration", default="github_new")
+                    name = typer.prompt(
+                        "Enter name for new GitHub configuration", default="github_new"
+                    )
             else:
                 console.print("[yellow]Cancelled.[/yellow]")
                 raise typer.Exit(code=0)
         else:
             if not name:
-                name = typer.prompt("Enter name for this provider configuration", default="github_personal")
+                name = typer.prompt(
+                    "Enter name for this provider configuration",
+                    default="github_personal",
+                )
 
         if not token:
             token = typer.prompt("Enter GitHub token", hide_input=True)
@@ -1260,31 +1277,39 @@ def login(
     elif provider_type == "bitbucket":
         if not organization:
             organization = typer.prompt("Enter BitBucket username")
-        
+
         # Check for existing BitBucket configurations with same username
         existing_config = _find_existing_bitbucket_config(organization)
         if existing_config:
-            console.print(f"[yellow]⚠ Found existing BitBucket configuration '{existing_config}' for username '{organization}'.[/yellow]")
+            console.print(
+                f"[yellow]⚠ Found existing BitBucket configuration '{existing_config}' for username '{organization}'.[/yellow]"
+            )
             console.print()
             console.print("Options:")
             console.print(f"  1. Update existing '{existing_config}' configuration")
             console.print("  2. Create new configuration with different name")
             console.print("  3. Cancel")
-            
+
             choice = typer.prompt("Choose option (1/2/3)", type=str)
-            
+
             if choice == "1":
                 name = existing_config
                 console.print(f"[blue]Updating existing configuration '{name}'[/blue]")
             elif choice == "2":
                 if not name:
-                    name = typer.prompt("Enter name for new configuration", default=f"bitbucket_{organization}_new")
+                    name = typer.prompt(
+                        "Enter name for new configuration",
+                        default=f"bitbucket_{organization}_new",
+                    )
             else:
                 console.print("[yellow]Cancelled.[/yellow]")
                 raise typer.Exit(code=0)
         else:
             if not name:
-                name = typer.prompt("Enter name for this provider configuration", default=f"bitbucket_{organization}")
+                name = typer.prompt(
+                    "Enter name for this provider configuration",
+                    default=f"bitbucket_{organization}",
+                )
 
         if not token:
             token = typer.prompt("Enter BitBucket app password", hide_input=True)
@@ -1297,8 +1322,10 @@ def login(
     console.print(f"[blue]Testing connection to {provider_type}...[/blue]")
     try:
         # Test the connection directly with the provider configuration
-        connection_successful = _test_provider_connection(provider_type, provider_config)
-        
+        connection_successful = _test_provider_connection(
+            provider_type, provider_config
+        )
+
         if connection_successful:
             console.print(f"[green]✓[/green] Successfully connected to {provider_type}")
 
@@ -1323,20 +1350,28 @@ def login(
             console.print(
                 f"[red]✗[/red] Failed to connect to {provider_type}. Please check your credentials."
             )
-            console.print(f"[yellow]Tip: Ensure your token has the required permissions and hasn't expired.[/yellow]")
+            console.print(
+                f"[yellow]Tip: Ensure your token has the required permissions and hasn't expired.[/yellow]"
+            )
             raise typer.Exit(code=1)
 
     except Exception as e:
         error_msg = str(e).strip()
         if error_msg:
-            console.print(f"[red]✗[/red] Error testing {provider_type} connection: {error_msg}")
+            console.print(
+                f"[red]✗[/red] Error testing {provider_type} connection: {error_msg}"
+            )
         else:
             console.print(f"[red]✗[/red] Error testing {provider_type} connection")
-        
+
         if "expired" in error_msg.lower():
-            console.print(f"[yellow]Tip: Your access token appears to have expired. Please generate a new one.[/yellow]")
+            console.print(
+                f"[yellow]Tip: Your access token appears to have expired. Please generate a new one.[/yellow]"
+            )
         elif "access denied" in error_msg.lower():
-            console.print(f"[yellow]Tip: Check that your token has the required permissions for repository access.[/yellow]")
+            console.print(
+                f"[yellow]Tip: Check that your token has the required permissions for repository access.[/yellow]"
+            )
         raise typer.Exit(code=1)
 
 

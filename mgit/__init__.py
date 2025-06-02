@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 # Read version from pyproject.toml - it's always there
-if getattr(sys, 'frozen', False):
+if getattr(sys, "frozen", False):
     # PyInstaller bundle - pyproject.toml is in the extracted directory
     pyproject_path = Path(sys._MEIPASS) / "pyproject.toml"
 else:
