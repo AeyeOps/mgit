@@ -27,6 +27,14 @@ on:
         required: false
         type: boolean
         default: true
+      version:
+        description: 'Release version to build'
+        required: false
+      draft:
+        description: 'Create GitHub release as draft'
+        required: false
+        type: boolean
+        default: false
 
 env:
   REGISTRY: ghcr.io
@@ -226,8 +234,8 @@ jobs:
     - name: Analyze Changes with PR Context
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ inputs.version || github.ref_name }}
       run: |
-        VERSION="${GITHUB_REF_NAME}"
         
         # Get last release tag
         LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
@@ -304,6 +312,7 @@ jobs:
     - name: Generate AI Release Notes
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        VERSION: ${{ inputs.version || github.ref_name }}
       run: |
         python -m pip install openai
         
@@ -407,18 +416,20 @@ jobs:
         
         if ! python generate_release_notes.py; then
           echo "::warning::AI release notes generation failed. Creating fallback notes."
-          echo "# mgit ${GITHUB_REF_NAME}" > RELEASE_NOTES_${GITHUB_REF_NAME}.md
-          echo "" >> RELEASE_NOTES_${GITHUB_REF_NAME}.md
-          echo "Release notes generation failed. See commit history for changes." >> RELEASE_NOTES_${GITHUB_REF_NAME}.md
-          echo "" >> RELEASE_NOTES_${GITHUB_REF_NAME}.md
-          echo "## Recent Changes" >> RELEASE_NOTES_${GITHUB_REF_NAME}.md
-          git log --oneline -n 10 >> RELEASE_NOTES_${GITHUB_REF_NAME}.md
+          echo "# mgit ${VERSION}" > RELEASE_NOTES_${VERSION}.md
+          echo "" >> RELEASE_NOTES_${VERSION}.md
+          echo "Release notes generation failed. See commit history for changes." >> RELEASE_NOTES_${VERSION}.md
+          echo "" >> RELEASE_NOTES_${VERSION}.md
+          echo "## Recent Changes" >> RELEASE_NOTES_${VERSION}.md
+          git log --oneline -n 10 >> RELEASE_NOTES_${VERSION}.md
         fi
         
     - name: Save release notes path
       id: save-notes
+      env:
+        VERSION: ${{ inputs.version || github.ref_name }}
       run: |
-        echo "path=RELEASE_NOTES_${GITHUB_REF_NAME}.md" >> $GITHUB_OUTPUT
+        echo "path=RELEASE_NOTES_${VERSION}.md" >> $GITHUB_OUTPUT
         
     - name: Upload release notes artifact
       uses: actions/upload-artifact@v4
@@ -501,7 +512,7 @@ jobs:
         cache-from: type=gha,scope=${{ matrix.variant }}
         cache-to: type=gha,mode=max,scope=${{ matrix.variant }}
         build-args: |
-          MGIT_VERSION=${{ github.ref_name }}
+          MGIT_VERSION=${{ inputs.version || github.ref_name }}
           BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
           VCS_REF=${{ github.sha }}
           
@@ -623,9 +634,9 @@ jobs:
         
         # Rename output to include version and platform
         if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-          mv dist/mgit.exe "dist/mgit-${{ github.ref_name }}-${{ matrix.platform }}.exe"
+          mv dist/mgit.exe "dist/mgit-${{ inputs.version || github.ref_name }}-${{ matrix.platform }}.exe"
         else
-          mv dist/mgit "dist/mgit-${{ github.ref_name }}-${{ matrix.platform }}"
+          mv dist/mgit "dist/mgit-${{ inputs.version || github.ref_name }}-${{ matrix.platform }}"
         fi
         
     - name: Upload build artifacts
@@ -659,8 +670,8 @@ jobs:
           linux-x64-artifacts/dist/mgit-*-linux-x64
           macos-x64-artifacts/dist/mgit-*-macos-x64
           windows-x64-artifacts/dist/mgit-*-windows-x64.exe
-        body_path: release-notes/RELEASE_NOTES_${{ github.ref_name }}.md
-        draft: false
+        body_path: release-notes/RELEASE_NOTES_${{ inputs.version || github.ref_name }}.md
+        draft: ${{ inputs.draft }}
         prerelease: false
         generate_release_notes: false
       env:
