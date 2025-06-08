@@ -56,7 +56,7 @@ docker run -d \
   -v mgit-config:/home/mgit/.mgit \
   -v mgit-data:/app/data \
   -e MGIT_LOG_LEVEL=INFO \
-  ghcr.io/steveant/mgit:latest --help
+  ghcr.io/exampleuser/mgit:latest --help
 ```
 
 #### Production Docker
@@ -75,7 +75,7 @@ docker run -d \
   -v mgit-data:/app/data \
   -e MGIT_ENV=production \
   -e MGIT_LOG_LEVEL=INFO \
-  ghcr.io/steveant/mgit:1.0.0
+  ghcr.io/exampleuser/mgit:1.0.0
 ```
 
 ### 2. Docker Compose Deployment
@@ -378,7 +378,7 @@ kubectl get events -n mgit-production --sort-by='.lastTimestamp'
 #### Image Pull Errors
 ```bash
 # Check image exists
-docker manifest inspect ghcr.io/steveant/mgit:1.0.0
+docker manifest inspect ghcr.io/exampleuser/mgit:1.0.0
 
 # Check pull secrets
 kubectl get secrets -n mgit-production

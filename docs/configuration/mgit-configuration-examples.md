@@ -51,10 +51,10 @@ AZURE_DEVOPS_EXT_PAT=your-azure-devops-pat-here
 
 # GitHub Configuration
 GITHUB_PAT=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-GITHUB_ORG=steveant
+GITHUB_ORG=myusername
 
 # BitBucket Configuration
-BITBUCKET_WORKSPACE=santonakakis
+BITBUCKET_WORKSPACE=myworkspace
 BITBUCKET_USERNAME=your-username
 BITBUCKET_APP_PASSWORD=your-app-password-here
 
@@ -108,11 +108,11 @@ GITHUB_ENTERPRISE_URL=https://github.company.com
 # BitBucket specific settings
 
 # Required settings
-BITBUCKET_USERNAME=steveant
+BITBUCKET_USERNAME=myusername
 BITBUCKET_APP_PASSWORD=xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # Optional settings
-BITBUCKET_WORKSPACE=santonakakis
+BITBUCKET_WORKSPACE=myworkspace
 
 # For BitBucket Server (optional)
 BITBUCKET_SERVER_URL=https://bitbucket.company.com
@@ -138,12 +138,12 @@ export AZURE_DEVOPS_EXT_PAT="your-pat-here"
 
 # GitHub
 export GITHUB_PAT="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-export GITHUB_ORG="steveant"
+export GITHUB_ORG="myusername"
 
 # BitBucket
-export BITBUCKET_USERNAME="steveant"
+export BITBUCKET_USERNAME="myusername"
 export BITBUCKET_APP_PASSWORD="app-password-here"
-export BITBUCKET_WORKSPACE="santonakakis"
+export BITBUCKET_WORKSPACE="myworkspace"
 
 # Logging
 export LOG_LEVEL="DEBUG"
@@ -308,7 +308,7 @@ curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/rate_limit
 ```bash
 # Common mistakes in ~/.config/mgit/config
 BITBUCKET_USERNAME=email@example.com      # ✗ Should be username, not email
-BITBUCKET_USERNAME=steveant               # ✓ Correct
+BITBUCKET_USERNAME=myusername               # ✓ Correct
 
 BITBUCKET_APP_PASSWORD=password123        # ✗ Regular password
 BITBUCKET_APP_PASSWORD=ATBB3k4j5k6j...   # ✓ App password format

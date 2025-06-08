@@ -53,6 +53,66 @@ When I discover an error I made:
 - Provider abstraction must be complete
 - Configuration migration is critical for users
 
+#### Session 2025-06-08: README.md Public Release Preparation
+| Error Found | Fix Applied | Guardrail Created | Times Prevented |
+|------------|-------------|-------------------|-----------------|
+| Broken GitHub URLs | Updated to source-only install | Document verification protocol | ∞ (prevented broken installs) |
+| Version inconsistency | Synced 0.2.12 across all files | Version sync checklist | Future releases |
+| False security claims | Removed AES-256 encryption claims | Security claim verification | Future documentation |
+| Wrong config field names | Fixed org_url → organization_url | Config example validation | User confusion |
+| Outdated file paths | Updated Windows paths | Cross-platform path verification | Platform issues |
+
+**Critical Lesson**: Documentation written for public release requires **line-by-line verification** against actual code implementation.
+
+## CRITICAL: README.md Public Release Protocol
+
+**BEFORE any public release, README.md MUST undergo systematic verification:**
+
+### Documentation Verification Checklist
+1. **Installation Commands**: Test every single installation command on fresh environment
+2. **Version Numbers**: Verify all version references match pyproject.toml and CLI output
+3. **URLs and Links**: Verify every GitHub URL, download link, and external reference
+4. **Configuration Examples**: Test all YAML config examples with actual providers
+5. **Command Syntax**: Verify every command example against CLI help output
+6. **File Paths**: Verify config file locations across all mentioned platforms
+7. **Feature Claims**: Verify every security, performance, and capability claim against code
+8. **Default Values**: Check all defaults against constants.py and actual CLI behavior
+
+### Systematic Verification Process
+When updating README.md for public use:
+
+```
+1. ASSUME EVERYTHING IS WRONG until proven by code evidence
+2. Create verification table: | Claim | Status | Evidence | Fix Needed |
+3. Go line-by-line through every factual statement
+4. Provide file:line evidence for each claim
+5. Test all installation and usage examples
+6. Verify all external links return 200 status
+7. Check version consistency across: pyproject.toml, constants.py, CLI output, README
+8. Validate all configuration examples with actual provider implementations
+```
+
+### Red Flags for Public Documentation
+- ❌ **GitHub URLs** without verifying repository exists
+- ❌ **Version numbers** without checking all source files
+- ❌ **Installation commands** without testing them
+- ❌ **Feature claims** without code evidence
+- ❌ **Configuration examples** without provider validation
+- ❌ **Default values** without checking constants
+- ❌ **Platform-specific paths** without cross-platform verification
+
+### Documentation Quality Gates
+README.md is NOT ready for public release until:
+- [ ] All installation methods tested and working
+- [ ] All version numbers consistent across codebase
+- [ ] All external links return 200 status
+- [ ] All configuration examples validated against provider code
+- [ ] All command examples tested against actual CLI
+- [ ] All feature claims verified with specific code evidence
+- [ ] All default values match constants.py and CLI behavior
+
+**Golden Rule**: If a first-time user follows the README exactly, they MUST be able to install and use mgit successfully without any errors or broken links.
+
 ## Build/Test/Lint Commands
 ```bash
 # Install dependencies (Poetry)

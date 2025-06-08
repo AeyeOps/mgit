@@ -63,7 +63,7 @@ For enhanced security with specific repository access:
 mgit login --provider github --token YOUR_GITHUB_TOKEN
 
 # For organization repositories
-mgit login --provider github --token YOUR_GITHUB_TOKEN --org steveant
+mgit login --provider github --token YOUR_GITHUB_TOKEN --org myusername
 
 # Verify configuration
 mgit config --show
@@ -92,7 +92,7 @@ DEFAULT_UPDATE_MODE=pull
 export GITHUB_PAT="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 # Optional: Set default organization
-export GITHUB_ORG="steveant"
+export GITHUB_ORG="myusername"
 
 # Optional: Set defaults
 export DEFAULT_CONCURRENCY="10"
@@ -112,20 +112,20 @@ To see what repositories are available, use the GitHub web interface or API dire
 mgit clone-all your-username ./my-repos --provider github
 
 # Clone all repos from an organization
-mgit clone-all steveant ./steveant-repos --provider github
+mgit clone-all myusername ./myusername-repos --provider github
 
 # Clone all repos from AeyeOps organization
 mgit clone-all AeyeOps ./aeyeops-repos --provider github
 
 # Clone with concurrency control
-mgit clone-all steveant ./repos -c 10 --provider github
+mgit clone-all myusername ./repos -c 10 --provider github
 ```
 
 ### Update repositories
 
 ```bash
 # Update all repos in a directory
-mgit pull-all steveant ./steveant-repos --provider github
+mgit pull-all myusername ./myusername-repos --provider github
 ```
 
 ## Organization vs User Repositories
@@ -145,7 +145,7 @@ For organization repositories, specify the org parameter:
 
 ```bash
 # Clone from multiple organizations
-mgit clone-all steveant ./steveant --provider github
+mgit clone-all myusername ./myusername --provider github
 mgit clone-all AeyeOps ./aeyeops --provider github
 ```
 
@@ -161,7 +161,7 @@ Create a structured workspace for multiple contexts:
 mgit clone-all your-username ~/github/personal --provider github
 
 # Organization repos
-ORGS=("steveant" "AeyeOps" "MyCompany")
+ORGS=("myusername" "AeyeOps" "MyCompany")
 for org in "${ORGS[@]}"; do
     mgit clone-all "$org" "~/github/orgs/$org" --provider github
 done
@@ -292,7 +292,7 @@ If you have 2FA enabled:
 │   ├── backend/
 │   └── infrastructure/
 └── opensource/       # Open source contributions
-    ├── steveant/
+    ├── myusername/
     └── AeyeOps/
 ```
 
@@ -326,7 +326,7 @@ mgit login --provider github --org https://github.company.com --token YOUR_TOKEN
 #!/bin/bash
 # Update multiple organizations
 
-ORGS=("steveant" "AeyeOps" "CompanyOrg")
+ORGS=("myusername" "AeyeOps" "CompanyOrg")
 BASE_DIR="$HOME/github/orgs"
 
 for org in "${ORGS[@]}"; do
@@ -369,28 +369,28 @@ jobs:
 
 ```bash
 # Clone repositories from organizations
-mgit clone-all steveant ./repos --provider github
+mgit clone-all myusername ./repos --provider github
 mgit clone-all AeyeOps ./repos --provider github
 ```
 
 ## Working with Specific Examples
 
-### Example 1: Managing steveant repositories
+### Example 1: Managing myusername repositories
 
 ```bash
 # Initial setup
-mgit login --provider github --token ghp_xxxxxxxxxxxx --org steveant
+mgit login --provider github --token ghp_xxxxxxxxxxxx --org myusername
 
 # Clone all repositories
-mkdir -p ~/projects/steveant
-mgit clone-all steveant ~/projects/steveant --provider github
+mkdir -p ~/projects/myusername
+mgit clone-all myusername ~/projects/myusername --provider github
 
 # Regular updates
-cd ~/projects/steveant
-mgit pull-all steveant . --provider github
+cd ~/projects/myusername
+mgit pull-all myusername . --provider github
 
 # Clone all projects
-mgit clone-all steveant ~/projects/steveant-active --provider github
+mgit clone-all myusername ~/projects/myusername-active --provider github
 ```
 
 ### Example 2: Working with AeyeOps organization
@@ -416,7 +416,7 @@ mgit clone-all your-username ~/github-backup/personal --provider github
 
 ```bash
 # Clone repositories
-mgit clone-all steveant ./repos --provider github
+mgit clone-all myusername ./repos --provider github
 ```
 
 ### Parallel Operations
