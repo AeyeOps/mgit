@@ -1,59 +1,79 @@
-"""Git-related utility functions for mgit CLI tool."""
+"""Git utility functions."""
 
 import re
-from urllib.parse import unquote, urlparse, urlunparse
+from pathlib import Path
+from typing import Optional
 
 
-def embed_pat_in_url(repo_url: str, pat: str) -> str:
+def embed_pat_in_url(url: str, pat: str) -> str:
     """
-    Rewrite repo_url to embed the PAT as credentials:
-      https://org@dev.azure.com ->
-        https://PersonalAccessToken:PAT@dev.azure.com
-    That way 'git clone' won't prompt for credentials.
+    Embed a Personal Access Token (PAT) into a git URL.
+
+    Args:
+        url: The original git URL.
+        pat: The Personal Access Token.
+
+    Returns:
+        The URL with the PAT embedded.
     """
-    parsed = urlparse(repo_url)
-    # Some ADOS remoteUrls look like:
-    # 'https://org@dev.azure.com/org/project/_git/repo'
-    # We'll embed 'PersonalAccessToken:pat@' as netloc
-    # credentials, ignoring any existing user
-    # Some Azure DevOps setups require this exact username
-    username = "PersonalAccessToken"
-    netloc = f"{username}:{pat}@{parsed.hostname}"
-    if parsed.port:
-        netloc += f":{parsed.port}"
-
-    new_parsed = parsed._replace(netloc=netloc)
-    return urlunparse(new_parsed)
+    if "@" in url:
+        # URL already has some form of authentication
+        return url
+    if url.startswith("https://"):
+        # Add PAT to HTTPS URL
+        return url.replace("https://", f"https://PersonalAccessToken:{pat}@")
+    return url  # Return original URL if not HTTPS
 
 
-def sanitize_repo_name(repo_url: str) -> str:
+def get_git_remote_url(repo_path: Path) -> Optional[str]:
     """
-    Extract and sanitize repository name from URL for use as a directory name.
-    Handles URL encoding, spaces, and special characters.
+    Get the remote URL of a git repository.
 
-    Example:
-      Input: https://dev.azure.com/org/project/_git/Repo%20Name%20With%20Spaces
-      Output: Repo_Name_With_Spaces
+    Args:
+        repo_path: Path to the git repository.
+
+    Returns:
+        The remote URL or None if not found.
     """
-    # Extract repo name from URL
-    parsed = urlparse(repo_url)
-    path_parts = parsed.path.split("/")
-    # The repo name is typically the last part of the path after _git
-    repo_name = ""
-    for i, part in enumerate(path_parts):
-        if part == "_git" and i + 1 < len(path_parts):
-            repo_name = path_parts[i + 1]
-            break
+    git_dir = repo_path / ".git"
+    if not git_dir.exists():
+        return None
 
-    # If we couldn't find it after _git, use the last part of the path
-    if not repo_name and path_parts:
-        repo_name = path_parts[-1]
+    config_path = git_dir / "config"
+    if not config_path.exists():
+        return None
 
-    # Decode URL encoding
-    repo_name = unquote(repo_name)
+    with open(config_path, "r", encoding="utf-8") as f:
+        for line in f:
+            if "url =" in line:
+                return line.split("=")[1].strip()
+    return None
 
-    # Replace spaces and special characters with underscores
-    # Keep alphanumeric, underscore, hyphen, and period
-    repo_name = re.sub(r"[^\w\-\.]", "_", repo_name)
 
-    return repo_name
+def sanitize_repo_name(name: str) -> str:
+    """
+    Sanitize a repository name to be used as a valid directory name.
+    This function replaces slashes and other invalid characters with hyphens.
+    """
+    # Replace slashes and whitespace with hyphens
+    name = re.sub(r"[/\\s]+", "-", name)
+    # Remove invalid characters for directory names
+    name = re.sub(r'[<>:"|?*]', "", name)
+    # Replace multiple hyphens with a single one
+    name = re.sub(r"-+", "-", name)
+    # Remove leading/trailing hyphens and dots
+    name = name.strip("-. ")
+    # Handle Windows reserved names
+    reserved_names = [
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5",
+        "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4",
+        "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    ]
+    if name.upper() in reserved_names:
+        name += "_"
+    return name
+
+
+def is_git_repository(path: Path) -> bool:
+    """Check if a path is a git repository."""
+    return (path / ".git").is_dir()

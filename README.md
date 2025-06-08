@@ -93,6 +93,35 @@ mgit pull-all myproject ./repos
 mgit pull-all myorg ./repos --config github_personal
 ```
 
+### Workspace Status
+
+Get a comprehensive, high-performance status report for all repositories within a directory. This command is your "mission control" to see which repositories have uncommitted changes, need to be pushed, or have drifted from their main branch.
+
+```bash
+# Get a report of all repos needing attention in the current directory
+mgit status .
+
+# Get a full report for a specific workspace, including clean repos
+mgit status ~/work/client-projects --all
+
+# Check status and ensure it's up-to-date with the remote
+mgit status . --fetch
+
+# Use in CI to fail a build if any repo has uncommitted changes
+mgit status . --fail-on-dirty
+```
+
+**Features & Options:**
+
+| Option | Description | Use Case |
+| :--- | :--- | :--- |
+| `PATH` | (Argument) The directory to scan recursively. | `mgit status ~/work/` |
+| `--concurrency N` | Run `N` status checks at the same time. | Speed up checks on large workspaces. |
+| `--output FORMAT` | Output as `table` (default) or `json`. | Use `json` for scripting and automation. |
+| `--show-clean`, `--all` | Show all repositories, not just those with changes. | Get a complete inventory of your workspace's state. |
+| `--fetch` | Run `git fetch` before checking status. | Get an accurate ahead/behind count against the remote. |
+| `--fail-on-dirty` | Exit with an error code if any repo has changes. | Perfect for CI/CD pipeline validation steps. |
+
 ## 🏢 Provider Management
 
 ### Authentication & Setup
@@ -257,6 +286,7 @@ export BITBUCKET_APP_PASSWORD=your-password
 |---------|-------------|
 | `mgit clone-all "pattern" ./dir` | Clone matching repositories |
 | `mgit pull-all project ./dir` | Update all repos in directory |
+| `mgit status <path>` | Get a status report for all repos in a directory |
 
 ### Provider Management
 

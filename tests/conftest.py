@@ -177,8 +177,11 @@ def mock_azure_client():
     return client
 
 
+from mgit.providers.base import Repository
+
+
 @pytest.fixture
-def mock_repositories():
+def mock_repositories() -> List[Repository]:
     """
     Create mock repository objects.
 
@@ -187,16 +190,32 @@ def mock_repositories():
     """
     repos = []
     for i in range(3):
-        repo = MagicMock()
-        repo.id = f"repo-id-{i}"
-        repo.name = f"repo-{i}"
-        repo.remote_url = f"https://dev.azure.com/test-org/_git/repo-{i}"
-        repo.default_branch = "refs/heads/main"
-        repo.size = 1024 * (i + 1)
-        repo.is_disabled = False
+        repo = Repository(
+            name=f"repo-{i}",
+            clone_url=f"https://dev.azure.com/test-org/_git/repo-{i}",
+            ssh_url=f"git@ssh.dev.azure.com:v3/test-org/test-project/repo-{i}",
+            is_disabled=False,
+            is_private=True,
+            default_branch="main",
+            size=1024 * (i + 1),
+            provider="azuredevops",
+            metadata={"id": f"repo-id-{i}"},
+        )
         repos.append(repo)
 
     return repos
+
+
+@pytest.fixture
+def mock_azure_repos(mock_repositories):
+    """Alias for mock_repositories."""
+    return mock_repositories
+
+
+@pytest.fixture
+def mock_config(sample_config):
+    """Alias for sample_config."""
+    return sample_config
 
 
 @pytest.fixture
@@ -217,6 +236,30 @@ def mock_projects():
         projects.append(project)
 
     return projects
+
+
+@pytest.fixture
+def azure_provider():
+    """Mock Azure DevOps provider."""
+    provider = MagicMock()
+    provider.test_connection.return_value = True
+    return provider
+
+
+@pytest.fixture
+def github_provider():
+    """Mock GitHub provider."""
+    provider = MagicMock()
+    provider.test_connection.return_value = True
+    return provider
+
+
+@pytest.fixture
+def bitbucket_provider():
+    """Mock Bitbucket provider."""
+    provider = MagicMock()
+    provider.test_connection.return_value = True
+    return provider
 
 
 # --- CLI Testing Fixtures ---

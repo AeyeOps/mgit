@@ -17,6 +17,7 @@ from rich.progress import Progress
 from rich.prompt import Confirm  # Added import
 
 from mgit.commands.listing import format_results, list_repositories
+from mgit.commands.status import get_repository_statuses, display_status_results
 from mgit.config.yaml_manager import CONFIG_DIR, get_global_setting, migrate_from_dotenv
 from mgit import __version__
 from mgit.exceptions import MgitError
@@ -334,7 +335,9 @@ def clone_all(
     # List repositories using provider manager
     logger.debug(f"Fetching repository list for project: {project}...")
     try:
-        repositories = provider_manager.list_repositories(project)
+        async def _collect_repos():
+            return [repo async for repo in provider_manager.list_repositories(project)]
+        repositories = asyncio.run(_collect_repos())
         logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
     except Exception as e:
         logger.error(f"Error fetching repository list: {e}")
@@ -672,7 +675,9 @@ def pull_all(
     # List repositories using provider manager
     logger.debug(f"Fetching repository list for project: {project}...")
     try:
-        repositories = provider_manager.list_repositories(project)
+        async def _collect_repos():
+            return [repo async for repo in provider_manager.list_repositories(project)]
+        repositories = asyncio.run(_collect_repos())
         logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
     except Exception as e:
         logger.error(f"Error fetching repository list: {e}")
@@ -1557,6 +1562,51 @@ def list_command(
             raise typer.Exit(1)
 
     asyncio.run(do_list())
+
+
+# -----------------------------------------------------------------------------
+# status Command
+# -----------------------------------------------------------------------------
+@app.command(name="status")
+def status_command(
+    path: Path = typer.Argument(
+        ".",
+        help="The path to scan for repositories.",
+        exists=True,
+        file_okay=False,
+        resolve_path=True,
+    ),
+    concurrency: int = typer.Option(
+        10, "--concurrency", "-c", help="Number of concurrent status checks."
+    ),
+    output: str = typer.Option(
+        "table", "--output", "-o", help="Output format (table, json)."
+    ),
+    show_clean: bool = typer.Option(
+        False, "--show-clean", "--all", help="Show all repositories, not just those with changes."
+    ),
+    fetch: bool = typer.Option(
+        False, "--fetch", help="Run 'git fetch' before checking status."
+    ),
+    fail_on_dirty: bool = typer.Option(
+        False, "--fail-on-dirty", help="Exit with an error code if any repository has changes."
+    ),
+):
+    """
+    Get a high-performance status report for all Git repositories within a directory.
+    """
+    async def do_status():
+        try:
+            results = await get_repository_statuses(path, concurrency, fetch)
+            display_status_results(results, output, show_clean)
+            if fail_on_dirty:
+                if any(not r.is_clean for r in results):
+                    raise typer.Exit(code=1)
+        except MgitError as e:
+            console.print(f"[red]Error: {e}[/red]")
+            raise typer.Exit(1)
+
+    asyncio.run(do_status())
 
 
 # The callback is no longer needed since we're using Typer's built-in help

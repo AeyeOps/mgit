@@ -78,6 +78,7 @@ class BitBucketProvider(GitProvider):
         self.oauth_token = config.get("oauth_token", "")
         self._session: Optional[aiohttp.ClientSession] = None
         self.logger = SecurityLogger(__name__)
+        self._rate_limit_info: Optional[Dict[str, Any]] = None
 
         super().__init__(config)
 
@@ -235,6 +236,7 @@ class BitBucketProvider(GitProvider):
             # Handle pagination
             while url:
                 async with self._session.get(url, headers=headers) as response:
+                    await self._check_rate_limit(response)
                     if response.status != 200:
                         text = await response.text()
                         raise APIError(
@@ -298,6 +300,7 @@ class BitBucketProvider(GitProvider):
             # Handle pagination
             while url:
                 async with self._session.get(url, headers=headers) as response:
+                    await self._check_rate_limit(response)
                     if response.status != 200:
                         text = await response.text()
                         raise APIError(
@@ -383,6 +386,7 @@ class BitBucketProvider(GitProvider):
                 async with self._session.get(
                     url, headers=headers, params=params
                 ) as response:
+                    await self._check_rate_limit(response)
                     if response.status != 200:
                         text = await response.text()
                         raise APIError(
@@ -429,6 +433,7 @@ class BitBucketProvider(GitProvider):
 
         try:
             async with self._session.get(url, headers=headers) as response:
+                await self._check_rate_limit(response)
                 if response.status == 200:
                     data = await response.json()
                     return self._convert_to_repository(data)
@@ -499,14 +504,27 @@ class BitBucketProvider(GitProvider):
 
         Note: BitBucket uses hourly rate limits per IP/user
         """
-        # TODO: Implement rate limit check
-        # - BitBucket doesn't have a dedicated rate limit endpoint
-        # - Check response headers for rate limit info:
-        #   - X-RateLimit-Limit
-        #   - X-RateLimit-Remaining
-        #   - X-RateLimit-Reset
-        # - Cache and return last known values
-        raise NotImplementedError("BitBucket rate limit info not yet implemented")
+        if self._rate_limit_info:
+            return {
+                "limit": self._rate_limit_info.get("limit", 0),
+                "remaining": self._rate_limit_info.get("remaining", 0),
+                "reset": self._rate_limit_info.get("reset", 0),
+            }
+        return None
+
+    async def _check_rate_limit(self, response: aiohttp.ClientResponse) -> None:
+        """Check response for rate limit headers and update info.
+
+        Args:
+            response: HTTP response object
+        """
+        # Update rate limit info from headers
+        if "X-RateLimit-Limit" in response.headers:
+            self._rate_limit_info = {
+                "limit": int(response.headers.get("X-RateLimit-Limit", 0)),
+                "remaining": int(response.headers.get("X-RateLimit-Remaining", 0)),
+                "reset": int(response.headers.get("X-RateLimit-Reset", 0)),
+            }
 
     @classmethod
     def match_url(cls, url: str) -> bool:
@@ -594,12 +612,33 @@ class BitBucketProvider(GitProvider):
 
         Returns:
             Dict with permission details
+
+        Raises:
+            APIError: If the API call fails
+            AuthenticationError: If not authenticated
         """
-        # TODO: Implement workspace permissions check
-        # - GET /workspaces/{workspace}/permissions
-        # - Parse permission levels
-        # - Useful for determining available operations
-        raise NotImplementedError("BitBucket workspace permissions not yet implemented")
+        if not await self.authenticate():
+            raise AuthenticationError("Authentication required")
+
+        await self._ensure_session()
+        headers = self._get_auth_headers()
+        url = f"{self.base_url}/workspaces/{workspace}/permissions"
+
+        try:
+            async with self._session.get(url, headers=headers) as response:
+                await self._check_rate_limit(response)
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    text = await response.text()
+                    raise APIError(
+                        f"Failed to get workspace permissions: {response.status} - {text}",
+                        self.PROVIDER_NAME,
+                    )
+        except aiohttp.ClientError as e:
+            raise ConnectionError(
+                f"Network error while getting workspace permissions: {e}"
+            )
 
     async def list_repository_branches(
         self, organization: str, repository: str
@@ -611,10 +650,37 @@ class BitBucketProvider(GitProvider):
             repository: Repository slug
 
         Returns:
-            List of branch information
+            List of branch information dictionaries
+
+        Raises:
+            APIError: If the API call fails
+            AuthenticationError: If not authenticated
         """
-        # TODO: Implement branch listing
-        # - GET /repositories/{workspace}/{repo_slug}/refs/branches
-        # - Include branch name, target commit, etc.
-        # - Useful for determining default branch
-        raise NotImplementedError("BitBucket branch listing not yet implemented")
+        if not await self.authenticate():
+            raise AuthenticationError("Authentication required")
+
+        await self._ensure_session()
+        headers = self._get_auth_headers()
+        url = f"{self.base_url}/repositories/{organization}/{repository}/refs/branches"
+        branches = []
+
+        try:
+            # Handle pagination
+            while url:
+                async with self._session.get(url, headers=headers) as response:
+                    await self._check_rate_limit(response)
+                    if response.status != 200:
+                        text = await response.text()
+                        raise APIError(
+                            f"Failed to list branches: {response.status} - {text}",
+                            self.PROVIDER_NAME,
+                        )
+
+                    data = await response.json()
+                    branches.extend(data.get("values", []))
+                    url = data.get("next")
+
+            return branches
+
+        except aiohttp.ClientError as e:
+            raise ConnectionError(f"Network error while listing branches: {e}")
