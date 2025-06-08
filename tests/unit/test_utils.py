@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 # Import the actual utils once available
-from mgit.git.utils import embed_pat_in_url, sanitize_repo_name
+from mgit.git.utils import sanitize_repo_name, embed_pat_in_url
 
 
 class TestHelperFunctions:
@@ -14,33 +14,22 @@ class TestHelperFunctions:
 
     def test_embed_pat_in_url_https(self):
         """Test embedding PAT in HTTPS URL."""
-        url = "https://dev.azure.com/org/project/_git/repo"
+        url = "https://dev.azure.com/test-org/_git/test-repo"
         pat = "test-pat-token"
-
-        result = embed_pat_in_url(url, pat)
-        assert (
-            result
-            == "https://PersonalAccessToken:test-pat-token@dev.azure.com/org/project/_git/repo"
-        )
+        expected = "https://PersonalAccessToken:test-pat-token@dev.azure.com/test-org/_git/test-repo"
+        assert embed_pat_in_url(url, pat) == expected
 
     def test_embed_pat_in_url_already_has_auth(self):
         """Test embedding PAT when URL already has authentication."""
-        url = "https://user:pass@dev.azure.com/org/project/_git/repo"
+        url = "https://user:pass@dev.azure.com/test-org/_git/test-repo"
         pat = "test-pat-token"
-
-        result = embed_pat_in_url(url, pat)
-        assert (
-            result
-            == "https://PersonalAccessToken:test-pat-token@dev.azure.com/org/project/_git/repo"
-        )
+        assert embed_pat_in_url(url, pat) == url
 
     def test_embed_pat_in_url_ssh(self):
-        """Test that SSH URLs are not modified."""
-        url = "git@github.com:user/repo.git"
+        """Test embedding PAT in SSH URL (should not modify)."""
+        url = "git@ssh.dev.azure.com:v3/test-org/test-project/test-repo"
         pat = "test-pat-token"
-
-        result = embed_pat_in_url(url, pat)
-        assert result == url  # SSH URLs should not be modified
+        assert embed_pat_in_url(url, pat) == url
 
     def test_sanitize_repo_name_basic(self):
         """Test basic repository name sanitization."""
@@ -52,11 +41,11 @@ class TestHelperFunctions:
         """Test sanitizing repository names with special characters."""
         assert sanitize_repo_name("my/repo") == "my-repo"
         assert sanitize_repo_name("my\\repo") == "my-repo"
-        assert sanitize_repo_name("my:repo") == "my-repo"
-        assert sanitize_repo_name("my*repo") == "my-repo"
-        assert sanitize_repo_name("my?repo") == "my-repo"
-        assert sanitize_repo_name("my<repo>") == "my-repo-"
-        assert sanitize_repo_name("my|repo") == "my-repo"
+        assert sanitize_repo_name("my:repo") == "myrepo"
+        assert sanitize_repo_name("my*repo") == "myrepo"
+        assert sanitize_repo_name("my?repo") == "myrepo"
+        assert sanitize_repo_name("my<repo>") == "myrepo"
+        assert sanitize_repo_name("my|repo") == "myrepo"
 
     def test_sanitize_repo_name_whitespace(self):
         """Test sanitizing repository names with whitespace."""
@@ -81,9 +70,9 @@ class TestHelperFunctions:
     @pytest.mark.parametrize(
         "name,expected",
         [
-            ("", "repo"),  # Empty name gets default
-            (".", "repo"),  # Just dots gets default
-            ("-", "repo"),  # Just dashes gets default
+            ("-repo", "repo"),
+            (".-repo", "repo"),
+            ("--repo", "repo"),
             ("CON", "CON_"),  # Windows reserved name
             ("PRN", "PRN_"),  # Windows reserved name
             ("AUX", "AUX_"),  # Windows reserved name

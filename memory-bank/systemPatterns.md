@@ -2,72 +2,80 @@
 
 ## System Architecture Overview
 
-*   [User to describe the high-level architecture of `mgit`. For example, is it a monolithic CLI, or does it have distinct layers? What are the major components?]
-    *   Example: `mgit` is a CLI application built with Python using the Typer library. It features a modular provider system to interact with different Git hosting services (GitHub, Bitbucket, Azure DevOps). Configuration is managed via a YAML file.
+`mgit` is a monolithic CLI application built with Python and the Typer library. Its architecture is designed to be extensible and maintainable through a clear separation of concerns into distinct subsystems: Provider Management, Commands, Security, Monitoring, and core Git interaction.
 
 ```mermaid
 graph TD
-    CLI_Interface[CLI Interface (Typer)] --> Command_Parser[Command Parser]
-    Command_Parser --> Config_Manager[ConfigManager (yaml_manager.py)]
-    Command_Parser --> Provider_Factory[ProviderFactory (factory.py)]
-    
-    Provider_Factory --> GitHub_Provider[GitHubProvider (github.py)]
-    Provider_Factory --> Bitbucket_Provider[BitbucketProvider (bitbucket.py)]
-    Provider_Factory --> AzureDevOps_Provider[AzureDevOpsProvider (azdevops.py)]
-    
-    GitHub_Provider --> GitHub_API[GitHub API]
-    Bitbucket_Provider --> Bitbucket_API[Bitbucket API]
-    AzureDevOps_Provider --> AzureDevOps_API[Azure DevOps API]
-    
-    Config_Manager --> Filesystem[config.yaml]
-    
-    CLI_Interface --> Git_Manager[GitManager (git/manager.py)]
-    Git_Manager --> Local_Git_Commands[Local Git Commands]
+    subgraph User Interface
+        CLI[CLI Interface (Typer in __main__.py)]
+    end
 
-    subgraph Providers
+    subgraph Core Subsystems
+        Cmd[Commands Subsystem (listing.py, monitoring.py)]
+        ProviderMgmt[Provider Management Subsystem]
+        SecuritySub[Security Subsystem]
+        MonitorSub[Monitoring Subsystem]
+        GitSub[Git Interaction Subsystem]
+    end
+
+    subgraph Provider Management Subsystem
         direction LR
-        GitHub_Provider
-        Bitbucket_Provider
-        AzureDevOps_Provider
+        PM[ProviderManager]
+        PF[ProviderFactory]
+        PR[ProviderRegistry]
+        ABC[GitProvider ABC]
+    end
+    
+    subgraph Concrete Providers
+        GitHub[GitHubProvider]
+        AzDevOps[AzDevOpsProvider]
+        Bitbucket[BitbucketProvider]
     end
 
-    subgraph CoreLogic
-        direction TB
-        Command_Parser
-        Config_Manager
-        Provider_Factory
-        Git_Manager
+    subgraph External Systems
+        direction LR
+        FS[config.yaml]
+        GitCLI[Local Git CLI]
+        APIs[Provider APIs]
     end
+
+    CLI --> Cmd
+    Cmd --> ProviderMgmt
+    Cmd --> GitSub
+    Cmd --> MonitorSub
+    
+    ProviderMgmt --> SecuritySub
+    ProviderMgmt --> APIs
+    ProviderMgmt --> FS
+    
+    ABC <|-- GitHub
+    ABC <|-- AzDevOps
+    ABC <|-- Bitbucket
+
+    GitSub --> GitCLI
 ```
-*(The above Mermaid diagram is an example based on the file structure. User should update/replace it to accurately reflect the system.)*
-
-## Key Technical Decisions
-
-*   **Language:** Python (version?)
-*   **CLI Framework:** Typer
-*   **Configuration:** YAML (`ruamel.yaml` for comment preservation)
-*   **Concurrency:** [e.g., `asyncio` for I/O-bound operations with providers, if applicable]
-*   **Testing:** `pytest`
-*   **Formatting:** `black`
-*   **Linting:** `ruff` (assumed from CI output)
-*   **Type Checking:** `mypy` (assumed from CI output)
-*   [User to add other key decisions]
 
 ## Design Patterns in Use
 
-*   **Factory Pattern:** Used in `providers/factory.py` to create instances of different Git providers.
-*   **Strategy Pattern:** (Potentially) Each provider class implements a common interface defined in `providers/base.py`, allowing different strategies for interacting with Git services.
-*   **Singleton Pattern:** (Potentially) For managing global configuration or a shared resource.
-*   [User to list and describe other patterns observed or intended].
+*   **Factory Pattern:** The `ProviderFactory` (`providers/factory.py`) provides a centralized method (`create_provider`) for instantiating different provider classes without exposing the creation logic to the client (`ProviderManager`).
+*   **Strategy Pattern:** The `GitProvider` abstract base class (`providers/base.py`) defines a common interface (a "strategy") for all Git providers. The `ProviderManager` is configured with a concrete strategy (e.g., `GitHubProvider`) at runtime, allowing it to use any provider interchangeably.
+*   **Singleton Pattern:** Both the `ProviderRegistry` (`providers/registry.py`) and the `SecurityMonitor` (`security/monitor.py`) are implemented as singletons. This ensures a single, globally accessible instance for managing provider registration and security event logging, respectively.
+*   **Facade Pattern:** The `GitManager` (`git/manager.py`) acts as a Facade, providing a simple, clean interface (`git_clone`, `git_pull`) over the more complex underlying `asyncio.subprocess` system for executing shell commands.
+*   **Command Pattern:** The application's CLI commands (`list`, `monitoring`, etc.) are encapsulated in their own modules within the `commands/` directory. This decouples the action's implementation from the main CLI definition in `__main__.py`.
 
-## Component Relationships & Critical Implementation Paths
+## Key Architectural Subsystems
 
-*   **Configuration Loading:** `yaml_manager.py` is critical for loading and saving provider configurations. It uses `ruamel.yaml` to preserve comments and structure.
-*   **Provider Interaction:**
-    *   `providers/manager_v2.py` (or a similar central manager) likely orchestrates operations across multiple configured providers.
-    *   Each provider (`github.py`, `bitbucket.py`, `azdevops.py`) encapsulates the logic for communicating with its respective API.
-    *   `providers/exceptions.py` defines custom exceptions for provider-related errors.
-*   **Local Git Operations:** `git/manager.py` handles interactions with the local Git CLI.
-*   **Command Handling:** `__main__.py` defines the Typer app and its commands, delegating to other modules for specific functionalities.
-*   **Security:** `security/credentials.py` handles masking of sensitive data.
-*   [User to detail other critical paths and component interactions].
+### Provider Management
+This is the core of `mgit`. It uses the **Registry** to auto-discover available providers, the **Factory** to instantiate them, and the **ProviderManager** to orchestrate operations. The **Strategy** pattern ensures all providers adhere to a common contract.
+
+### Asynchronous Task Execution
+The `AsyncExecutor` (`utils/async_executor.py`) is a generic, reusable component for managing concurrent batch operations. It uses `asyncio.Semaphore` for concurrency control and is tightly integrated with the `rich` library for progress display, providing a consistent UX for long-running tasks like `clone-all`.
+
+### Security Model
+The application features a multi-layered security model:
+1.  **Prevention (`CredentialMasker`):** Proactively masks credentials in logs, URLs, and API responses using regex and keyword detection.
+2.  **Validation (`SecurityValidator`):** Validates and sanitizes all user input (URLs, paths, names) to prevent common vulnerabilities like path traversal.
+3.  **Detection (`SecurityMonitor`):** An event-driven singleton that tracks security-related events (e.g., auth failures), detects anomalies (e.g., rapid failures), and provides a security overview.
+
+### Progress Display System
+The `ProgressManager` (`utils/progress.py`) provides a high-level abstraction over the `rich` library, enabling styled, nested progress bars for a polished and informative user experience during complex operations.
