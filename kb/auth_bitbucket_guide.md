@@ -1,6 +1,6 @@
 # Bitbucket Cloud Authentication Methods
 
-This document outlines the authentication methods available for Bitbucket Cloud API access, specifically for environments with SSO enabled (like pdisoftware.atlassian.net).
+This document outlines the authentication methods available for Bitbucket Cloud API access, specifically for environments with SSO enabled through Atlassian.
 
 ## Authentication Options
 
@@ -84,7 +84,7 @@ bitbucket = Cloud(
 
 ## SSO Considerations
 
-When SSO is enabled (as with pdisoftware.atlassian.net):
+When SSO is enabled through your organization's Atlassian account:
 
 1. Traditional username/password authentication is no longer available for API access
 2. You cannot use your SSO credentials directly with the API

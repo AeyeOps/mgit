@@ -263,7 +263,7 @@ def clone_all(
         None,
         "--config",
         "-cfg",
-        help="Named provider configuration (e.g., 'ado_pdidev', 'github_personal'). Uses default if not specified.",
+        help="Named provider configuration (e.g., 'ado_myorg', 'github_personal'). Uses default if not specified.",
     ),
     url: Optional[str] = typer.Option(
         None,
@@ -604,7 +604,7 @@ def pull_all(
         None,
         "--config",
         "-cfg",
-        help="Named provider configuration (e.g., 'ado_pdidev', 'github_personal'). Uses default if not specified.",
+        help="Named provider configuration (e.g., 'ado_myorg', 'github_personal'). Uses default if not specified.",
     ),
     concurrency: int = typer.Option(
         int(get_config_value("DEFAULT_CONCURRENCY", "4")),
@@ -1414,7 +1414,7 @@ def config(
 
     Examples:
       mgit config --list                    # List all providers
-      mgit config --show ado_pdidev         # Show provider details
+      mgit config --show ado_myorg          # Show provider details
       mgit config --set-default github_personal  # Set default provider
       mgit config --remove old_config       # Remove provider
       mgit config --global                  # Show global settings
@@ -1553,9 +1553,9 @@ def list_command(
 
     Examples:
       mgit list "*/*/*"                    # List all repos from all providers
-      mgit list "pdidev/*/*"               # List all repos from pdidev org
+      mgit list "myorg/*/*"                # List all repos from myorg org
       mgit list "*/*/pay*"                 # List repos ending in 'pay' from any org
-      mgit list "pdidev/PDIOperations/*"   # List all repos in specific project
+      mgit list "myorg/MyProject/*"        # List all repos in specific project
     """
 
     async def do_list():

@@ -11,7 +11,7 @@ Discover, clone, and manage hundreds of repositories with powerful query pattern
 
 ## ✨ What Makes mgit Special
 
-🔍 **Smart Repository Discovery** - Find repositories across providers using powerful query patterns like `"pdidev/*/*"` or `"*/*/payment*"`
+🔍 **Smart Repository Discovery** - Find repositories across providers using powerful query patterns like `"myorg/*/*"` or `"*/*/payment*"`
 
 📊 **Professional Progress Tracking** - Multi-level progress bars show real-time discovery and operation status
 
@@ -31,10 +31,10 @@ pip install https://github.com/AeyeOps/mgit/releases/download/v0.2.3/mgit-0.2.3-
 mgit login --provider azuredevops --name work_ado
 
 # 3. Discover repositories
-mgit list "pdidev/*/*"
+mgit list "myorg/*/*"
 
 # 4. Clone everything from a project
-mgit clone-all "pdidev/PDIOperations/*" ./my-repos
+mgit clone-all "myorg/MyProject/*" ./my-repos
 ```
 
 ## 🔍 Repository Discovery
