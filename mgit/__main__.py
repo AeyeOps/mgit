@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+import warnings
+
+# Suppress the specific UserWarning from PyInstaller's bootloader
+warnings.filterwarnings("ignore", message="pkg_resources is deprecated as an API", category=UserWarning)
+
 import asyncio
 import logging
 import os
