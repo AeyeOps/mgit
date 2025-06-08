@@ -2,7 +2,7 @@
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.12-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.2.13-blue.svg)](#)
 
 Efficiently manage repositories across Azure DevOps, GitHub, and BitBucket from a single CLI.
 
@@ -15,7 +15,7 @@ DevOps teams managing hundreds of repositories across multiple providers face da
 - Bulk operations that respect API rate limits
 - Pattern-based repository discovery across providers
 - Concurrent execution for performance at scale
-- Secure credential management with AES-256 encryption
+- Secure credential management with token masking and safe file permissions
 
 ## Requirements
 
@@ -28,7 +28,7 @@ DevOps teams managing hundreds of repositories across multiple providers face da
 
 ```bash
 # 1. Install mgit from source
-git clone <repository-url> && cd mgit
+git clone https://github.com/AeyeOps/mgit && cd mgit
 poetry install --with dev
 
 # 2. Configure provider access
@@ -46,11 +46,11 @@ poetry run mgit status ./repos
 
 ## Installation
 
-### From Source (Currently Only Method)
+### From Source
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/AeyeOps/mgit
 cd mgit
 
 # Install with Poetry
@@ -58,11 +58,11 @@ poetry install --with dev
 
 # Run mgit
 poetry run mgit --version
-# Should show: mgit version: 0.2.12
+# Should show: mgit version: 0.2.13
 
 # Or install globally
 poetry build
-pip install dist/mgit-0.2.12-py3-none-any.whl
+pip install dist/mgit-0.2.13-py3-none-any.whl
 ```
 
 ### Building Binaries
@@ -78,7 +78,7 @@ poetry run poe build-windows
 poetry run poe build-all
 ```
 
-**Note**: Pre-built releases, Docker images, and PyPI packages are not yet available. Installation from source is currently the only supported method.
+**Note**: Pre-built releases and PyPI packages are planned for future versions.
 
 ## Provider Setup
 
