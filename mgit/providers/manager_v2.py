@@ -27,7 +27,7 @@ class ProviderManager:
     """Modern provider manager with named configuration support.
 
     This manager works with YAML-based configurations and supports:
-    - Named provider configurations (e.g., 'ado_pdidev', 'github_personal')
+    - Named provider configurations (e.g., 'ado_myorg', 'github_personal')
     - Multiple configurations per provider type
     - Auto-detection from URLs
     - Fallback to default provider
@@ -39,7 +39,7 @@ class ProviderManager:
         """Initialize provider manager.
 
         Args:
-            provider_name: Named provider configuration (e.g., 'ado_pdidev')
+            provider_name: Named provider configuration (e.g., 'ado_myorg')
             auto_detect_url: URL to auto-detect provider type from
         """
         self.provider_name = provider_name

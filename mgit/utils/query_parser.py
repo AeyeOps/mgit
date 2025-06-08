@@ -1,8 +1,8 @@
 """Query parser for mgit list command.
 
 Handles query patterns like:
-- "pdidev/*/pay*" - repos ending in "pay" across all projects in pdidev
-- "pdidev/PDIOperations/*" - all repos in specific org/project
+- "myorg/*/pay*" - repos ending in "pay" across all projects in myorg
+- "myorg/MyProject/*" - all repos in specific org/project
 - "*/*/mobile*" - mobile repos across all orgs
 """
 
@@ -45,11 +45,11 @@ def parse_query(query: str) -> QueryPattern:
         QueryPattern with parsed segments
 
     Examples:
-        >>> parse_query("pdidev/*/pay*")
-        QueryPattern(org_pattern='pdidev', project_pattern='*', repo_pattern='pay*')
+        >>> parse_query("myorg/*/pay*")
+        QueryPattern(org_pattern='myorg', project_pattern='*', repo_pattern='pay*')
 
-        >>> parse_query("pdidev/PDIOperations/*")
-        QueryPattern(org_pattern='pdidev', project_pattern='PDIOperations', repo_pattern='*')
+        >>> parse_query("myorg/MyProject/*")
+        QueryPattern(org_pattern='myorg', project_pattern='MyProject', repo_pattern='*')
 
         >>> parse_query("*/*/*")
         QueryPattern(org_pattern='*', project_pattern='*', repo_pattern='*')
@@ -86,7 +86,7 @@ def matches_pattern(text: str, pattern: str, case_sensitive: bool = False) -> bo
         True
         >>> matches_pattern("user-service", "pay*")
         False
-        >>> matches_pattern("pdidev.visualstudio.com", "pdidev")
+        >>> matches_pattern("myorg.visualstudio.com", "myorg")
         True
     """
     if not case_sensitive:
@@ -98,7 +98,7 @@ def matches_pattern(text: str, pattern: str, case_sensitive: bool = False) -> bo
         return True
 
     # If pattern doesn't contain wildcards, try prefix matching for user-friendliness
-    # This allows "pdidev" to match "pdidev.visualstudio.com"
+    # This allows "myorg" to match "myorg.visualstudio.com"
     if "*" not in pattern and "?" not in pattern:
         return fnmatch.fnmatch(text, pattern + "*")
 

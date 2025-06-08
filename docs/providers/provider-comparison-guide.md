@@ -29,7 +29,7 @@ This guide compares the three supported mgit providers (Azure DevOps, GitHub, an
 ### Azure DevOps: Project-Based
 
 ```
-Azure DevOps Organization (pdidev)
+Azure DevOps Organization (myorg)
 ├── Project: DataEngineering
 │   ├── data-pipeline-etl
 │   ├── data-warehouse
@@ -140,7 +140,7 @@ mgit clone-all santonakakis ./santonakakis-repos --provider bitbucket
 # 2. Set scopes: Code (Read & Write), Project (Read)
 # 3. Copy token immediately
 
-mgit login --provider azuredevops --org https://dev.azure.com/pdidev --token YOUR_PAT
+mgit login --provider azuredevops --org https://dev.azure.com/myorg --token YOUR_PAT
 ```
 
 **Alternative Methods:**

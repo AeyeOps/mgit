@@ -46,7 +46,7 @@ DEFAULT_CONCURRENCY=10
 DEFAULT_UPDATE_MODE=pull
 
 # Azure DevOps Configuration
-AZURE_DEVOPS_ORG_URL=https://dev.azure.com/pdidev
+AZURE_DEVOPS_ORG_URL=https://dev.azure.com/myorg
 AZURE_DEVOPS_EXT_PAT=your-azure-devops-pat-here
 
 # GitHub Configuration
@@ -73,7 +73,7 @@ CONSOLE_LEVEL=INFO
 # Azure DevOps specific settings
 
 # Required settings
-AZURE_DEVOPS_ORG_URL=https://dev.azure.com/pdidev
+AZURE_DEVOPS_ORG_URL=https://dev.azure.com/myorg
 AZURE_DEVOPS_EXT_PAT=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # Optional settings
@@ -133,7 +133,7 @@ export DEFAULT_CONCURRENCY="10"
 export DEFAULT_UPDATE_MODE="pull"
 
 # Azure DevOps
-export AZURE_DEVOPS_ORG_URL="https://dev.azure.com/pdidev"
+export AZURE_DEVOPS_ORG_URL="https://dev.azure.com/myorg"
 export AZURE_DEVOPS_EXT_PAT="your-pat-here"
 
 # GitHub

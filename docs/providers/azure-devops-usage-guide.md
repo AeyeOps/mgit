@@ -25,7 +25,7 @@ This guide provides step-by-step instructions for using mgit with Azure DevOps, 
 3. **Create New Token**:
    - Click "New Token"
    - **Name**: Give it a descriptive name (e.g., "mgit-access")
-   - **Organization**: Select your organization (e.g., `pdidev`)
+   - **Organization**: Select your organization (e.g., `myorg`)
    - **Expiration**: Set an appropriate expiration date (max 1 year)
    - **Scopes**: Select the following minimum scopes:
      - Code: Read & Write
@@ -40,7 +40,7 @@ This guide provides step-by-step instructions for using mgit with Azure DevOps, 
 
 ```bash
 # Login to Azure DevOps
-mgit login --provider azdevops --org https://dev.azure.com/pdidev --token YOUR_PAT_HERE
+mgit login --provider azdevops --org https://dev.azure.com/myorg --token YOUR_PAT_HERE
 
 # Verify configuration
 mgit config --show
@@ -52,7 +52,7 @@ Create or edit `~/.config/mgit/config`:
 
 ```bash
 # Azure DevOps configuration
-AZURE_DEVOPS_ORG_URL=https://dev.azure.com/pdidev
+AZURE_DEVOPS_ORG_URL=https://dev.azure.com/myorg
 AZURE_DEVOPS_EXT_PAT=YOUR_PAT_HERE
 
 # Optional: Set defaults
@@ -64,7 +64,7 @@ DEFAULT_UPDATE_MODE=pull
 
 ```bash
 # Set environment variables
-export AZURE_DEVOPS_ORG_URL="https://dev.azure.com/pdidev"
+export AZURE_DEVOPS_ORG_URL="https://dev.azure.com/myorg"
 export AZURE_DEVOPS_EXT_PAT="YOUR_PAT_HERE"
 
 # Optional: Set defaults
@@ -159,9 +159,9 @@ mgit login --provider azdevops
 ### Organization URL Issues
 
 **Common mistakes**:
-- ❌ `pdidev.visualstudio.com` (old format)
-- ❌ `dev.azure.com/pdidev/` (trailing slash)
-- ✅ `https://dev.azure.com/pdidev` (correct format)
+- ❌ `myorg.visualstudio.com` (old format)
+- ❌ `dev.azure.com/myorg/` (trailing slash)
+- ✅ `https://dev.azure.com/myorg` (correct format)
 
 ### Rate Limiting
 
@@ -246,7 +246,7 @@ steps:
 
 ```bash
 # 1. Initial setup
-mgit login --provider azdevops --org https://dev.azure.com/pdidev --token YOUR_PAT_HERE
+mgit login --provider azdevops --org https://dev.azure.com/myorg --token YOUR_PAT_HERE
 
 # 2. Clone repos from a known project
 # (Use Azure DevOps web interface to explore available projects and repositories)
@@ -274,7 +274,7 @@ mgit clone-all --provider azdevops --project "DataEngineering" \
 # Script to manage multiple Azure DevOps projects
 
 PROJECTS=("Frontend" "Backend" "DataEngineering" "Infrastructure" "DevOps")
-BASE_DIR="$HOME/workspace/pdidev"
+BASE_DIR="$HOME/workspace/myorg"
 
 # Clone all projects
 for project in "${PROJECTS[@]}"; do
