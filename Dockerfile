@@ -16,8 +16,8 @@ LABEL org.opencontainers.image.title="mgit" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.authors="Steve Antonakakis <steve.antonakakis@gmail.com>" \
-      org.opencontainers.image.source="https://github.com/steveant/mgit"
+      org.opencontainers.image.authors="Example User <user@example.com>" \
+      org.opencontainers.image.source="https://github.com/exampleuser/mgit"
 
 # Install system dependencies needed for building
 RUN apt-get update && apt-get install -y \
