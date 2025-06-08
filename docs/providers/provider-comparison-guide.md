@@ -60,7 +60,7 @@ mgit clone-all DataEngineering ./data-eng --provider azuredevops
 
 ```
 GitHub
-├── Personal Account (steveant)
+├── Personal Account (myusername)
 │   ├── personal-website
 │   ├── dotfiles
 │   └── learning-rust
@@ -88,7 +88,7 @@ mgit clone-all your-username ./personal-repos --provider github
 
 # Clone organization repos
 mgit clone-all AeyeOps ./aeyeops-repos --provider github
-mgit clone-all steveant ./steveant-repos --provider github
+mgit clone-all myusername ./myusername-repos --provider github
 ```
 
 ### BitBucket: Workspace-Based with Optional Projects
@@ -99,7 +99,7 @@ BitBucket
 │   ├── personal-project
 │   └── experiments
 └── Team Workspaces
-    └── santonakakis
+    └── myworkspace
         ├── Project: Web Platform
         │   ├── frontend-react
         │   ├── backend-api
@@ -121,7 +121,7 @@ BitBucket
 **mgit Usage:**
 ```bash
 # Clone all repos from workspace
-mgit clone-all santonakakis ./santonakakis-repos --provider bitbucket
+mgit clone-all myworkspace ./myworkspace-repos --provider bitbucket
 ```
 
 ## Authentication Methods
