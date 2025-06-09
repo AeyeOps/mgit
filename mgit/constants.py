@@ -1,6 +1,6 @@
 """Constants module for mgit."""
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 # Default values used if environment variables and config file don't provide values
 DEFAULT_VALUES = {
