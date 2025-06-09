@@ -56,47 +56,43 @@ For enhanced security with specific repository access:
 
 ## Configuration
 
-### Method 1: Using mgit login command
+### Method 1: Using mgit login command (Recommended)
 
 ```bash
-# For personal repositories
-mgit login --provider github --token YOUR_GITHUB_TOKEN
-
-# For organization repositories
-mgit login --provider github --token YOUR_GITHUB_TOKEN --org myusername
+# Login to GitHub
+mgit login --provider github --name personal_gh
+# Enter token when prompted (format: ghp_...)
 
 # Verify configuration
-mgit config --show
+mgit config --show personal_gh
 ```
 
-### Method 2: Configuration file
+### Method 2: Manual YAML configuration
 
-Create or edit `~/.config/mgit/config`:
+Edit `~/.config/mgit/config.yaml`:
 
-```bash
-# GitHub configuration
-GITHUB_PAT=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```yaml
+# Modern unified configuration
+global:
+  default_concurrency: 10
+  default_update_mode: pull
 
-# Optional: default organization
-GITHUB_ORG=AeyeOps
-
-# Optional: Set defaults
-DEFAULT_CONCURRENCY=10
-DEFAULT_UPDATE_MODE=pull
+providers:
+  personal_gh:
+    url: https://api.github.com
+    user: your-github-username
+    token: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    workspace: ""                      # Optional organization name
 ```
 
-### Method 3: Environment variables
+### Method 3: Legacy environment variables (Deprecated)
+
+**Note**: Environment variables are deprecated. Use YAML configuration instead.
 
 ```bash
-# Set GitHub token
+# Legacy environment variables (still supported but not recommended)
 export GITHUB_PAT="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-
-# Optional: Set default organization
 export GITHUB_ORG="myusername"
-
-# Optional: Set defaults
-export DEFAULT_CONCURRENCY="10"
-export DEFAULT_UPDATE_MODE="pull"
 ```
 
 ## Common Commands

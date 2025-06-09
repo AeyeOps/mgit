@@ -54,46 +54,46 @@ This guide provides detailed instructions for using mgit with BitBucket, includi
 
 ## Configuration
 
-### Method 1: Using mgit login command
+### Method 1: Using mgit login command (Recommended)
 
 ```bash
-# Login with BitBucket app password
-mgit login --provider bitbucket --org YOUR_WORKSPACE --token YOUR_APP_PASSWORD
+# Login to BitBucket
+mgit login --provider bitbucket --name team_bb
+# Enter username (not email)
+# Enter app password when prompted
+# Enter workspace slug
 
 # Verify configuration
-mgit config --show
+mgit config --show team_bb
 ```
 
-### Method 2: Configuration file
+### Method 2: Manual YAML configuration
 
-Create or edit `~/.config/mgit/config`:
+Edit `~/.config/mgit/config.yaml`:
 
-```bash
-# BitBucket configuration
-BITBUCKET_USERNAME=your-username
-BITBUCKET_APP_PASSWORD=your-app-password-here
+```yaml
+# Modern unified configuration
+global:
+  default_concurrency: 5
+  default_update_mode: pull
 
-# Optional: default workspace
-BITBUCKET_WORKSPACE=myworkspace
-
-# Optional: Set defaults
-DEFAULT_CONCURRENCY=5
-DEFAULT_UPDATE_MODE=pull
+providers:
+  team_bb:
+    url: https://api.bitbucket.org/2.0
+    user: your-username                # BitBucket username (not email)
+    token: your-app-password-here
+    workspace: myworkspace             # BitBucket workspace slug
 ```
 
-### Method 3: Environment variables
+### Method 3: Legacy environment variables (Deprecated)
+
+**Note**: Environment variables are deprecated. Use YAML configuration instead.
 
 ```bash
-# Set BitBucket credentials
+# Legacy environment variables (still supported but not recommended)
 export BITBUCKET_USERNAME="your-username"
 export BITBUCKET_APP_PASSWORD="your-app-password"
-
-# Optional: Set default workspace
 export BITBUCKET_WORKSPACE="myworkspace"
-
-# Optional: Set defaults
-export DEFAULT_CONCURRENCY="5"
-export DEFAULT_UPDATE_MODE="pull"
 ```
 
 ## Common Commands

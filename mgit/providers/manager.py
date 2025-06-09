@@ -177,20 +177,8 @@ class ProviderManager:
                 f"All providers must have: url, user, token, workspace (optional)"
             )
         
-        # Map unified field names to provider-specific field names
-        if self._provider_type == "azuredevops":
-            self._config["organization_url"] = self._config["url"]
-            self._config["pat"] = self._config["token"]
-            
-        elif self._provider_type == "github":
-            self._config["pat"] = self._config["token"]
-            self._config["base_url"] = "https://api.github.com"
-                
-        elif self._provider_type == "bitbucket":
-            self._config["username"] = self._config["user"]
-            self._config["app_password"] = self._config["token"]
-            self._config["base_url"] = "https://api.bitbucket.org/2.0"
-        else:
+        # No field mapping needed - providers now use unified fields directly
+        if self._provider_type not in ["azuredevops", "github", "bitbucket"]:
             raise ConfigurationError(f"Unknown provider type: {self._provider_type}")
 
     async def test_connection_async(self) -> bool:
