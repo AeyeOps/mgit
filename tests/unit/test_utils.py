@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 
 # Import the actual utils once available
-from mgit.git.utils import sanitize_repo_name, embed_pat_in_url
+from mgit.git.utils import (
+    embed_pat_in_url,
+    normalize_path,
+    sanitize_repo_name,
+    validate_url,
+)
 
 
 class TestHelperFunctions:
@@ -161,15 +166,13 @@ class TestPathUtilities:
         paths = [
             "~/projects/repo",
             "$HOME/projects/repo",
-            "./projects/repo",
-            "../parent/projects/repo",
         ]
 
         for path_str in paths:
-            path = Path(path_str).expanduser()
+            path = normalize_path(path_str)
             # Path should be expanded correctly
             assert "$" not in str(path)
-            assert "~" not in str(path) or str(path).startswith("~")
+            assert "~" not in str(path)
 
 
 class TestConfigurationHelpers:
@@ -201,24 +204,9 @@ class TestConfigurationHelpers:
 
     def test_validate_url(self):
         """Test URL validation."""
-        valid_urls = [
-            "https://dev.azure.com/org",
-            "https://github.com/user/repo",
-            "http://localhost:8080",
-            "https://bitbucket.org/workspace/repo",
-        ]
-
-        invalid_urls = [
-            "not-a-url",
-            "ftp://invalid-protocol.com",
-            "https://",
-            "",
-            None,
-        ]
-
-        for url in valid_urls:
-            assert url.startswith(("http://", "https://"))
-
-        for url in invalid_urls:
-            if url:
-                assert not url.startswith(("http://", "https://"))
+        assert validate_url("https://example.com") is True
+        assert validate_url("http://example.com") is True
+        assert validate_url("ftp://example.com") is False
+        assert validate_url("example.com") is False
+        assert validate_url("") is False
+        assert validate_url(None) is False

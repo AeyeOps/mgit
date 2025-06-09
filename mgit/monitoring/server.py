@@ -30,7 +30,7 @@ from .metrics import get_metrics_collector
 class MonitoringServer:
     """HTTP server for monitoring endpoints."""
 
-    def __init__(self, host: str = "0.0.0.0", port: int = 8080):
+    def __init__(self, host: str = "127.0.0.1", port: int = 8080):
         """Initialize monitoring server.
 
         Args:
@@ -436,7 +436,7 @@ class MonitoringServer:
 class SimpleMonitoringServer:
     """Simple HTTP server fallback when aiohttp is not available."""
 
-    def __init__(self, host: str = "0.0.0.0", port: int = 8080):
+    def __init__(self, host: str = "127.0.0.1", port: int = 8080):
         """Initialize simple monitoring server.
 
         Args:
@@ -580,7 +580,9 @@ class SimpleMonitoringServer:
 _monitoring_server: Optional[MonitoringServer] = None
 
 
-def get_monitoring_server(host: str = "0.0.0.0", port: int = 8080) -> MonitoringServer:
+def get_monitoring_server(
+    host: str = "127.0.0.1", port: int = 8080
+) -> MonitoringServer:
     """Get global monitoring server instance.
 
     Args:
@@ -597,7 +599,7 @@ def get_monitoring_server(host: str = "0.0.0.0", port: int = 8080) -> Monitoring
 
 
 async def start_monitoring_server(
-    host: str = "0.0.0.0", port: int = 8080
+    host: str = "127.0.0.1", port: int = 8080
 ) -> MonitoringServer:
     """Start the monitoring server.
 
@@ -614,7 +616,7 @@ async def start_monitoring_server(
 
 
 def start_simple_monitoring_server(
-    host: str = "0.0.0.0", port: int = 8080
+    host: str = "127.0.0.1", port: int = 8080
 ) -> SimpleMonitoringServer:
     """Start the simple monitoring server (fallback).
 
