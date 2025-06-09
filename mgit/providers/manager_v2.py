@@ -170,11 +170,21 @@ class ProviderManager:
 
         # Map YAML field names to provider field names
         if self._provider_type == "azuredevops":
+            # Handle legacy field names
+            if "default_org_url" in self._config and "org_url" not in self._config:
+                self._config["org_url"] = self._config["default_org_url"]
+            
             required_yaml = ["org_url", "pat"]
             # Map to provider expected field names
             if "org_url" in self._config:
                 self._config["organization_url"] = self._config["org_url"]
         elif self._provider_type == "github":
+            # Handle legacy field names
+            if "pat" in self._config and "token" not in self._config:
+                self._config["token"] = self._config["pat"]
+            if "default_owner" in self._config and "owner" not in self._config:
+                self._config["owner"] = self._config["default_owner"]
+                
             required_yaml = ["token"]
             # Map token to pat for GitHub provider
             if "token" in self._config:
@@ -183,10 +193,16 @@ class ProviderManager:
                 if "base_url" not in self._config:
                     self._config["base_url"] = "https://api.github.com"
         elif self._provider_type == "bitbucket":
+            # Handle legacy field names
+            if "default_username" in self._config and "username" not in self._config:
+                self._config["username"] = self._config["default_username"]
+            if "default_workspace" in self._config and "workspace" not in self._config:
+                self._config["workspace"] = self._config["default_workspace"]
+                
             required_yaml = ["username", "app_password"]
             # Map fields for BitBucket
-            if "default_workspace" in self._config:
-                self._config["workspace"] = self._config["default_workspace"]
+            if "workspace" in self._config and "default_workspace" not in self._config:
+                self._config["default_workspace"] = self._config["workspace"]
             # Set default base_url if not present
             if "base_url" not in self._config:
                 self._config["base_url"] = "https://api.bitbucket.org/2.0"
