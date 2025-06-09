@@ -1,5 +1,6 @@
 """Git utility functions."""
 
+import os
 import re
 from pathlib import Path
 from typing import Optional
@@ -56,7 +57,7 @@ def sanitize_repo_name(name: str) -> str:
     This function replaces slashes and other invalid characters with hyphens.
     """
     # Replace slashes and whitespace with hyphens
-    name = re.sub(r"[/\\s]+", "-", name)
+    name = re.sub(r"[\s/\\]+", "-", name)
     # Remove invalid characters for directory names
     name = re.sub(r'[<>:"|?*]', "", name)
     # Replace multiple hyphens with a single one
@@ -65,9 +66,28 @@ def sanitize_repo_name(name: str) -> str:
     name = name.strip("-. ")
     # Handle Windows reserved names
     reserved_names = [
-        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5",
-        "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4",
-        "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        "COM1",
+        "COM2",
+        "COM3",
+        "COM4",
+        "COM5",
+        "COM6",
+        "COM7",
+        "COM8",
+        "COM9",
+        "LPT1",
+        "LPT2",
+        "LPT3",
+        "LPT4",
+        "LPT5",
+        "LPT6",
+        "LPT7",
+        "LPT8",
+        "LPT9",
     ]
     if name.upper() in reserved_names:
         name += "_"
@@ -77,3 +97,15 @@ def sanitize_repo_name(name: str) -> str:
 def is_git_repository(path: Path) -> bool:
     """Check if a path is a git repository."""
     return (path / ".git").is_dir()
+
+
+def normalize_path(path_str: str) -> Path:
+    """Normalize a path string, expanding user and environment variables."""
+    return Path(os.path.expanduser(os.path.expandvars(path_str)))
+
+
+def validate_url(url: str) -> bool:
+    """Validate if a string is a valid-looking URL."""
+    if not url:
+        return False
+    return url.startswith(("http://", "https://"))

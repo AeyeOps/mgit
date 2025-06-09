@@ -9,14 +9,23 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
 from ruamel.yaml import YAML
 
 logger = logging.getLogger(__name__)
 
+
 # Configuration paths
-CONFIG_DIR = Path.home() / ".config" / "mgit"
-CONFIG_FILE = CONFIG_DIR / "config.yaml"
+def get_config_file() -> Path:
+    """Get the path to the config file, respecting the environment variable."""
+    env_path = os.getenv("MGIT_CONFIG_PATH")
+    if env_path:
+        return Path(env_path)
+    return Path.home() / ".config" / "mgit" / "config.yaml"
+
+
+CONFIG_FILE = get_config_file()
+CONFIG_DIR = CONFIG_FILE.parent
+
 
 # Ensure config directory exists
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)

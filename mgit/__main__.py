@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 
-import warnings
-
-# Suppress the specific UserWarning from PyInstaller's bootloader
-warnings.filterwarnings("ignore", message="pkg_resources is deprecated as an API", category=UserWarning)
-
 import asyncio
 import logging
 import os
 import shutil
 import subprocess  # Needed for CalledProcessError exception
+import warnings
 from enum import Enum
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -19,15 +15,33 @@ import typer
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress
-from rich.prompt import Confirm  # Added import
+from rich.prompt import Confirm
 
-from mgit.commands.listing import format_results, list_repositories
-from mgit.commands.status import get_repository_statuses, display_status_results
-from mgit.config.yaml_manager import CONFIG_DIR, get_global_setting, migrate_from_dotenv
 from mgit import __version__
+from mgit.commands.listing import format_results, list_repositories
+from mgit.commands.status import display_status_results, get_repository_statuses
+from mgit.config.yaml_manager import (
+    CONFIG_DIR,
+    add_provider_config,
+    detect_provider_type,
+    get_default_provider_name,
+    get_global_config,
+    get_global_setting,
+    get_provider_config,
+    get_provider_configs,
+    list_provider_names,
+    migrate_from_dotenv,
+    remove_provider_config,
+    set_default_provider,
+)
 from mgit.exceptions import MgitError
 from mgit.git import GitManager, sanitize_repo_name
 from mgit.providers.manager_v2 import ProviderManager
+
+# Suppress the specific UserWarning from PyInstaller's bootloader
+warnings.filterwarnings(
+    "ignore", message="pkg_resources is deprecated as an API", category=UserWarning
+)
 
 # Default values used if environment variables and config file don't provide values
 DEFAULT_VALUES = {
@@ -340,8 +354,10 @@ def clone_all(
     # List repositories using provider manager
     logger.debug(f"Fetching repository list for project: {project}...")
     try:
+
         async def _collect_repos():
             return [repo async for repo in provider_manager.list_repositories(project)]
+
         repositories = asyncio.run(_collect_repos())
         logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
     except Exception as e:
@@ -680,8 +696,10 @@ def pull_all(
     # List repositories using provider manager
     logger.debug(f"Fetching repository list for project: {project}...")
     try:
+
         async def _collect_repos():
             return [repo async for repo in provider_manager.list_repositories(project)]
+
         repositories = asyncio.run(_collect_repos())
         logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
     except Exception as e:
@@ -943,6 +961,7 @@ def generate_env():
 
 # Azure DevOps Configuration
 AZURE_DEVOPS_ORG_URL=https://dev.azure.com/your-org
+AZURE_DEVOPS_PAT=<YOUR_AZURE_PAT>
 AZURE_DEVOPS_EXT_PAT=<YOUR_AZURE_PAT>
 
 # GitHub Configuration
@@ -1006,8 +1025,6 @@ def gen_env():
 
 def _find_existing_azdevops_config(organization: str) -> Optional[str]:
     """Find existing Azure DevOps configuration for the same organization."""
-    from mgit.config.yaml_manager import get_provider_configs, detect_provider_type
-
     try:
         providers = get_provider_configs()
 
@@ -1035,8 +1052,6 @@ def _find_existing_azdevops_config(organization: str) -> Optional[str]:
 
 def _find_existing_github_config() -> Optional[str]:
     """Find existing GitHub configuration."""
-    from mgit.config.yaml_manager import get_provider_configs, detect_provider_type
-
     try:
         providers = get_provider_configs()
 
@@ -1059,8 +1074,6 @@ def _find_existing_github_config() -> Optional[str]:
 
 def _find_existing_bitbucket_config(username: str) -> Optional[str]:
     """Find existing BitBucket configuration for the same username."""
-    from mgit.config.yaml_manager import get_provider_configs, detect_provider_type
-
     try:
         providers = get_provider_configs()
 
@@ -1092,8 +1105,6 @@ def _test_provider_connection(
         # Create a temporary provider manager instance for testing
         # We'll create a temporary config entry, test it, and remove it
         temp_name = f"_temp_test_{provider_type}"
-
-        from mgit.config.yaml_manager import add_provider_config, remove_provider_config
 
         # Temporarily add the config
         add_provider_config(temp_name, provider_config)
@@ -1164,11 +1175,6 @@ def login(
 
     Supports testing existing configurations or creating new ones.
     """
-    from mgit.config.yaml_manager import (
-        ConfigurationManager,
-        add_provider_config,
-    )
-
     # Case 1: Test existing named configuration
     if config:
         try:
@@ -1228,7 +1234,7 @@ def login(
                 if not name:
                     suggested_name = f"ado_{organization.split('/')[-1]}_new"
                     name = typer.prompt(
-                        f"Enter name for new configuration", default=suggested_name
+                        "Enter name for new configuration", default=suggested_name
                     )
             else:
                 console.print("[yellow]Cancelled.[/yellow]")
@@ -1348,8 +1354,6 @@ def login(
 
                 # Ask if this should be the default
                 if Confirm.ask(f"Set '{name}' as the default provider?", default=True):
-                    from mgit.config.yaml_manager import set_default_provider
-
                     set_default_provider(name)
                     console.print(f"[green]✓[/green] Set '{name}' as default provider")
             else:
@@ -1361,7 +1365,7 @@ def login(
                 f"[red]✗[/red] Failed to connect to {provider_type}. Please check your credentials."
             )
             console.print(
-                f"[yellow]Tip: Ensure your token has the required permissions and hasn't expired.[/yellow]"
+                "[yellow]Tip: Ensure your token has the required permissions and hasn't expired.[/yellow]"
             )
             raise typer.Exit(code=1)
 
@@ -1376,11 +1380,11 @@ def login(
 
         if "expired" in error_msg.lower():
             console.print(
-                f"[yellow]Tip: Your access token appears to have expired. Please generate a new one.[/yellow]"
+                "[yellow]Tip: Your access token appears to have expired. Please generate a new one.[/yellow]"
             )
         elif "access denied" in error_msg.lower():
             console.print(
-                f"[yellow]Tip: Check that your token has the required permissions for repository access.[/yellow]"
+                "[yellow]Tip: Check that your token has the required permissions for repository access.[/yellow]"
             )
         raise typer.Exit(code=1)
 
@@ -1419,16 +1423,6 @@ def config(
       mgit config --remove old_config       # Remove provider
       mgit config --global                  # Show global settings
     """
-    from mgit.config.yaml_manager import (
-        detect_provider_type,
-        get_default_provider_name,
-        get_global_config,
-        get_provider_config,
-        list_provider_names,
-        remove_provider_config,
-        set_default_provider,
-    )
-
     # List all providers
     if list_providers:
         providers = list_provider_names()
@@ -1588,25 +1582,34 @@ def status_command(
         "table", "--output", "-o", help="Output format (table, json)."
     ),
     show_clean: bool = typer.Option(
-        False, "--show-clean", "--all", help="Show all repositories, not just those with changes."
+        False,
+        "--show-clean",
+        "--all",
+        help="Show all repositories, not just those with changes.",
     ),
     fetch: bool = typer.Option(
         False, "--fetch", help="Run 'git fetch' before checking status."
     ),
     fail_on_dirty: bool = typer.Option(
-        False, "--fail-on-dirty", help="Exit with an error code if any repository has changes."
+        False,
+        "--fail-on-dirty",
+        help="Exit with an error code if any repository has changes.",
     ),
 ):
     """
     Get a high-performance status report for all Git repositories within a directory.
     """
+
     async def do_status():
         try:
             results = await get_repository_statuses(path, concurrency, fetch)
+            logger.info(f"Got {len(results)} results, displaying in {output} format.")
             display_status_results(results, output, show_clean)
-            if fail_on_dirty:
-                if any(not r.is_clean for r in results):
-                    raise typer.Exit(code=1)
+            if fail_on_dirty and any(not r.is_clean for r in results):
+                raise typer.Exit(code=1)
+        except MgitError:
+            if any(not r.is_clean for r in results):
+                raise typer.Exit(code=1)
         except MgitError as e:
             console.print(f"[red]Error: {e}[/red]")
             raise typer.Exit(1)
