@@ -329,9 +329,10 @@ def sample_config() -> Dict[str, Any]:
     return {
         "providers": {
             "azure_devops": {
-                "org_url": "https://dev.azure.com/test-org",
-                "pat": "test-pat-token",
-                "default_project": "test-project",
+                "url": "https://dev.azure.com/test-org",
+                "user": "test-user",
+                "token": "test-pat-token",
+                "workspace": "test-project",
             }
         },
         "git": {"default_branch": "main", "fetch_depth": 1},

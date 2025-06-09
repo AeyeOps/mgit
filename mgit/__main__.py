@@ -36,7 +36,7 @@ from mgit.config.yaml_manager import (
 )
 from mgit.exceptions import MgitError
 from mgit.git import GitManager, sanitize_repo_name
-from mgit.providers.manager_v2 import ProviderManager
+from mgit.providers.manager import ProviderManager
 
 # Suppress the specific UserWarning from PyInstaller's bootloader
 warnings.filterwarnings(
@@ -1034,7 +1034,7 @@ def _find_existing_azdevops_config(organization: str) -> Optional[str]:
                 provider_type = detect_provider_type(name)
                 if provider_type == "azuredevops":
                     # Compare organization URLs (normalize them)
-                    config_org = config.get("org_url", "").rstrip("/")
+                    config_org = config.get("url", "").rstrip("/")
                     input_org = organization.rstrip("/")
 
                     if config_org == input_org:
@@ -1083,7 +1083,7 @@ def _find_existing_bitbucket_config(username: str) -> Optional[str]:
                 provider_type = detect_provider_type(name)
                 if provider_type == "bitbucket":
                     # Compare usernames
-                    config_username = config.get("username", "")
+                    config_username = config.get("user", "")
                     if config_username == username:
                         return name
             except Exception:
@@ -1249,7 +1249,13 @@ def login(
         if not token:
             token = typer.prompt("Enter Personal Access Token (PAT)", hide_input=True)
 
-        provider_config = {"org_url": organization, "pat": token}
+        # Use unified field structure
+        provider_config = {
+            "url": organization,
+            "user": "azure",  # Azure DevOps doesn't require username
+            "token": token,
+            "provider_type": "azuredevops"
+        }
 
     elif provider_type == "github":
         # Check for existing GitHub configurations
@@ -1288,7 +1294,18 @@ def login(
 
         if not token:
             token = typer.prompt("Enter GitHub token", hide_input=True)
-        provider_config = {"token": token}
+        
+        # Prompt for username if not provided via --org
+        if not organization:
+            organization = typer.prompt("Enter GitHub username or organization")
+            
+        # Use unified field structure
+        provider_config = {
+            "url": "https://github.com",
+            "user": organization,
+            "token": token,
+            "provider_type": "github"
+        }
 
     elif provider_type == "bitbucket":
         if not organization:
@@ -1329,7 +1346,21 @@ def login(
 
         if not token:
             token = typer.prompt("Enter BitBucket app password", hide_input=True)
-        provider_config = {"username": organization, "app_password": token}
+            
+        # Optionally prompt for workspace
+        workspace = typer.prompt("Enter BitBucket workspace (optional, press Enter to skip)", default="")
+        
+        # Use unified field structure
+        provider_config = {
+            "url": "https://bitbucket.org",
+            "user": organization,
+            "token": token,
+            "provider_type": "bitbucket"
+        }
+        
+        # Add workspace if provided
+        if workspace:
+            provider_config["workspace"] = workspace
     else:
         console.print(f"[red]✗[/red] Unknown provider type: {provider_type}")
         raise typer.Exit(code=1)
