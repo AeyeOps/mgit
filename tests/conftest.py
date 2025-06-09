@@ -34,14 +34,18 @@ def configure_git_for_tests():
     Configure Git globally for all tests.
     This runs once per test session.
     """
-    import subprocess
     import os
-    
+    import subprocess
+
     # Set Git config for tests
     subprocess.run(["git", "config", "--global", "user.name", "Test User"], check=False)
-    subprocess.run(["git", "config", "--global", "user.email", "test@mgit.dev"], check=False)
-    subprocess.run(["git", "config", "--global", "init.defaultBranch", "main"], check=False)
-    
+    subprocess.run(
+        ["git", "config", "--global", "user.email", "test@mgit.dev"], check=False
+    )
+    subprocess.run(
+        ["git", "config", "--global", "init.defaultBranch", "main"], check=False
+    )
+
     # Also set environment variables
     os.environ["GIT_AUTHOR_NAME"] = "Test User"
     os.environ["GIT_AUTHOR_EMAIL"] = "test@mgit.dev"

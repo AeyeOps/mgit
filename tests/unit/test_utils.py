@@ -160,11 +160,11 @@ class TestPathUtilities:
 
         resolved = (base / relative).resolve()
         resolved_str = str(resolved)
-        
+
         # Handle macOS /System/Volumes/Data prefix
         if resolved_str.startswith("/System/Volumes/Data"):
             resolved_str = resolved_str.replace("/System/Volumes/Data", "")
-        
+
         assert resolved_str == "/home/user/documents/file.txt"
 
     def test_path_normalization(self):
