@@ -46,7 +46,10 @@ class ConfigurationManager:
         """Load configuration from YAML file."""
         if not CONFIG_FILE.exists():
             logger.debug(f"Config file not found: {CONFIG_FILE}")
-            self._raw_config_cache = self._yaml.map({"providers": {}, "global": {}})
+            # Create empty CommentedMap
+            self._raw_config_cache = self._yaml.map()
+            self._raw_config_cache["providers"] = self._yaml.map()
+            self._raw_config_cache["global"] = self._yaml.map()
             return {"providers": {}, "global": {}}
 
         try:
@@ -81,7 +84,10 @@ class ConfigurationManager:
 
         except Exception as e:
             logger.error(f"Failed to load config: {e}")
-            self._raw_config_cache = self._yaml.map({"providers": {}, "global": {}})
+            # Create empty CommentedMap on error
+            self._raw_config_cache = self._yaml.map()
+            self._raw_config_cache["providers"] = self._yaml.map()
+            self._raw_config_cache["global"] = self._yaml.map()
             return {"providers": {}, "global": {}}
 
     def load_config(self, force_reload: bool = False) -> Dict[str, Any]:
