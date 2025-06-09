@@ -344,7 +344,7 @@ def migrate_from_dotenv() -> bool:
     # Load current YAML config if exists
     current_config = config_manager.load_config()
 
-    # Map old dotenv keys to new YAML structure
+    # Map old dotenv keys to unified YAML structure
     migrations = {
         # Global settings
         "LOG_FILENAME": ("global", "log_filename"),
@@ -352,16 +352,17 @@ def migrate_from_dotenv() -> bool:
         "CON_LEVEL": ("global", "console_level"),
         "DEFAULT_CONCURRENCY": ("global", "default_concurrency"),
         "DEFAULT_UPDATE_MODE": ("global", "default_update_mode"),
-        # Azure DevOps settings
-        "AZURE_DEVOPS_ORG_URL": ("provider", "azuredevops", "org_url"),
-        "AZURE_DEVOPS_EXT_PAT": ("provider", "azuredevops", "pat"),
-        # GitHub settings
-        "GITHUB_ORG_URL": ("provider", "github", "org_url"),
+        # Azure DevOps settings (map to unified fields)
+        "AZURE_DEVOPS_ORG_URL": ("provider", "azuredevops", "url"),
+        "AZURE_DEVOPS_EXT_PAT": ("provider", "azuredevops", "token"),
+        # GitHub settings (map to unified fields)
+        "GITHUB_ORG_URL": ("provider", "github", "url"),
         "GITHUB_PAT": ("provider", "github", "token"),
-        # BitBucket settings
-        "BITBUCKET_ORG_URL": ("provider", "bitbucket", "org_url"),
-        "BITBUCKET_APP_PASSWORD": ("provider", "bitbucket", "app_password"),
-        "BITBUCKET_USERNAME": ("provider", "bitbucket", "username"),
+        # BitBucket settings (map to unified fields)
+        "BITBUCKET_ORG_URL": ("provider", "bitbucket", "url"),
+        "BITBUCKET_APP_PASSWORD": ("provider", "bitbucket", "token"),
+        "BITBUCKET_USERNAME": ("provider", "bitbucket", "user"),
+        "BITBUCKET_WORKSPACE": ("provider", "bitbucket", "workspace"),
     }
 
     # Apply migrations

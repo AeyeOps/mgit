@@ -43,7 +43,7 @@ class BitBucketProvider(GitProvider):
     """
 
     PROVIDER_NAME = "bitbucket"
-    SUPPORTED_AUTH_METHODS = [AuthMethod.APP_PASSWORD, AuthMethod.OAUTH]
+    SUPPORTED_AUTH_METHODS = [AuthMethod.APP_PASSWORD]
     DEFAULT_API_VERSION = "2.0"  # BitBucket API version
 
     # BitBucket URL patterns
@@ -58,24 +58,22 @@ class BitBucketProvider(GitProvider):
         """Initialize BitBucket provider.
 
         Args:
-            config: Configuration dictionary with:
-                - base_url: BitBucket API base URL (default: https://api.bitbucket.org/2.0)
-                - auth_method: Authentication method (app_password or oauth)
-                - username: BitBucket username (if auth_method is app_password)
-                - app_password: App password (if auth_method is app_password)
-                - oauth_token: OAuth token (if auth_method is oauth)
-                - api_version: BitBucket API version (optional)
+            config: Configuration dictionary with unified fields:
+                - url: BitBucket API base URL (e.g., https://api.bitbucket.org/2.0)
+                - user: BitBucket username
+                - token: App password or OAuth token
+                - workspace: BitBucket workspace slug
         """
         # Security components
         self._validator = SecurityValidator()
         self._monitor = get_security_monitor()
 
-        self.base_url = config.get("base_url", "https://api.bitbucket.org/2.0")
-        self.auth_method = config.get("auth_method", "app_password")
-        self.username = config.get("username", "")
-        self.app_password = config.get("app_password", "")
+        self.url = config.get("url", "https://api.bitbucket.org/2.0")
+        self.user = config.get("user", "")
+        self.token = config.get("token", "")
         self.workspace = config.get("workspace", "")
-        self.oauth_token = config.get("oauth_token", "")
+        # Default to app_password auth method for unified structure
+        self.auth_method = "app_password"
         self._session: Optional[aiohttp.ClientSession] = None
         self.logger = SecurityLogger(__name__)
         self._rate_limit_info: Optional[Dict[str, Any]] = None
@@ -98,36 +96,29 @@ class BitBucketProvider(GitProvider):
             )
             raise ConfigurationError("Invalid BitBucket workspace name format")
 
-        # Validate base URL
-        if not self._validator.validate_url(self.base_url):
+        # Validate URL
+        if not self._validator.validate_url(self.url):
             raise ConfigurationError(
-                f"Invalid or insecure base_url: {mask_sensitive_data(self.base_url)}"
+                f"Invalid or insecure URL: {mask_sensitive_data(self.url)}"
             )
 
-        if self.auth_method == "app_password":
-            if not self.username:
-                raise ConfigurationError(
-                    "Username is required for app_password authentication"
-                )
-            if not self.app_password:
-                raise ConfigurationError(
-                    "App password is required for app_password authentication"
-                )
-            # Validate app password format
-            if not validate_bitbucket_app_password(self.app_password):
-                self._monitor.log_validation_failure(
-                    "bitbucket_app_password",
-                    mask_sensitive_data(self.app_password),
-                    "Invalid app password format",
-                )
-                raise ConfigurationError("Invalid BitBucket app password format")
-        elif self.auth_method == "oauth":
-            if not self.oauth_token:
-                raise ConfigurationError(
-                    "OAuth token is required for oauth authentication"
-                )
-        else:
-            raise ConfigurationError(f"Unsupported auth method: {self.auth_method}")
+        if not self.user:
+            raise ConfigurationError(
+                "BitBucket username is required"
+            )
+        if not self.token:
+            raise ConfigurationError(
+                "BitBucket token (app password) is required"
+            )
+        
+        # Validate token format
+        if not validate_bitbucket_app_password(self.token):
+            self._monitor.log_validation_failure(
+                "bitbucket_token",
+                mask_sensitive_data(self.token),
+                "Invalid token format",
+            )
+            raise ConfigurationError("Invalid BitBucket token format")
 
     async def _ensure_session(self) -> None:
         """Ensure we have a valid session for the current event loop."""
@@ -170,7 +161,7 @@ class BitBucketProvider(GitProvider):
             headers = self._get_auth_headers()
 
             async with self._session.get(
-                f"{self.base_url}/user", headers=headers
+                f"{self.url}/user", headers=headers
             ) as response:
                 if response.status == 200:
                     self._authenticated = True
@@ -229,7 +220,7 @@ class BitBucketProvider(GitProvider):
 
         await self._ensure_session()
         headers = self._get_auth_headers()
-        url = f"{self.base_url}/workspaces"
+        url = f"{self.url}/workspaces"
         organizations = []
 
         try:
@@ -293,7 +284,7 @@ class BitBucketProvider(GitProvider):
 
         await self._ensure_session()
         headers = self._get_auth_headers()
-        url = f"{self.base_url}/workspaces/{organization}/projects"
+        url = f"{self.url}/workspaces/{organization}/projects"
         projects = []
 
         try:
@@ -364,7 +355,7 @@ class BitBucketProvider(GitProvider):
 
         await self._ensure_session()
         headers = self._get_auth_headers()
-        url = f"{self.base_url}/repositories/{organization}"
+        url = f"{self.url}/repositories/{organization}"
 
         # Add query parameters for filters
         params = {}
@@ -429,7 +420,7 @@ class BitBucketProvider(GitProvider):
 
         await self._ensure_session()
         headers = self._get_auth_headers()
-        url = f"{self.base_url}/repositories/{organization}/{repository}"
+        url = f"{self.url}/repositories/{organization}/{repository}"
 
         try:
             async with self._session.get(url, headers=headers) as response:
@@ -467,23 +458,13 @@ class BitBucketProvider(GitProvider):
         """
         from urllib.parse import quote
 
-        if self.auth_method == "app_password":
-            # Extract repository path from clone URL
-            if repository.clone_url.startswith("https://bitbucket.org/"):
-                repo_path = repository.clone_url.replace("https://bitbucket.org/", "")
-                # URL encode credentials to handle special characters
-                encoded_username = quote(self.username, safe="")
-                encoded_password = quote(self.app_password, safe="")
-                return f"https://{encoded_username}:{encoded_password}@bitbucket.org/{repo_path}"
-        elif self.auth_method == "oauth":
-            # For OAuth, we'll use the token as username with x-oauth-basic as password
-            # This is a common pattern for OAuth tokens in git URLs
-            if repository.clone_url.startswith("https://bitbucket.org/"):
-                repo_path = repository.clone_url.replace("https://bitbucket.org/", "")
-                encoded_token = quote(self.oauth_token, safe="")
-                return (
-                    f"https://{encoded_token}:x-oauth-basic@bitbucket.org/{repo_path}"
-                )
+        # Extract repository path from clone URL
+        if repository.clone_url.startswith("https://bitbucket.org/"):
+            repo_path = repository.clone_url.replace("https://bitbucket.org/", "")
+            # URL encode credentials to handle special characters
+            encoded_username = quote(self.user, safe="")
+            encoded_token = quote(self.token, safe="")
+            return f"https://{encoded_username}:{encoded_token}@bitbucket.org/{repo_path}"
 
         # Fallback to original URL if we can't authenticate it
         return repository.clone_url
@@ -551,13 +532,10 @@ class BitBucketProvider(GitProvider):
         """Get authentication headers based on auth method."""
         headers = {"Accept": "application/json"}
 
-        if self.auth_method == "app_password":
-            # Basic authentication with username:app_password
-            credentials = f"{self.username}:{self.app_password}"
-            encoded_credentials = base64.b64encode(credentials.encode()).decode()
-            headers["Authorization"] = f"Basic {encoded_credentials}"
-        elif self.auth_method == "oauth":
-            headers["Authorization"] = f"Bearer {self.oauth_token}"
+        # Basic authentication with username:token
+        credentials = f"{self.user}:{self.token}"
+        encoded_credentials = base64.b64encode(credentials.encode()).decode()
+        headers["Authorization"] = f"Basic {encoded_credentials}"
 
         return headers
 
@@ -622,7 +600,7 @@ class BitBucketProvider(GitProvider):
 
         await self._ensure_session()
         headers = self._get_auth_headers()
-        url = f"{self.base_url}/workspaces/{workspace}/permissions"
+        url = f"{self.url}/workspaces/{workspace}/permissions"
 
         try:
             async with self._session.get(url, headers=headers) as response:
@@ -661,7 +639,7 @@ class BitBucketProvider(GitProvider):
 
         await self._ensure_session()
         headers = self._get_auth_headers()
-        url = f"{self.base_url}/repositories/{organization}/{repository}/refs/branches"
+        url = f"{self.url}/repositories/{organization}/{repository}/refs/branches"
         branches = []
 
         try:

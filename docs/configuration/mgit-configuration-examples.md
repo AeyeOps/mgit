@@ -45,15 +45,18 @@ chmod 600 ~/.config/mgit/config
 DEFAULT_CONCURRENCY=10
 DEFAULT_UPDATE_MODE=pull
 
-# Azure DevOps Configuration
+# DEPRECATED: This file shows legacy environment variable configuration.
+# Use 'mgit login' command and YAML configuration instead.
+
+# Azure DevOps Configuration (legacy)
 AZURE_DEVOPS_ORG_URL=https://dev.azure.com/myorg
 AZURE_DEVOPS_EXT_PAT=your-azure-devops-pat-here
 
-# GitHub Configuration
+# GitHub Configuration (legacy)
 GITHUB_PAT=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 GITHUB_ORG=myusername
 
-# BitBucket Configuration
+# BitBucket Configuration (legacy)
 BITBUCKET_WORKSPACE=myworkspace
 BITBUCKET_USERNAME=your-username
 BITBUCKET_APP_PASSWORD=your-app-password-here
@@ -66,59 +69,72 @@ CONSOLE_LEVEL=INFO
 
 ## Provider-Specific Configurations
 
-### Azure DevOps Configuration
+### Modern YAML Configuration
 
-```bash
-# ~/.config/mgit/config
-# Azure DevOps specific settings
+**Recommended approach**: Use `mgit login` to configure providers automatically.
 
-# Required settings
-AZURE_DEVOPS_ORG_URL=https://dev.azure.com/myorg
-AZURE_DEVOPS_EXT_PAT=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```yaml
+# ~/.config/mgit/config.yaml
+# Modern YAML configuration with unified fields
 
-# Optional settings
-AZUREDEVOPS_USERNAME=your-username
+global:
+  default_provider: work_ado
+  default_concurrency: 8
 
-# Note: Project-specific settings and clone options are handled via command-line arguments
+providers:
+  work_ado:
+    url: https://dev.azure.com/myorg
+    user: ""                           # Not used for Azure DevOps PAT auth
+    token: your-azure-devops-pat
+    workspace: ""                      # Optional
+    
+  personal_gh:
+    url: https://api.github.com
+    user: your-github-username
+    token: ghp_your-github-token
+    workspace: ""                      # Optional organization
+    
+  team_bb:
+    url: https://api.bitbucket.org/2.0
+    user: your-bitbucket-username
+    token: your-bitbucket-app-password
+    workspace: your-workspace
 ```
 
-### GitHub Configuration
+### Legacy Environment Variables (Deprecated)
+
+**Note**: Environment variable configuration is deprecated. Use YAML configuration instead.
 
 ```bash
-# ~/.config/mgit/config
-# GitHub specific settings
+# Legacy Azure DevOps
+export AZURE_DEVOPS_ORG_URL="https://dev.azure.com/myorg"
+export AZURE_DEVOPS_EXT_PAT="your-pat-here"
 
-# Required settings
-GITHUB_PAT=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# Legacy GitHub
+export GITHUB_PAT="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+export GITHUB_ORG="myusername"
 
-# Optional settings
-GITHUB_ORG=AeyeOps
-GITHUB_USERNAME=your-username
-
-# For GitHub Enterprise (optional)
-GITHUB_ENTERPRISE_URL=https://github.company.com
-
-# Note: Organization-specific settings and clone options are handled via command-line arguments
+# Legacy BitBucket
+export BITBUCKET_USERNAME="myusername"
+export BITBUCKET_APP_PASSWORD="app-password-here"
+export BITBUCKET_WORKSPACE="myworkspace"
 ```
 
-### BitBucket Configuration
+### Unified Field Reference
 
-```bash
-# ~/.config/mgit/config
-# BitBucket specific settings
+All providers now use the same field structure:
 
-# Required settings
-BITBUCKET_USERNAME=myusername
-BITBUCKET_APP_PASSWORD=xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+| Field | Description | Azure DevOps | GitHub | BitBucket |
+|-------|-------------|--------------|--------|-----------|
+| `url` | API endpoint URL | `https://dev.azure.com/org` | `https://api.github.com` | `https://api.bitbucket.org/2.0` |
+| `user` | Username | Not used (empty string) | GitHub username | BitBucket username |
+| `token` | Authentication token | Personal Access Token | Personal Access Token | App Password |
+| `workspace` | Workspace/Org identifier | Optional | Optional organization | BitBucket workspace slug |
 
-# Optional settings
-BITBUCKET_WORKSPACE=myworkspace
-
-# For BitBucket Server (optional)
-BITBUCKET_SERVER_URL=https://bitbucket.company.com
-
-# Note: Workspace-specific settings and clone options are handled via command-line arguments
-```
+**Benefits of unified fields**:
+- Consistent configuration across all providers
+- Easier to understand and maintain
+- No provider-specific field names to remember
 
 ## Environment Variable Configuration
 
@@ -183,17 +199,29 @@ python -m mgit clone-all org ./repos --provider github
 ### Multiple Configuration Files
 
 ```bash
-# ~/.config/mgit/config.work
+# ~/.config/mgit/config.work.yaml
 # Work-specific configuration
-DEFAULT_CONCURRENCY=20
-AZURE_DEVOPS_ORG_URL=https://dev.azure.com/company
-AZURE_DEVOPS_EXT_PAT=work-pat-token
+global:
+  default_concurrency: 20
+  
+providers:
+  work_ado:
+    url: https://dev.azure.com/company
+    user: ""
+    token: work-pat-token
+    workspace: ""
 
-# ~/.config/mgit/config.personal
+# ~/.config/mgit/config.personal.yaml
 # Personal configuration
-DEFAULT_CONCURRENCY=5
-GITHUB_PAT=personal-github-token
-GITHUB_ORG=my-username
+global:
+  default_concurrency: 5
+  
+providers:
+  personal_gh:
+    url: https://api.github.com
+    user: my-username
+    token: personal-github-token
+    workspace: ""
 ```
 
 ```bash

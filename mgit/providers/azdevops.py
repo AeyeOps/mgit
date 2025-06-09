@@ -37,19 +37,29 @@ class AzureDevOpsProvider(GitProvider):
         """Initialize Azure DevOps provider.
 
         Args:
-            config: Configuration dictionary with keys:
-                - organization_url: Azure DevOps organization URL
-                - pat: Personal Access Token
+            config: Configuration dictionary with unified keys:
+                - url: Azure DevOps organization URL
+                - user: Username (not used for Azure DevOps PAT auth)
+                - token: Personal Access Token
+                - workspace: Optional workspace identifier
         """
         # Set instance attributes before calling super() which calls _validate_config
-        self.organization_url = config.get("organization_url", "")
-        self.pat = config.get("pat", "")
+        # Fail-fast: require these fields to be present (no fallbacks)
+        if "url" not in config:
+            raise ValueError("Missing required field: url")
+        if "token" not in config:
+            raise ValueError("Missing required field: token")
+            
+        self.url = config["url"]
+        self.user = config.get("user", "")  # Not used for PAT auth
+        self.token = config["token"]
+        self.workspace = config.get("workspace", "")
 
-        # Ensure URL is properly formatted
-        if self.organization_url and not self.organization_url.startswith(
-            ("http://", "https://")
-        ):
-            self.organization_url = f"https://{self.organization_url}"
+        # Ensure URL is properly formatted (fail-fast validation)
+        if not self.url:
+            raise ValueError("url cannot be empty")
+        if not self.url.startswith(("http://", "https://")):
+            self.url = f"https://{self.url}"
 
         # Azure DevOps SDK clients
         self.connection: Optional[Connection] = None
@@ -65,10 +75,10 @@ class AzureDevOpsProvider(GitProvider):
         Raises:
             ValueError: If configuration is invalid
         """
-        if not self.organization_url:
+        if not self.url:
             raise ValueError("Azure DevOps organization URL is required")
-        if not self.pat:
-            raise ValueError("Personal Access Token (PAT) is required")
+        if not self.token:
+            raise ValueError("Personal Access Token is required")
 
     async def authenticate(self) -> bool:
         """Authenticate with Azure DevOps.
@@ -81,9 +91,9 @@ class AzureDevOpsProvider(GitProvider):
 
         try:
             # Initialize connection
-            credentials = BasicAuthentication("", self.pat)
+            credentials = BasicAuthentication("", self.token)
             self.connection = Connection(
-                base_url=self.organization_url, creds=credentials
+                base_url=self.url, creds=credentials
             )
 
             # Get clients
@@ -95,7 +105,7 @@ class AzureDevOpsProvider(GitProvider):
 
             self._authenticated = True
             logger.debug(
-                "Azure DevOps authentication successful for %s", self.organization_url
+                "Azure DevOps authentication successful for %s", self.url
             )
             return True
 
@@ -147,7 +157,7 @@ class AzureDevOpsProvider(GitProvider):
             return []
 
         # Parse organization name from URL
-        parsed = urlparse(self.organization_url)
+        parsed = urlparse(self.url)
         org_name = (
             parsed.path.strip("/").split("/")[0] if parsed.path else parsed.hostname
         )
@@ -155,7 +165,7 @@ class AzureDevOpsProvider(GitProvider):
         return [
             Organization(
                 name=org_name,
-                url=self.organization_url,
+                url=self.url,
                 provider=self.PROVIDER_NAME,
                 metadata={},
             )
@@ -345,7 +355,7 @@ class AzureDevOpsProvider(GitProvider):
         Returns:
             Authenticated clone URL
         """
-        return embed_pat_in_url(repository.clone_url, self.pat)
+        return embed_pat_in_url(repository.clone_url, self.token)
 
     async def _get_project(
         self, project_name_or_id: str

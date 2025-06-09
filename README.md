@@ -303,15 +303,21 @@ global:
 
 providers:
   work_ado:
-    org_url: https://dev.azure.com/myorg    # Note: 'org_url' not 'organization_url'
-    pat: your-azure-devops-pat
+    url: https://dev.azure.com/myorg
+    user: ""                                # Not used for Azure DevOps PAT auth
+    token: your-azure-devops-pat
+    workspace: ""                           # Optional workspace identifier
     
   personal_gh:
-    token: ghp_your-github-token            # Note: 'token' not 'pat' for GitHub
+    url: https://api.github.com
+    user: your-github-username
+    token: ghp_your-github-token
+    workspace: ""                           # Optional organization/workspace
     
   team_bb:
-    username: myusername
-    app_password: your-bitbucket-app-password
+    url: https://api.bitbucket.org/2.0
+    user: myusername
+    token: your-bitbucket-app-password
     workspace: myworkspace
 ```
 
