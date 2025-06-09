@@ -210,15 +210,30 @@ jobs:
     - name: Install dependencies
       run: poetry install --with dev
     
-    - name: Configure Git for tests
+    - name: Configure Git for tests (Unix)
+      if: runner.os != 'Windows'
       run: |
         git config --global user.name "CI Bot"
         git config --global user.email "ci-bot@mgit.dev"
+        git config --global init.defaultBranch main
         # Also set as environment variables for subprocess calls
         echo "GIT_AUTHOR_NAME=CI Bot" >> $GITHUB_ENV
         echo "GIT_AUTHOR_EMAIL=ci-bot@mgit.dev" >> $GITHUB_ENV
         echo "GIT_COMMITTER_NAME=CI Bot" >> $GITHUB_ENV
         echo "GIT_COMMITTER_EMAIL=ci-bot@mgit.dev" >> $GITHUB_ENV
+    
+    - name: Configure Git for tests (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        git config --global user.name "CI Bot"
+        git config --global user.email "ci-bot@mgit.dev"
+        git config --global init.defaultBranch main
+        # Also set as environment variables for subprocess calls
+        echo "GIT_AUTHOR_NAME=CI Bot" >> $env:GITHUB_ENV
+        echo "GIT_AUTHOR_EMAIL=ci-bot@mgit.dev" >> $env:GITHUB_ENV
+        echo "GIT_COMMITTER_NAME=CI Bot" >> $env:GITHUB_ENV
+        echo "GIT_COMMITTER_EMAIL=ci-bot@mgit.dev" >> $env:GITHUB_ENV
         
     - name: Verify installation
       run: |
