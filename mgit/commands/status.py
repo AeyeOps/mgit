@@ -7,8 +7,7 @@ import asyncio
 import json
 import logging
 import re
-import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
@@ -70,9 +69,7 @@ async def _get_single_repo_status(repo_path: Path, fetch: bool) -> RepositorySta
             )
 
         raw_output = stdout.decode("utf-8", errors="ignore")
-        return _parse_status_output(
-            repo_path, raw_output
-        )
+        return _parse_status_output(repo_path, raw_output)
     except Exception as e:
         return RepositoryStatus(path=repo_path, is_clean=False, error=str(e))
 
@@ -112,7 +109,7 @@ def _parse_status_output(repo_path: Path, output: str) -> RepositoryStatus:
                 # Check modified (worktree) status
                 if line[1] != " ":
                     status.modified_files += 1
-    
+
     if status.ahead_by > 0 or status.behind_by > 0:
         status.is_clean = False
 
@@ -123,6 +120,7 @@ async def get_repository_statuses(
     path: Path, concurrency: int, fetch: bool
 ) -> List[RepositoryStatus]:
     """Finds all git repos in a path and gets their status concurrently."""
+    logger.info(f"Getting statuses for repos in: {path}")
     repos_to_check = []
     # First, check if the root path itself is a repository
     if is_git_repository(path):
@@ -138,8 +136,9 @@ async def get_repository_statuses(
     if not repos_to_check:
         return []
 
-    executor = AsyncExecutor(concurrency=concurrency)
-    
+    # Pass the console to the executor to ensure progress bars go to stderr
+    executor = AsyncExecutor(concurrency=concurrency, rich_console=console)
+
     async def process_repo(repo_path: Path):
         return await _get_single_repo_status(repo_path, fetch)
 
@@ -148,14 +147,16 @@ async def get_repository_statuses(
         process_func=process_repo,
         task_description="Checking repository statuses...",
     )
-    
+
     # Process errors into status objects
     for repo_path, error in errors:
-        results.append(RepositoryStatus(path=repo_path, is_clean=False, error=str(error)))
+        results.append(
+            RepositoryStatus(path=repo_path, is_clean=False, error=str(error))
+        )
 
     # Filter out None results if any and sort by path
     final_results = sorted([r for r in results if r], key=lambda r: r.path)
-    
+
     return final_results
 
 
@@ -163,11 +164,16 @@ def display_status_results(
     results: List[RepositoryStatus], output_format: str, show_clean: bool
 ):
     """Displays the status results in the specified format."""
+    logger.info(f"Entering display_status_results with {len(results)} results.")
+    logger.debug(f"Displaying {len(results)} status results in {output_format} format.")
     if not show_clean:
         results = [r for r in results if not r.is_clean]
 
     if not results:
-        console.print("[green]✓ All repositories are clean.[/green]")
+        if output_format == "json":
+            console.print("[]")
+        else:
+            console.print("[green]✓ All repositories are clean.[/green]")
         return
 
     if output_format == "json":
@@ -188,9 +194,9 @@ def display_status_results(
         ]
         console.print(json.dumps(json_output, indent=2))
     else:
-        table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("Repository", style="cyan", no_wrap=True)
-        table.add_column("Branch")
+        table = Table(show_header=True, header_style="bold magenta", expand=True)
+        table.add_column("Repository", style="cyan", max_width=50, overflow="fold")
+        table.add_column("Branch", style="yellow")
         table.add_column("Status")
 
         for r in results:
@@ -205,11 +211,15 @@ def display_status_results(
                 if r.behind_by:
                     status_parts.append(f"[bold red]Behind ({r.behind_by})[/bold red]")
                 if r.modified_files:
-                    status_parts.append(f"[yellow]Modified ({r.modified_files})[/yellow]")
+                    status_parts.append(
+                        f"[yellow]Modified ({r.modified_files})[/yellow]"
+                    )
                 if r.staged_files:
                     status_parts.append(f"[cyan]Staged ({r.staged_files})[/cyan]")
                 if r.untracked_files:
-                    status_parts.append(f"[magenta]Untracked ({r.untracked_files})[/magenta]")
+                    status_parts.append(
+                        f"[magenta]Untracked ({r.untracked_files})[/magenta]"
+                    )
 
             status_str = ", ".join(status_parts)
             table.add_row(str(r.path), r.branch_name, status_str)

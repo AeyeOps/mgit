@@ -12,6 +12,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple, TypeVar, Union
 
+from rich.console import Console
 from rich.progress import Progress, TaskID
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,10 @@ class AsyncExecutor:
     """
 
     def __init__(
-        self, concurrency: int = 4, mode: ExecutionMode = ExecutionMode.CONCURRENT
+        self,
+        concurrency: int = 4,
+        mode: ExecutionMode = ExecutionMode.CONCURRENT,
+        rich_console: Optional[Console] = None,
     ):
         """
         Initialize the AsyncExecutor.
@@ -62,12 +66,14 @@ class AsyncExecutor:
         Args:
             concurrency: Maximum number of concurrent operations (for CONCURRENT mode)
             mode: Execution mode (CONCURRENT or SEQUENTIAL)
+            rich_console: Optional Rich Console to use for progress bars
         """
         self.concurrency = concurrency
         self.mode = mode
         self.semaphore = (
             asyncio.Semaphore(concurrency) if mode == ExecutionMode.CONCURRENT else None
         )
+        self.console = rich_console or Console(stderr=True)
 
     async def run_batch(
         self,
@@ -133,7 +139,7 @@ class AsyncExecutor:
                     )
         else:
             # Run with progress tracking
-            with Progress() as progress:
+            with Progress(console=self.console) as progress:
                 overall_task = progress.add_task(task_description, total=len(items))
 
                 # Create individual task tracking

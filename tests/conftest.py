@@ -5,7 +5,6 @@ This module contains fixtures that are available to all tests in the test suite.
 """
 
 import asyncio
-import json
 import shutil
 import tempfile
 from pathlib import Path
@@ -14,6 +13,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from typer.testing import CliRunner
+
+from mgit.providers.base import Repository
 
 # --- Pytest Configuration ---
 
@@ -62,17 +63,17 @@ def temp_home_dir(temp_dir: Path, monkeypatch) -> Path:
 @pytest.fixture
 def config_dir(temp_home_dir: Path) -> Path:
     """
-    Create a temporary .mgit configuration directory.
+    Create a temporary .config/mgit configuration directory.
 
     Args:
         temp_home_dir: The temporary home directory fixture.
 
     Returns:
-        Path: Path to the .mgit directory.
+        Path: Path to the .config/mgit directory.
     """
-    mgit_dir = temp_home_dir / ".mgit"
-    mgit_dir.mkdir(exist_ok=True)
-    return mgit_dir
+    config_dir = temp_home_dir / ".config" / "mgit"
+    config_dir.mkdir(exist_ok=True, parents=True)
+    return config_dir
 
 
 # --- Git Repository Fixtures ---
@@ -175,9 +176,6 @@ def mock_azure_client():
     client.get_core_client.return_value = core_client
 
     return client
-
-
-from mgit.providers.base import Repository
 
 
 @pytest.fixture
@@ -304,10 +302,12 @@ def sample_config() -> Dict[str, Any]:
         Dict: Sample configuration data.
     """
     return {
-        "azure_devops": {
-            "organization": "https://dev.azure.com/test-org",
-            "pat": "test-pat-token",
-            "default_project": "test-project",
+        "providers": {
+            "azure_devops": {
+                "org_url": "https://dev.azure.com/test-org",
+                "pat": "test-pat-token",
+                "default_project": "test-project",
+            }
         },
         "git": {"default_branch": "main", "fetch_depth": 1},
         "concurrency": {"max_workers": 5, "timeout": 300},
@@ -326,8 +326,12 @@ def config_file(config_dir: Path, sample_config: Dict[str, Any]) -> Path:
     Returns:
         Path: Path to the configuration file.
     """
-    config_path = config_dir / "config.json"
-    config_path.write_text(json.dumps(sample_config, indent=2))
+    from ruamel.yaml import YAML
+
+    yaml = YAML()
+    config_path = config_dir / "config.yaml"
+    with open(config_path, "w") as f:
+        yaml.dump(sample_config, f)
     return config_path
 
 
