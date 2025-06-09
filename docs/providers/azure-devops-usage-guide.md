@@ -40,36 +40,40 @@ This guide provides step-by-step instructions for using mgit with Azure DevOps, 
 
 ```bash
 # Login to Azure DevOps
-mgit login --provider azdevops --org https://dev.azure.com/myorg --token YOUR_PAT_HERE
+mgit login --provider azuredevops --name work_ado
+# Enter URL: https://dev.azure.com/myorg
+# Enter token when prompted
 
 # Verify configuration
-mgit config --show
+mgit config --show work_ado
 ```
 
-### Method 2: Using configuration file
+### Method 2: Manual YAML configuration
 
-Create or edit `~/.config/mgit/config`:
+Edit `~/.config/mgit/config.yaml`:
 
-```bash
-# Azure DevOps configuration
-AZURE_DEVOPS_ORG_URL=https://dev.azure.com/myorg
-AZURE_DEVOPS_EXT_PAT=YOUR_PAT_HERE
+```yaml
+# Modern unified configuration
+global:
+  default_concurrency: 10
+  default_update_mode: pull
 
-# Optional: Set defaults
-DEFAULT_CONCURRENCY=10
-DEFAULT_UPDATE_MODE=pull
+providers:
+  work_ado:
+    url: https://dev.azure.com/myorg
+    user: ""                           # Not used for Azure DevOps PAT auth
+    token: YOUR_PAT_HERE
+    workspace: ""                      # Optional
 ```
 
-### Method 3: Using environment variables
+### Method 3: Legacy environment variables (Deprecated)
+
+**Note**: Environment variables are deprecated. Use YAML configuration instead.
 
 ```bash
-# Set environment variables
+# Legacy environment variables (still supported but not recommended)
 export AZURE_DEVOPS_ORG_URL="https://dev.azure.com/myorg"
 export AZURE_DEVOPS_EXT_PAT="YOUR_PAT_HERE"
-
-# Optional: Set defaults
-export DEFAULT_CONCURRENCY="10"
-export DEFAULT_UPDATE_MODE="pull"
 ```
 
 ## Common Commands
@@ -79,32 +83,33 @@ To see what repositories are available in a project, you'll need to use the Azur
 
 ### Clone all repositories from a project
 ```bash
-# Clone all repos from a project
-mgit clone-all --provider azdevops --project "MyProject" --destination ./repos
+# Clone all repos from a project using named configuration
+mgit clone-all "myorg/MyProject/*" ./repos --config work_ado
 
-# With concurrency control (default is 5)
-mgit clone-all --provider azdevops --project "DataPlatform" --destination ./data-platform-repos --concurrency 10
+# With concurrency control
+mgit clone-all "myorg/DataPlatform/*" ./data-platform-repos --config work_ado --concurrency 10
 
-# Clone and update existing repos
-mgit clone-all --provider azdevops --project "MyProject" --destination ./repos --update-mode merge
+# Clone with pattern matching
+mgit clone-all "myorg/MyProject/*-service" ./repos --config work_ado
 ```
 
 ### Update all repositories
 ```bash
 # Pull latest changes for all repos
-mgit pull-all --provider azdevops --project "MyProject" --path ./repos
+mgit pull-all "MyProject" ./repos --config work_ado
 
 # With specific update strategy
-mgit pull-all --provider azdevops --project "DataPlatform" --path ./data-platform-repos --strategy rebase
+mgit pull-all "DataPlatform" ./data-platform-repos --config work_ado --strategy rebase
 ```
 
 ### Filter repositories
 ```bash
 # Clone only repos matching a pattern
-mgit clone-all --provider azdevops --project "MyProject" --destination ./repos --filter "*-service"
+mgit clone-all "myorg/MyProject/*-service" ./repos --config work_ado
 
-# Clone repos with multiple filters
-mgit clone-all --provider azdevops --project "MyProject" --destination ./repos --filter "api-*" --filter "*-frontend"
+# Use pattern matching for multiple filters
+mgit clone-all "myorg/MyProject/api-*" ./repos --config work_ado
+mgit clone-all "myorg/MyProject/*-frontend" ./repos --config work_ado
 ```
 
 ## Project-Based Repository Management

@@ -59,28 +59,25 @@ class GitHubProvider(GitProvider):
         """Initialize GitHub provider.
 
         Args:
-            config: Configuration dictionary with:
-                - base_url: GitHub API base URL (default: https://api.github.com)
-                - auth_method: Authentication method (pat or oauth)
-                - pat: Personal access token (if auth_method is pat)
-                - oauth_token: OAuth token (if auth_method is oauth)
-                - api_version: GitHub API version (optional)
+            config: Configuration dictionary with unified fields:
+                - url: GitHub API base URL (e.g., https://api.github.com)
+                - user: GitHub username
+                - token: Personal access token or OAuth token
+                - workspace: Optional workspace/organization name
         """
         # Security components
         self._validator = SecurityValidator()
         self._monitor = get_security_monitor()
 
         # Set attributes before calling super().__init__ which calls _validate_config
-        self.base_url = config.get("base_url", "https://api.github.com")
-        auth_method = config.get("auth_method", "pat")
-        # Map enum values to expected strings
-        if auth_method == "personal_access_token":
-            auth_method = "pat"
-        elif auth_method == "oauth_token":
-            auth_method = "oauth"
-        self.auth_method = auth_method
-        self.pat = config.get("pat", "")
-        self.oauth_token = config.get("oauth_token", "")
+        # Fail-fast: require unified fields to be present
+        if "token" not in config:
+            raise ValueError("Missing required field: token")
+            
+        self.url = config.get("url", "https://api.github.com")
+        self.user = config.get("user", "")
+        self.token = config["token"]
+        self.workspace = config.get("workspace", "")
         self.api_version = config.get("api_version", self.DEFAULT_API_VERSION)
 
         # HTTP session for API calls
@@ -96,38 +93,28 @@ class GitHubProvider(GitProvider):
         Raises:
             ConfigurationError: If configuration is invalid
         """
-        if not self.base_url:
-            raise ConfigurationError("GitHub base_url is required", self.PROVIDER_NAME)
+        if not self.url:
+            raise ConfigurationError("GitHub URL is required", self.PROVIDER_NAME)
 
         # Validate URL format and security
-        if not self._validator.validate_url(self.base_url):
+        if not self._validator.validate_url(self.url):
             raise ConfigurationError(
-                f"Invalid or insecure base_url: {mask_sensitive_data(self.base_url)}",
+                f"Invalid or insecure URL: {mask_sensitive_data(self.url)}",
                 self.PROVIDER_NAME,
             )
 
-        if self.auth_method == "pat":
-            if not self.pat:
-                raise ConfigurationError(
-                    "GitHub PAT is required for PAT authentication", self.PROVIDER_NAME
-                )
-            # Validate PAT format
-            if not validate_github_pat(self.pat):
-                self._monitor.log_validation_failure(
-                    "github_pat", mask_sensitive_data(self.pat), "Invalid PAT format"
-                )
-                raise ConfigurationError(
-                    "Invalid GitHub PAT format", self.PROVIDER_NAME
-                )
-        elif self.auth_method == "oauth":
-            if not self.oauth_token:
-                raise ConfigurationError(
-                    "OAuth token is required for OAuth authentication",
-                    self.PROVIDER_NAME,
-                )
-        else:
+        if not self.token:
             raise ConfigurationError(
-                f"Unsupported auth method: {self.auth_method}", self.PROVIDER_NAME
+                "GitHub token is required", self.PROVIDER_NAME
+            )
+            
+        # Validate token format
+        if not validate_github_pat(self.token):
+            self._monitor.log_validation_failure(
+                "github_token", mask_sensitive_data(self.token), "Invalid token format"
+            )
+            raise ConfigurationError(
+                "Invalid GitHub token format", self.PROVIDER_NAME
             )
 
     async def _ensure_session(self) -> None:
@@ -164,29 +151,21 @@ class GitHubProvider(GitProvider):
         if self._authenticated:
             return True
 
-        organization = self.base_url  # Use base_url as organization identifier
+        organization = self.url  # Use URL as organization identifier
 
         try:
             await self._ensure_session()
 
             # Set up authentication headers
-            if self.auth_method == "pat":
-                self._headers = {
-                    "Authorization": f"token {self.pat}",
-                    "Accept": "application/vnd.github.v3+json",
-                    "X-GitHub-Api-Version": self.api_version,
-                    "User-Agent": "mgit-client/1.0",
-                }
-            elif self.auth_method == "oauth":
-                self._headers = {
-                    "Authorization": f"Bearer {self.oauth_token}",
-                    "Accept": "application/vnd.github.v3+json",
-                    "X-GitHub-Api-Version": self.api_version,
-                    "User-Agent": "mgit-client/1.0",
-                }
+            self._headers = {
+                "Authorization": f"token {self.token}",
+                "Accept": "application/vnd.github.v3+json",
+                "X-GitHub-Api-Version": self.api_version,
+                "User-Agent": "mgit-client/1.0",
+            }
 
             # Test authentication with /user endpoint
-            url = f"{self.base_url}/user"
+            url = f"{self.url}/user"
             async with self._session.get(url, headers=self._headers) as response:
                 if response.status == 200:
                     user_data = await response.json()
@@ -303,7 +282,7 @@ class GitHubProvider(GitProvider):
                 return False
 
             # Test connection with rate_limit endpoint (doesn't require auth)
-            url = f"{self.base_url}/rate_limit"
+            url = f"{self.url}/rate_limit"
             async with self._session.get(url, headers=self._headers) as response:
                 if response.status == 200:
                     rate_limit_data = await response.json()
@@ -349,7 +328,7 @@ class GitHubProvider(GitProvider):
 
         try:
             # Get user's organizations
-            url = f"{self.base_url}/user/orgs"
+            url = f"{self.url}/user/orgs"
             async with self._session.get(url, headers=self._headers) as response:
                 if response.status == 200:
                     orgs_data = await response.json()
@@ -376,7 +355,7 @@ class GitHubProvider(GitProvider):
                     )
 
             # Get user info to include personal namespace
-            url = f"{self.base_url}/user"
+            url = f"{self.url}/user"
             async with self._session.get(url, headers=self._headers) as response:
                 if response.status == 200:
                     user_data = await response.json()
@@ -448,7 +427,7 @@ class GitHubProvider(GitProvider):
         await self._ensure_session()
         try:
             # Build URL and query parameters
-            url = f"{self.base_url}/orgs/{organization}/repos"
+            url = f"{self.url}/orgs/{organization}/repos"
             params = {"per_page": 100, "page": 1}
 
             # Apply filters
@@ -503,7 +482,7 @@ class GitHubProvider(GitProvider):
                     elif response.status == 404:
                         # Try user repos endpoint instead
                         if "/orgs/" in url:
-                            url = f"{self.base_url}/users/{organization}/repos"
+                            url = f"{self.url}/users/{organization}/repos"
                             continue
                         else:
                             logger.error(
@@ -561,7 +540,7 @@ class GitHubProvider(GitProvider):
             return None
 
         try:
-            url = f"{self.base_url}/repos/{organization}/{repository}"
+            url = f"{self.url}/repos/{organization}/{repository}"
             async with self._session.get(url, headers=self._headers) as response:
                 await self._check_rate_limit(response)
 
@@ -623,16 +602,10 @@ class GitHubProvider(GitProvider):
 
         # Convert HTTPS URL to authenticated format
         if clone_url.startswith("https://github.com/"):
-            if self.auth_method == "pat":
-                # Format: https://{token}@github.com/{owner}/{repo}.git
-                return clone_url.replace(
-                    "https://github.com/", f"https://{self.pat}@github.com/"
-                )
-            elif self.auth_method == "oauth":
-                # Format: https://{token}@github.com/{owner}/{repo}.git
-                return clone_url.replace(
-                    "https://github.com/", f"https://{self.oauth_token}@github.com/"
-                )
+            # Format: https://{token}@github.com/{owner}/{repo}.git
+            return clone_url.replace(
+                "https://github.com/", f"https://{self.token}@github.com/"
+            )
 
         # If not HTTPS or already authenticated, return as-is
         return clone_url
@@ -764,12 +737,12 @@ class GitHubProvider(GitProvider):
         Returns:
             GitHubProvider instance
         """
-        # Map common config keys to GitHub-specific format
+        # Map config to unified format
         github_config = {
-            "base_url": config.get("base_url", "https://api.github.com"),
-            "auth_method": config.get("auth_method", "pat"),
-            "pat": config.get("pat", config.get("GITHUB_PAT", "")),
-            "oauth_token": config.get("oauth_token", ""),
+            "url": config.get("url", "https://api.github.com"),
+            "user": config.get("user", ""),
+            "token": config.get("token", config.get("GITHUB_TOKEN", "")),
+            "workspace": config.get("workspace", ""),
             "api_version": config.get("api_version", cls.DEFAULT_API_VERSION),
         }
 
