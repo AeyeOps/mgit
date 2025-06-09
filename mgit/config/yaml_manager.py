@@ -144,28 +144,27 @@ class ConfigurationManager:
         return list(self.get_provider_configs().keys())
 
     def detect_provider_type(self, provider_name: str) -> str:
-        """Detect the provider type from configuration structure."""
+        """Detect the provider type from the URL."""
         config = self.get_provider_config(provider_name)
 
-        # Detect based on configuration keys (check both new and legacy field names)
-        if ("org_url" in config or "default_org_url" in config) and "pat" in config:
+        # Detect from URL - the only reliable way
+        if "url" not in config:
+            raise ValueError(
+                f"Missing 'url' field in provider '{provider_name}'. "
+                f"Available fields: {list(config.keys())}"
+            )
+            
+        url_lower = config["url"].lower()
+        if "dev.azure.com" in url_lower or "visualstudio.com" in url_lower:
             return "azuredevops"
-        elif "token" in config or "pat" in config:
+        elif "github.com" in url_lower:
             return "github"
-        elif "app_password" in config and ("username" in config or "default_username" in config):
+        elif "bitbucket.org" in url_lower:
             return "bitbucket"
         else:
-            # Try to infer from name
-            name_lower = provider_name.lower()
-            if "ado" in name_lower or "azure" in name_lower or "devops" in name_lower:
-                return "azuredevops"
-            elif "github" in name_lower or "gh" in name_lower:
-                return "github"
-            elif "bitbucket" in name_lower or "bb" in name_lower:
-                return "bitbucket"
-
             raise ValueError(
-                f"Cannot detect provider type for '{provider_name}'. Configuration keys: {list(config.keys())}"
+                f"Cannot detect provider type from URL '{config['url']}' for '{provider_name}'. "
+                f"URL must contain: dev.azure.com, visualstudio.com, github.com, or bitbucket.org"
             )
 
     def save_config(self, config: Dict[str, Any]) -> None:

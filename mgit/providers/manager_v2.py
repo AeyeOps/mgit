@@ -168,53 +168,30 @@ class ProviderManager:
         if not self._config:
             raise ConfigurationError("No configuration available")
 
-        # Map YAML field names to provider field names
-        if self._provider_type == "azuredevops":
-            # Handle legacy field names
-            if "default_org_url" in self._config and "org_url" not in self._config:
-                self._config["org_url"] = self._config["default_org_url"]
-            
-            required_yaml = ["org_url", "pat"]
-            # Map to provider expected field names
-            if "org_url" in self._config:
-                self._config["organization_url"] = self._config["org_url"]
-        elif self._provider_type == "github":
-            # Handle legacy field names
-            if "pat" in self._config and "token" not in self._config:
-                self._config["token"] = self._config["pat"]
-            if "default_owner" in self._config and "owner" not in self._config:
-                self._config["owner"] = self._config["default_owner"]
-                
-            required_yaml = ["token"]
-            # Map token to pat for GitHub provider
-            if "token" in self._config:
-                self._config["pat"] = self._config["token"]
-                # Also set base_url if not present
-                if "base_url" not in self._config:
-                    self._config["base_url"] = "https://api.github.com"
-        elif self._provider_type == "bitbucket":
-            # Handle legacy field names
-            if "default_username" in self._config and "username" not in self._config:
-                self._config["username"] = self._config["default_username"]
-            if "default_workspace" in self._config and "workspace" not in self._config:
-                self._config["workspace"] = self._config["default_workspace"]
-                
-            required_yaml = ["username", "app_password"]
-            # Map fields for BitBucket
-            if "workspace" in self._config and "default_workspace" not in self._config:
-                self._config["default_workspace"] = self._config["workspace"]
-            # Set default base_url if not present
-            if "base_url" not in self._config:
-                self._config["base_url"] = "https://api.bitbucket.org/2.0"
-        else:
-            raise ConfigurationError(f"Unknown provider type: {self._provider_type}")
-
-        missing = [field for field in required_yaml if not self._config.get(field)]
+        # Validate unified fields exist
+        required_unified = ["url", "user", "token"]
+        missing = [field for field in required_unified if field not in self._config]
         if missing:
             raise ConfigurationError(
-                f"Missing required fields for {self._provider_type}: {missing}. "
-                f"Available fields: {list(self._config.keys())}"
+                f"Missing required unified fields: {missing}. "
+                f"All providers must have: url, user, token, workspace (optional)"
             )
+        
+        # Map unified field names to provider-specific field names
+        if self._provider_type == "azuredevops":
+            self._config["organization_url"] = self._config["url"]
+            self._config["pat"] = self._config["token"]
+            
+        elif self._provider_type == "github":
+            self._config["pat"] = self._config["token"]
+            self._config["base_url"] = "https://api.github.com"
+                
+        elif self._provider_type == "bitbucket":
+            self._config["username"] = self._config["user"]
+            self._config["app_password"] = self._config["token"]
+            self._config["base_url"] = "https://api.bitbucket.org/2.0"
+        else:
+            raise ConfigurationError(f"Unknown provider type: {self._provider_type}")
 
     async def test_connection_async(self) -> bool:
         """Test provider connection and authentication (async).
