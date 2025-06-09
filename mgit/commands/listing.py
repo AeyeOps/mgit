@@ -19,7 +19,7 @@ from rich.table import Table
 
 from ..exceptions import MgitError
 from ..providers.base import Repository
-from ..providers.manager_v2 import ProviderManager
+from ..providers.manager import ProviderManager
 from ..utils.query_parser import matches_pattern, parse_query, validate_query
 
 logger = logging.getLogger(__name__)
