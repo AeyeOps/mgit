@@ -209,6 +209,11 @@ jobs:
         
     - name: Install dependencies
       run: poetry install --with dev
+    
+    - name: Configure Git for tests
+      run: |
+        git config --global user.name "CI Bot"
+        git config --global user.email "ci-bot@mgit.dev"
         
     - name: Verify installation
       run: |
