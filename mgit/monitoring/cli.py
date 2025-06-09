@@ -44,7 +44,7 @@ def _ensure_typer():
 
 
 def start_server_command(
-    host: str = "0.0.0.0",
+    host: str = "127.0.0.1",
     port: int = 8080,
     simple: bool = False,
     log_level: str = "INFO",
@@ -325,7 +325,7 @@ if TYPER_AVAILABLE:
 
     @monitoring_app.command("server")
     def server_command(
-        host: str = typer.Option("0.0.0.0", "--host", "-h", help="Server host"),
+        host: str = typer.Option("127.0.0.1", "--host", "-h", help="Server host"),
         port: int = typer.Option(8080, "--port", "-p", help="Server port"),
         simple: bool = typer.Option(False, "--simple", help="Use simple server"),
         log_level: str = typer.Option("INFO", "--log-level", help="Log level"),
