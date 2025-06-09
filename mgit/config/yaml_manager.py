@@ -147,12 +147,12 @@ class ConfigurationManager:
         """Detect the provider type from configuration structure."""
         config = self.get_provider_config(provider_name)
 
-        # Detect based on configuration keys
-        if "org_url" in config and "pat" in config:
+        # Detect based on configuration keys (check both new and legacy field names)
+        if ("org_url" in config or "default_org_url" in config) and "pat" in config:
             return "azuredevops"
-        elif "token" in config:
+        elif "token" in config or "pat" in config:
             return "github"
-        elif "app_password" in config and "username" in config:
+        elif "app_password" in config and ("username" in config or "default_username" in config):
             return "bitbucket"
         else:
             # Try to infer from name
