@@ -23,34 +23,30 @@ def pytest_configure(config):
     """Configure pytest with custom settings."""
     # Set asyncio event loop scope
     config.option.asyncio_default_fixture_loop_scope = "function"
-    
-    # Configure Git for tests to avoid CI failures
-    import subprocess
-    import os
-    
-    # Only configure if not already set
-    try:
-        result = subprocess.run(
-            ["git", "config", "--global", "user.name"],
-            capture_output=True,
-            text=True,
-            check=False
-        )
-        if not result.stdout.strip():
-            subprocess.run(
-                ["git", "config", "--global", "user.name", "Test User"],
-                check=False
-            )
-            subprocess.run(
-                ["git", "config", "--global", "user.email", "test@mgit.dev"],
-                check=False
-            )
-    except Exception:
-        # Git might not be available in some test environments
-        pass
 
 
 # --- Directory and File Fixtures ---
+
+
+@pytest.fixture(scope="session", autouse=True)
+def configure_git_for_tests():
+    """
+    Configure Git globally for all tests.
+    This runs once per test session.
+    """
+    import subprocess
+    import os
+    
+    # Set Git config for tests
+    subprocess.run(["git", "config", "--global", "user.name", "Test User"], check=False)
+    subprocess.run(["git", "config", "--global", "user.email", "test@mgit.dev"], check=False)
+    subprocess.run(["git", "config", "--global", "init.defaultBranch", "main"], check=False)
+    
+    # Also set environment variables
+    os.environ["GIT_AUTHOR_NAME"] = "Test User"
+    os.environ["GIT_AUTHOR_EMAIL"] = "test@mgit.dev"
+    os.environ["GIT_COMMITTER_NAME"] = "Test User"
+    os.environ["GIT_COMMITTER_EMAIL"] = "test@mgit.dev"
 
 
 @pytest.fixture
