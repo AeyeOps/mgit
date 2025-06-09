@@ -214,6 +214,11 @@ jobs:
       run: |
         git config --global user.name "CI Bot"
         git config --global user.email "ci-bot@mgit.dev"
+        # Also set as environment variables for subprocess calls
+        echo "GIT_AUTHOR_NAME=CI Bot" >> $GITHUB_ENV
+        echo "GIT_AUTHOR_EMAIL=ci-bot@mgit.dev" >> $GITHUB_ENV
+        echo "GIT_COMMITTER_NAME=CI Bot" >> $GITHUB_ENV
+        echo "GIT_COMMITTER_EMAIL=ci-bot@mgit.dev" >> $GITHUB_ENV
         
     - name: Verify installation
       run: |
