@@ -23,6 +23,31 @@ def pytest_configure(config):
     """Configure pytest with custom settings."""
     # Set asyncio event loop scope
     config.option.asyncio_default_fixture_loop_scope = "function"
+    
+    # Configure Git for tests to avoid CI failures
+    import subprocess
+    import os
+    
+    # Only configure if not already set
+    try:
+        result = subprocess.run(
+            ["git", "config", "--global", "user.name"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if not result.stdout.strip():
+            subprocess.run(
+                ["git", "config", "--global", "user.name", "Test User"],
+                check=False
+            )
+            subprocess.run(
+                ["git", "config", "--global", "user.email", "test@mgit.dev"],
+                check=False
+            )
+    except Exception:
+        # Git might not be available in some test environments
+        pass
 
 
 # --- Directory and File Fixtures ---
