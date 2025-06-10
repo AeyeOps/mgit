@@ -293,7 +293,7 @@ def create_secure_provider_factory():
                     # Log successful authentication
                     self._monitor.log_authentication_attempt(
                         provider=provider_name,
-                        organization=getattr(self, "organization_url", "unknown"),
+                        organization=getattr(self, "url", "unknown"),
                         success=True,
                     )
 
@@ -303,7 +303,7 @@ def create_secure_provider_factory():
                     # Log failed authentication
                     self._monitor.log_authentication_attempt(
                         provider=provider_name,
-                        organization=getattr(self, "organization_url", "unknown"),
+                        organization=getattr(self, "url", "unknown"),
                         success=False,
                         details={"error": str(e)},
                     )

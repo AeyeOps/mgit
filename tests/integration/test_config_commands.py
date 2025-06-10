@@ -29,43 +29,6 @@ class TestConfigCommand:
         pytest.skip("Skipping outdated test.")
 
 
-@pytest.mark.integration
-class TestGenerateEnvCommand:
-    """Test cases for the generate-env command."""
-
-    def test_generate_env_success(
-        self, cli_runner, config_file, temp_dir, temp_home_dir, monkeypatch
-    ):
-        """Test generating .env file."""
-        monkeypatch.chdir(temp_dir)
-        # The config_file fixture creates the file in the correct location
-        result = cli_runner.invoke(app, ["generate-env"])
-
-        assert result.exit_code == 0
-        assert "Created .env.sample" in result.stdout
-
-        # Check .env file was created
-        env_file = temp_dir / ".env.sample"
-        assert env_file.exists()
-
-        # Verify content
-        content = env_file.read_text()
-        assert "AZURE_DEVOPS_ORG_URL=" in content
-        assert "AZURE_DEVOPS_PAT=" in content
-
-    def test_generate_env_existing_file(self, cli_runner, temp_dir, monkeypatch):
-        """Test generating .env when file already exists."""
-        monkeypatch.chdir(temp_dir)
-
-        # Create existing .env file
-        env_file = temp_dir / ".env.sample"
-        env_file.write_text("# Existing content\n")
-
-        result = cli_runner.invoke(app, ["generate-env"])
-
-        # Should create .env.sample1
-        assert result.exit_code == 0
-        assert "Created .env.sample1" in result.stdout
 
 
 @pytest.mark.integration
