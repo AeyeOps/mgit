@@ -68,12 +68,19 @@ class BitBucketProvider(GitProvider):
         self._validator = SecurityValidator()
         self._monitor = get_security_monitor()
 
-        self.url = config.get("url", "https://api.bitbucket.org/2.0")
+        # Normalize URL - if it's bitbucket.org, use api.bitbucket.org
+        url = config.get("url", "https://api.bitbucket.org/2.0")
+        if "bitbucket.org" in url and "api.bitbucket.org" not in url:
+            # Convert bitbucket.org URLs to API URLs
+            self.url = "https://api.bitbucket.org/2.0"
+        else:
+            self.url = url.rstrip('/')  # Remove trailing slash
+            
         self.user = config.get("user", "")
         self.token = config.get("token", "")
         self.workspace = config.get("workspace", "")
         # Default to app_password auth method for unified structure
-        self.auth_method = "app_password"
+        self.auth_method = "token"
         self._session: Optional[aiohttp.ClientSession] = None
         self.logger = SecurityLogger(__name__)
         self._rate_limit_info: Optional[Dict[str, Any]] = None
@@ -111,14 +118,6 @@ class BitBucketProvider(GitProvider):
                 "BitBucket token (app password) is required"
             )
         
-        # Validate token format
-        if not validate_bitbucket_app_password(self.token):
-            self._monitor.log_validation_failure(
-                "bitbucket_token",
-                mask_sensitive_data(self.token),
-                "Invalid token format",
-            )
-            raise ConfigurationError("Invalid BitBucket token format")
 
     async def _ensure_session(self) -> None:
         """Ensure we have a valid session for the current event loop."""
