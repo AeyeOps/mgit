@@ -2,6 +2,7 @@
 """Test script for ado_pdidev provider configuration."""
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 from rich.console import Console
@@ -11,6 +12,9 @@ from rich import print as rprint
 
 # Add mgit to path
 sys.path.insert(0, str(Path(__file__).parent))
+
+# Set HOME to Steve's directory to find config
+os.environ['HOME'] = '/home/steve'
 
 from mgit.config.yaml_manager import get_provider_config
 from mgit.providers.azdevops import AzureDevOpsProvider
@@ -34,8 +38,10 @@ async def test_ado():
         # Display loaded configuration (masking sensitive data)
         console.print(Panel(
             f"[green]Configuration loaded successfully[/green]\n"
-            f"Organization URL: {config.get('organization_url', 'Not set')}\n"
-            f"PAT: {'*' * 10 if config.get('pat') else 'Not set'}",
+            f"URL: {config.get('url', 'Not set')}\n"
+            f"User: {config.get('user', 'Not set')}\n"
+            f"Token: {'*' * 10 if config.get('token') else 'Not set'}\n"
+            f"Workspace: {config.get('workspace', 'Not set')}",
             title="Configuration"
         ))
         
@@ -122,20 +128,29 @@ async def test_ado():
         # Display repositories in a table
         repo_table = Table(title=f"Repositories in {first_project.name}")
         repo_table.add_column("Name", style="cyan")
-        repo_table.add_column("Clone URL", style="green")
+        repo_table.add_column("Clone URL", style="green", max_width=50)
         repo_table.add_column("Default Branch", style="yellow")
         repo_table.add_column("Is Private", style="magenta")
         
         # Show first 10 repositories
         for repo in repositories[:10]:
+            # Truncate long URLs for display
+            clone_url = repo.clone_url
+            if len(clone_url) > 47:
+                clone_url = clone_url[:44] + "..."
+            
             repo_table.add_row(
                 repo.name,
-                repo.clone_url,
+                clone_url,
                 repo.default_branch,
                 "Yes" if repo.is_private else "No"
             )
-        
+            
         console.print(repo_table)
+        
+        # Show full clone URL for reference
+        if repositories:
+            console.print(f"\n[dim]Full clone URL example: {repositories[0].clone_url}[/dim]")
         
         if len(repositories) > 10:
             console.print(f"\n[dim]... and {len(repositories) - 10} more repositories[/dim]")
