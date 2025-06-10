@@ -17,7 +17,6 @@ from .yaml_manager import (
     get_provider_config,
     get_provider_configs,
     list_provider_names,
-    migrate_from_dotenv,
     remove_provider_config,
     set_default_provider,
     set_global_setting,
@@ -38,8 +37,6 @@ __all__ = [
     "get_global_config",
     "get_global_setting",
     "set_global_setting",
-    # Migration
-    "migrate_from_dotenv",
     # Paths
     "CONFIG_DIR",
     "CONFIG_FILE",

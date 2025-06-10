@@ -14,17 +14,9 @@ from ruamel.yaml import YAML
 logger = logging.getLogger(__name__)
 
 
-# Configuration paths
-def get_config_file() -> Path:
-    """Get the path to the config file, respecting the environment variable."""
-    env_path = os.getenv("MGIT_CONFIG_PATH")
-    if env_path:
-        return Path(env_path)
-    return Path.home() / ".config" / "mgit" / "config.yaml"
-
-
-CONFIG_FILE = get_config_file()
-CONFIG_DIR = CONFIG_FILE.parent
+# Configuration paths - XDG Base Directory standard
+CONFIG_DIR = Path.home() / ".config" / "mgit"
+CONFIG_FILE = CONFIG_DIR / "config.yaml"
 
 
 # Ensure config directory exists
@@ -84,11 +76,7 @@ class ConfigurationManager:
 
         except Exception as e:
             logger.error(f"Failed to load config: {e}")
-            # Create empty CommentedMap on error
-            self._raw_config_cache = self._yaml.map()
-            self._raw_config_cache["providers"] = self._yaml.map()
-            self._raw_config_cache["global"] = self._yaml.map()
-            return {"providers": {}, "global": {}}
+            raise
 
     def load_config(self, force_reload: bool = False) -> Dict[str, Any]:
         """Load the complete configuration with caching."""
@@ -322,75 +310,3 @@ def set_global_setting(key: str, value: Any) -> None:
     config_manager.set_global_setting(key, value)
 
 
-def migrate_from_dotenv() -> bool:
-    """Migrate configuration from old dotenv format to YAML.
-
-    Returns:
-        bool: True if migration was performed, False if no migration needed
-    """
-    old_config_file = CONFIG_DIR / "config"  # Old dotenv file
-
-    if not old_config_file.exists():
-        return False
-
-    logger.info("Migrating configuration from dotenv to YAML format")
-
-    # Import dotenv_values locally to avoid dependency
-    from dotenv import dotenv_values
-
-    # Load old configuration
-    old_config = dotenv_values(str(old_config_file))
-
-    # Load current YAML config if exists
-    current_config = config_manager.load_config()
-
-    # Map old dotenv keys to unified YAML structure
-    migrations = {
-        # Global settings
-        "LOG_FILENAME": ("global", "log_filename"),
-        "LOG_LEVEL": ("global", "log_level"),
-        "CON_LEVEL": ("global", "console_level"),
-        "DEFAULT_CONCURRENCY": ("global", "default_concurrency"),
-        "DEFAULT_UPDATE_MODE": ("global", "default_update_mode"),
-        # Azure DevOps settings (map to unified fields)
-        "AZURE_DEVOPS_ORG_URL": ("provider", "azuredevops", "url"),
-        "AZURE_DEVOPS_EXT_PAT": ("provider", "azuredevops", "token"),
-        # GitHub settings (map to unified fields)
-        "GITHUB_ORG_URL": ("provider", "github", "url"),
-        "GITHUB_PAT": ("provider", "github", "token"),
-        # BitBucket settings (map to unified fields)
-        "BITBUCKET_ORG_URL": ("provider", "bitbucket", "url"),
-        "BITBUCKET_APP_PASSWORD": ("provider", "bitbucket", "token"),
-        "BITBUCKET_USERNAME": ("provider", "bitbucket", "user"),
-        "BITBUCKET_WORKSPACE": ("provider", "bitbucket", "workspace"),
-    }
-
-    # Apply migrations
-    for old_key, new_path in migrations.items():
-        if old_key in old_config and old_config[old_key]:
-            value = old_config[old_key]
-
-            if new_path[0] == "global":
-                # Global setting
-                current_config["global"][new_path[1]] = value
-            elif new_path[0] == "provider":
-                # Provider configuration
-                provider_type = new_path[1]
-                provider_key = new_path[2]
-
-                # Find or create provider config
-                provider_name = f"{provider_type}_migrated"
-                if provider_name not in current_config["providers"]:
-                    current_config["providers"][provider_name] = {}
-
-                current_config["providers"][provider_name][provider_key] = value
-
-    # Save migrated configuration
-    config_manager.save_config(current_config)
-
-    # Rename old config file to backup
-    backup_file = old_config_file.with_suffix(".backup")
-    old_config_file.rename(backup_file)
-    logger.info(f"Old configuration backed up to {backup_file}")
-
-    return True

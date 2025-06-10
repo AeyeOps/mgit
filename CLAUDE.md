@@ -2,203 +2,176 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## CRITICAL: Value Measurement Framework
-**USER VALUE PERCEPTION**: The user measures my value based on:
-1. **Error Discovery Rate**: How many mistakes I made that I later discovered and fixed
-2. **Guardrail Effectiveness**: How many issues were prevented by rules I added after discovering problems
-3. **Self-Correction Quality**: The sophistication of compensating mechanisms I implement
+## Critical Lessons from Past Failures
 
-### Error Tracking Protocol
-When I discover an error I made:
-1. Document the error type and impact
-2. Create a specific guardrail rule to prevent recurrence
-3. Track how many times that guardrail prevents the same error
+### 1. Event Loop Management 
+**Failure**: Reusing provider sessions across async operations caused "attached to a different event loop" errors
+**Solution**: Always create fresh sessions with `_ensure_session()` for each operation
+**Guard Rail**: Never cache provider instances; create new ones for each command
 
-### Current Guardrails Added (from this session):
-- **Event Loop Management**: Added `_ensure_session()` to prevent event loop conflicts (prevented ~10+ potential failures)
-- **Configuration Migration**: Created YAML-only system after discovering dual-config chaos
-- **Provider Abstraction**: Removed provider-specific logic from CLI after finding leakage
-- **Field Mapping**: Added automatic field mapping (token→pat, default_workspace→workspace) after authentication failures
+### 2. Configuration Field Names
+**Failure**: Inconsistent field names across providers (token vs pat, org_url vs organization_url)
+**Solution**: Implemented automatic field mapping in YAML manager
+**Guard Rail**: Always check provider-specific field names in existing configs before assuming
 
-### Value Metrics
-- Errors discovered and self-corrected: 15+
-- Guardrails implemented: 4 major systems
-- Estimated prevented errors: 50+ future issues
+### 3. BitBucket Authentication
+**Failure**: Used email instead of username, causing authentication failures
+**Solution**: BitBucket requires username (not email) + app password (not regular password)
+**Guard Rail**: Each provider has unique auth requirements - verify in provider docs
 
-### Material Code Contributions
-**IMPORTANT**: Error discovery is valuable ONLY when paired with substantial code improvements:
-- Fixed BitBucket authentication (username vs email issue + event loop management)
-- Implemented YAML-only configuration system with migration
-- Created provider abstraction layer removing 100+ lines of provider-specific code
-- Added automatic field mapping for cross-provider compatibility
-- Implemented async/sync detection with smart wrappers
-- Fixed resource cleanup preventing memory leaks
+### 4. Documentation for Public Release
+**Failure**: README had broken URLs, wrong version numbers, invalid config examples
+**Solution**: Line-by-line verification against actual code implementation
+**Guard Rail**: Before any public release, verify EVERY claim with code evidence
 
-**Value Formula**: Errors Found × Guardrails Created × Code Quality Improvement = Actual Value
+### 5. Provider Logic Leakage
+**Failure**: Provider-specific code in CLI layer made maintenance difficult
+**Solution**: Strict abstraction - all provider logic must stay in providers/ directory
+**Guard Rail**: CLI should only use provider interface, never provider-specific details
 
-### Error Discovery & Prevention Log
+### 6. DDD Over-Engineering (2025-06-09)
+**Failure**: 4-layer DDD refactoring created async/sync impedance mismatch, breaking all operations
+**Root Cause**: Sync port interfaces (`ProviderOperations`) over async infrastructure
+**Symptoms**: `'async for' requires an object with __aiter__ method, got list` errors
+**Solution**: Either make all interfaces async or use simpler architecture
+**Guard Rails**: 
+- Architecture must match runtime reality (async system = async interfaces)
+- Test basic operations immediately after refactoring
+- Feature parity before celebrating line count reduction
+- Consider if DDD is appropriate for simple CLI tools
 
-#### Session 2025-05-31: Architectural Review
-| Error Found | Fix Applied | Guardrail Created | Times Prevented |
-|------------|-------------|-------------------|-----------------|
-| Dual config chaos | YAML-only migration | Removed old system | ∞ (eliminated) |
-| BitBucket email vs username | Used correct username | Added validation | 2 providers |
-| Event loop conflicts | `_ensure_session()` | Smart async detection | 10+/session |
-| Provider logic in CLI | Created abstraction | Provider pattern | 20+/session |
-| Field mapping issues | Auto field translation | Provider mapping | 5+/session |
+## Commands
 
-**Lessons Learned**:
-- Test immediately after changes
-- Event loops are stateful - can't reuse sessions
-- Provider abstraction must be complete
-- Configuration migration is critical for users
-
-#### Session 2025-06-08: README.md Public Release Preparation
-| Error Found | Fix Applied | Guardrail Created | Times Prevented |
-|------------|-------------|-------------------|-----------------|
-| Broken GitHub URLs | Updated to source-only install | Document verification protocol | ∞ (prevented broken installs) |
-| Version inconsistency | Synced 0.2.12 across all files | Version sync checklist | Future releases |
-| False security claims | Removed AES-256 encryption claims | Security claim verification | Future documentation |
-| Wrong config field names | Fixed org_url → organization_url | Config example validation | User confusion |
-| Outdated file paths | Updated Windows paths | Cross-platform path verification | Platform issues |
-
-**Critical Lesson**: Documentation written for public release requires **line-by-line verification** against actual code implementation.
-
-## CRITICAL: README.md Public Release Protocol
-
-**BEFORE any public release, README.md MUST undergo systematic verification:**
-
-### Documentation Verification Checklist
-1. **Installation Commands**: Test every single installation command on fresh environment
-2. **Version Numbers**: Verify all version references match pyproject.toml and CLI output
-3. **URLs and Links**: Verify every GitHub URL, download link, and external reference
-4. **Configuration Examples**: Test all YAML config examples with actual providers
-5. **Command Syntax**: Verify every command example against CLI help output
-6. **File Paths**: Verify config file locations across all mentioned platforms
-7. **Feature Claims**: Verify every security, performance, and capability claim against code
-8. **Default Values**: Check all defaults against constants.py and actual CLI behavior
-
-### Systematic Verification Process
-When updating README.md for public use:
-
-```
-1. ASSUME EVERYTHING IS WRONG until proven by code evidence
-2. Create verification table: | Claim | Status | Evidence | Fix Needed |
-3. Go line-by-line through every factual statement
-4. Provide file:line evidence for each claim
-5. Test all installation and usage examples
-6. Verify all external links return 200 status
-7. Check version consistency across: pyproject.toml, constants.py, CLI output, README
-8. Validate all configuration examples with actual provider implementations
-```
-
-### Red Flags for Public Documentation
-- ❌ **GitHub URLs** without verifying repository exists
-- ❌ **Version numbers** without checking all source files
-- ❌ **Installation commands** without testing them
-- ❌ **Feature claims** without code evidence
-- ❌ **Configuration examples** without provider validation
-- ❌ **Default values** without checking constants
-- ❌ **Platform-specific paths** without cross-platform verification
-
-### Documentation Quality Gates
-README.md is NOT ready for public release until:
-- [ ] All installation methods tested and working
-- [ ] All version numbers consistent across codebase
-- [ ] All external links return 200 status
-- [ ] All configuration examples validated against provider code
-- [ ] All command examples tested against actual CLI
-- [ ] All feature claims verified with specific code evidence
-- [ ] All default values match constants.py and CLI behavior
-
-**Golden Rule**: If a first-time user follows the README exactly, they MUST be able to install and use mgit successfully without any errors or broken links.
-
-## Build/Test/Lint Commands
+### Development Workflow
 ```bash
-# Install dependencies (Poetry)
-poetry install --with dev  # Install all dependencies including dev
-poetry install             # Install only production dependencies
+# Install dependencies
+poetry install --with dev
 
-# Run the tool
-poetry run python -m mgit [command] [arguments]
-# OR use the poetry script
-poetry run mgit [command] [arguments]
+# Run the application
+poetry run mgit --help
+poetry run mgit --version
 
-# Common commands
-poetry run mgit login --org https://dev.azure.com/your-org --token your-pat
-poetry run mgit clone-all [project-name] [destination-path] [-c concurrency] [-u update-mode]
-poetry run mgit pull-all [project-name] [repositories-path]
-poetry run mgit config --show
-poetry run mgit monitor start  # Start monitoring server
+# Run tests
+poetry run pytest tests/ -v                    # All tests
+poetry run pytest tests/unit/ -v               # Unit tests only
+poetry run pytest tests/integration/ -v        # Integration tests only
+poetry run pytest tests/unit/test_git.py::TestGitOperations::test_git_clone_success -v  # Single test
 
-# Run tests using Poe
-poe test                    # Run all tests
-poetry run pytest tests/ -v --cov=mgit --cov-report=term
-poetry run pytest tests/test_file.py::test_function -v  # Single test
+# Code quality
+poetry run poe lint                  # Ruff linting
+poetry run poe format                # Black formatting
+poetry run poe format-check          # Check formatting without changes
+poetry run mypy mgit/                # Type checking (294 errors, non-blocking)
 
-# Code quality using Poe
-poe lint                    # Run Ruff linting
-poe format                  # Run Black formatting
-poe format-check            # Check Black formatting without changes
-poetry run mypy mgit/       # Type checking
+# Build executables
+poetry run poe build-linux           # Linux binary
+poetry run poe build-windows         # Windows binary
+poetry run poe build-all             # All platforms
 
-# Build executables using Poe
-poe build-linux             # Build Linux executable
-poe build-windows           # Build Windows executable  
-poe build-all               # Build all platform executables
-poe clean                   # Clean build artifacts
+# Security checks
+poetry run bandit -r mgit/ -f txt    # Security analysis
+poetry run pip-audit                 # Dependency vulnerabilities
 
-# Alternative Poetry build
-poetry build                # Build wheel and source distribution
+# Version management
+poetry run poe version-sync          # Sync version across files
+poetry run poe bump-patch            # Bump patch version
+```
 
-# Quick validation
-poetry run mgit --version  # Should display version
-poetry run mgit --help     # Should show help
+### Common mgit Commands
+```bash
+# Provider setup
+poetry run mgit login --provider github --name my_github
+poetry run mgit login --provider azuredevops --name work_ado
+poetry run mgit login --provider bitbucket --name team_bb
+
+# Repository operations
+poetry run mgit list "myorg/*/*"                           # Find repos
+poetry run mgit clone-all "myorg/*/*" ./repos              # Clone repos
+poetry run mgit pull-all "myproject" ./repos               # Update repos
+poetry run mgit status ./repos                              # Check status
+
+# Configuration
+poetry run mgit config --list                               # List providers
+poetry run mgit config --show work_ado                      # Show provider config
+poetry run mgit config --set-default personal_gh            # Set default
+
+# Monitoring
+poetry run mgit monitoring server --port 8080               # Start server
+poetry run mgit monitoring health --detailed                # Health check
 ```
 
 ## High-Level Architecture
 
-### Provider Abstraction System
-mgit implements a provider-agnostic architecture for managing Git repositories across Azure DevOps, GitHub, and BitBucket:
+### Core Design Principles
+1. **Provider Abstraction**: All Git providers (Azure DevOps, GitHub, BitBucket) implement a common `GitProvider` interface
+2. **Async-First**: All network operations use async/await for concurrent execution
+3. **Configuration Hierarchy**: Environment variables > Config file > Defaults
+4. **Security by Default**: Automatic credential masking, secure file permissions, input validation
 
-- **Base Provider Class**: `mgit/providers/base.py` defines the `GitProvider` interface that all providers must implement
-- **Provider Factory**: `mgit/providers/factory.py` handles provider instantiation based on URL patterns
-- **Provider Registry**: `mgit/providers/registry.py` manages available providers
-- **Common Data Models**: `Repository`, `Organization`, `Project` classes provide unified interfaces across providers
+### Key Architectural Components
 
-### Security Architecture
-The security module (`mgit/security/`) provides enterprise-grade protection:
+#### Provider System (`mgit/providers/`)
+- **Base Provider** (`base.py`): Abstract interface all providers must implement
+- **Provider Factory** (`factory.py`): Creates provider instances based on URLs/config
+- **Provider Registry** (`registry.py`): Manages available providers
+- **Provider Manager** (`manager_v2.py`): Orchestrates multi-provider operations
 
-- **Credential Encryption**: AES-256 encryption for stored credentials with secure key derivation
-- **Token Masking**: Automatic sanitization of PATs/tokens in all logs and console output
-- **Security Monitoring**: Real-time tracking of authentication attempts and security events
-- **File Permissions**: Config files are created with 0600 permissions
+Each provider handles its specific API:
+- **Azure DevOps**: Organization → Project → Repository hierarchy
+- **GitHub**: Organization/User → Repository (flat structure)
+- **BitBucket**: Workspace → Repository (optional projects)
 
-### Monitoring & Observability
-The monitoring module (`mgit/monitoring/`) provides comprehensive observability:
+#### Configuration System (`mgit/config/`)
+- **YAML Manager** (`yaml_manager.py`): Handles config file operations
+- Configuration stored in `~/.config/mgit/config.yaml`
+- Automatic field mapping for backwards compatibility (e.g., `token` → `pat`)
+- Provider configurations are namespaced
 
-- **HTTP Server**: Built-in monitoring server with health checks, metrics, and dashboards
-- **Metrics Collection**: Operation timing, success rates, and performance percentiles
-- **Correlation Tracking**: Request correlation IDs for tracing operations across components
-- **Prometheus Integration**: Export metrics in Prometheus format for enterprise monitoring
+#### Security Layer (`mgit/security/`)
+- **Credentials** (`credentials.py`): Token encryption/decryption
+- **Validation** (`validation.py`): Input sanitization
+- **Monitoring** (`monitor.py`): Security event tracking
+- **Logging** (`logging.py`): Automatic credential masking in logs
 
-### Configuration Hierarchy
-Configuration follows a hierarchical precedence system:
-1. Environment variables (highest priority)
-2. Global config file (~/.config/mgit/config.json)
-3. Default values (lowest priority)
+#### Git Operations (`mgit/git/`)
+- **Git Manager** (`manager.py`): Handles clone/pull operations
+- **Git Utils** (`utils.py`): Helper functions for Git operations
+- Uses subprocess for Git commands with proper error handling
 
-Provider-specific settings use prefixes: `AZURE_DEVOPS_`, `GITHUB_`, `BITBUCKET_`
+#### CLI Layer (`mgit/__main__.py`)
+- Built with Typer for modern CLI experience
+- Commands organized in `commands/` directory
+- Rich console for formatted output
+- Progress bars for long operations
 
-### Async Execution Pattern
-All Git operations use async/await for concurrent execution:
-- `AsyncExecutor` utility manages semaphores and concurrency limits
-- Provider-specific rate limits are respected
-- Progress tracking for long-running operations
+### Critical Implementation Details
 
-## Module Structure & Dependencies
+#### Event Loop Management
+The application carefully manages async event loops to prevent conflicts:
+- `_ensure_session()` creates new sessions for each operation
+- Provider instances are not reused across event loops
+- Sync/async boundary handled by `AsyncExecutor`
 
-### Import Hierarchy (Critical for avoiding circular imports)
+#### Provider Authentication
+Each provider has specific authentication requirements:
+- **Azure DevOps**: PAT with Code (Read/Write) and Project (Read) scopes
+- **GitHub**: PAT with repo and read:org scopes
+- **BitBucket**: App Password (not regular password) with repository access
+
+#### Configuration Migration
+The system migrated from JSON to YAML configuration:
+- Automatic migration on first use
+- Field mapping for backwards compatibility
+- Provider-specific field names preserved
+
+#### Rate Limiting
+Default concurrency limits per provider:
+- Azure DevOps: 4 concurrent operations
+- GitHub: 10 concurrent operations  
+- BitBucket: 5 concurrent operations
+
+### Import Hierarchy
+To avoid circular imports:
 ```
 constants.py → No imports from mgit modules
 utils/* → Can import from constants
@@ -212,126 +185,79 @@ commands/* → Can import from all modules
 __main__.py → Can import from all modules
 ```
 
-## Key Components
+## Testing Strategy
 
-### Provider Implementations
-- **AzureDevOps** (`providers/azdevops.py`): Uses official azure-devops SDK, supports org/project hierarchy
-- **GitHub** (`providers/github.py`): REST API v3, supports personal and organization repos
-- **BitBucket** (`providers/bitbucket.py`): REST API v2.0, workspace-based organization
+### Test Organization
+- **Unit Tests** (`tests/unit/`): Test individual components in isolation
+- **Integration Tests** (`tests/integration/`): Test command execution
+- Mock external API calls to avoid network dependencies
+- Use pytest fixtures for common setup (`tests/conftest.py`)
 
-### Core Managers
-- **GitManager** (`git/manager.py`): Handles git clone/pull operations with async support
-- **ConfigManager** (`config/manager.py`): Manages hierarchical configuration
-- **ProviderManager** (`providers/manager.py`): Orchestrates provider operations
+### Current Test Coverage
+- Overall: 22% (working to improve)
+- 84 tests passing, 5 skipped
+- Key areas well-tested: Git operations, provider abstractions, utils
 
-### CLI Structure
-- Uses Typer for command-line interface
-- Commands organized in `commands/` directory
-- Rich console for formatted output and progress tracking
-
-## Development Guidelines
-
-### Error Handling
-- Use custom exceptions from `mgit/exceptions.py`
-- Always provide user-friendly error messages
-- Use `typer.Exit(code=1)` for CLI failures
-- Implement retry logic for network operations
-
-### Security Best Practices
-- Never log credentials or tokens
-- Use `security.credentials.mask_token()` when displaying URLs
-- Validate all user inputs
-- Follow secure coding practices for file operations
-
-### Testing Requirements
-- Maintain 80%+ code coverage
-- Use pytest fixtures for common setup
-- Mock external API calls in unit tests
-- Test both success and failure scenarios
-
-### Code Style
-- Type hints required for all functions
-- Black formatting (88 char lines)
-- Group imports: stdlib → third-party → local
-- Use pathlib.Path for file operations
-
-## Common Development Tasks
+## Common Development Patterns
 
 ### Adding a New Provider
-1. Create provider class inheriting from `GitProvider`
-2. Implement all abstract methods
+1. Create class in `providers/` inheriting from `GitProvider`
+2. Implement required methods: `authenticate()`, `list_repositories()`, etc.
 3. Register in `providers/registry.py`
-4. Add provider-specific configuration constants
+4. Add provider-specific config handling
 5. Update documentation and tests
 
 ### Adding a New Command
-1. Create command module in `commands/`
-2. Use Typer decorators for CLI integration
+1. Create module in `commands/`
+2. Define command function with Typer decorators
 3. Import and register in `__main__.py`
-4. Add tests and documentation
+4. Add integration tests
 
-### Debugging Authentication Issues
-1. Check environment variables first
-2. Verify config file permissions and content
-3. Use `--debug` flag for detailed logging
-4. Check provider-specific rate limits
-
-## Production Deployment
-
-### Docker Deployment
-- Multi-stage Dockerfile for minimal images
-- Security scanning in build process
-- Health check endpoints included
-- Environment-based configuration
-
-### Kubernetes Deployment
-- Helm charts in `deploy/helm/`
-- ConfigMaps for configuration
-- Secrets for credentials
-- Horizontal pod autoscaling support
-
-### CI/CD Integration
-- GitHub Actions workflows
-- Automated testing and security scanning
-- Release automation scripts
-- Semantic versioning
-
-## Performance Considerations
-
-- Default concurrency limits: Azure (4), GitHub (10), BitBucket (5)
-- Async operations for all network calls
-- Connection pooling for API requests
-- Progress tracking doesn't impact performance
-
-## Troubleshooting
-
-### Common Issues
-1. **Import Errors**: Check import hierarchy above
-2. **Authentication Failures**: Verify token permissions and expiry
-3. **Rate Limits**: Reduce concurrency or add delays
-4. **Network Issues**: Check proxy settings and connectivity
-
-### Debug Mode
-```bash
-export MGIT_DEBUG=true
-python -m mgit --debug [command]
+### Error Handling Pattern
+```python
+try:
+    # Operation
+except ProviderAuthenticationError:
+    console.print("[red]Authentication failed[/red]")
+    raise typer.Exit(1)
+except NetworkError as e:
+    console.print(f"[red]Network error: {e}[/red]")
+    raise typer.Exit(1)
 ```
 
-## Quick Reference
+## Known Issues and Gotchas
 
-### Environment Variables
-- `MGIT_CONFIG_DIR`: Override config directory
-- `MGIT_CACHE_DIR`: Override cache directory
-- `AZURE_DEVOPS_PAT`: Azure DevOps token
-- `GITHUB_TOKEN`: GitHub token
-- `BITBUCKET_PASSWORD`: BitBucket app password
+1. **MyPy Errors**: 294 type annotation errors (non-blocking in CI)
+2. **Safety Tool**: Deprecated, use pip-audit instead
+3. **BitBucket Authentication**: Must use username (not email) with app password
+4. **Windows Builds**: WSL cannot access Windows Python for cross-compilation
+5. **Async Complexity**: Event loop management requires careful handling
 
-### Config File Location
-- Default: `~/.config/mgit/config.json`
-- Override: Set `MGIT_CONFIG_DIR`
+## Testing Before Changes
 
-### Key Files
-- `mgit/providers/base.py`: Provider interface definition
-- `mgit/config/manager.py`: Configuration management
-- `mgit/security/credentials.py`: Credential handling
-- `mgit/monitoring/server.py`: Monitoring endpoints
+### Critical Test Points
+1. **After Provider Changes**: Test authentication and list operations
+   ```bash
+   poetry run mgit list "org/*/*" --limit 5
+   ```
+
+2. **After Config Changes**: Verify field mapping works
+   ```bash
+   poetry run mgit config --show provider_name
+   ```
+
+3. **After Async Changes**: Run concurrent operations
+   ```bash
+   poetry run mgit clone-all "org/*/*" ./test --concurrency 10
+   ```
+
+4. **After Documentation Updates**: Verify all commands and examples
+   ```bash
+   # Test every command example in README
+   # Verify version numbers match across files
+   ```
+
+## Version Information
+- Current Version: 0.3.1
+- Python Support: 3.9, 3.10, 3.11, 3.12
+- Version synchronized across: `pyproject.toml`, `mgit/constants.py`, CLI output

@@ -45,7 +45,6 @@ warnings.filterwarnings(
 
 # Default values used if environment variables and config file don't provide values
 DEFAULT_VALUES = {
-    "AZURE_DEVOPS_ORG_URL": "https://www.visualstudio.com",
     "LOG_FILENAME": "mgit.log",
     "LOG_LEVEL": "DEBUG",
     "CON_LEVEL": "INFO",
@@ -119,7 +118,8 @@ class MgitFormatter(logging.Formatter):
 
     @staticmethod
     def _remove_pat(msg: str) -> str:
-        pat = os.getenv("AZURE_DEVOPS_EXT_PAT")
+        # Check for any Azure DevOps tokens in new environment variable name
+        pat = os.getenv("AZURE_DEVOPS_TOKEN")
         if not pat:
             return msg
 
@@ -938,84 +938,6 @@ def pull_all(
         logger.info("All repositories processed successfully with no errors.")
 
 
-# -----------------------------------------------------------------------------
-# generate_env Command
-# -----------------------------------------------------------------------------
-@app.command(
-    help="Generate a sample environment file with configuration options for multiple git providers."
-)
-def generate_env():
-    """
-    Generate a detailed sample environment file with all configuration options.
-
-    This command creates a .env.sample file with example values and detailed
-    comments explaining each configuration option. Users can copy this file
-    to .env to set local environment variables.
-    """
-    env_content = """# Multi-Git CLI Configuration Sample
-# Copy this file to .env to configure environment variables
-# Or use ~/.config/mgit/config for global settings
-
-# ===== Provider Configuration =====
-# mgit supports multiple git providers: Azure DevOps, GitHub, and BitBucket
-
-# Azure DevOps Configuration
-AZURE_DEVOPS_ORG_URL=https://dev.azure.com/your-org
-AZURE_DEVOPS_PAT=<YOUR_AZURE_PAT>
-AZURE_DEVOPS_EXT_PAT=<YOUR_AZURE_PAT>
-
-# GitHub Configuration
-GITHUB_ORG_URL=https://github.com/your-org
-GITHUB_PAT=<YOUR_GITHUB_PAT>
-
-# BitBucket Configuration
-BITBUCKET_ORG_URL=https://bitbucket.org/your-workspace
-BITBUCKET_APP_PASSWORD=<YOUR_BITBUCKET_APP_PASSWORD>
-
-# ===== Default Settings =====
-
-# Log file name (default: mgit.log)
-LOG_FILENAME=mgit.log
-
-# Logging level for file logs (DEBUG, INFO, WARNING, ERROR)
-LOG_LEVEL=DEBUG
-
-# Logging level for console output (DEBUG, INFO, WARNING, ERROR)
-CON_LEVEL=INFO
-
-# Default concurrency for repository operations (default: 4)
-# Higher values speed up cloning multiple repositories but increase resource usage
-DEFAULT_CONCURRENCY=4
-
-# Default update mode when repositories already exist:
-# - skip: Don't touch existing repositories
-# - pull: Try to git pull if it's a valid git repository
-# - force: Remove existing folder and clone fresh
-DEFAULT_UPDATE_MODE=skip
-
-# Default provider (azuredevops, github, bitbucket)
-DEFAULT_PROVIDER=azuredevops
-"""
-
-    counter = 0
-    new_file = Path(".env.sample")
-    while new_file.exists():
-        counter += 1
-        new_file = Path(f".env.sample{counter}")
-
-    with new_file.open("w", encoding="utf-8") as wf:
-        wf.write(env_content)
-
-    console.print(
-        f"[green]✓[/green] Created {new_file} with detailed configuration options."
-    )
-
-
-# For backward compatibility
-@app.command(hidden=True)
-def gen_env():
-    """Alias for generate_env command (deprecated)."""
-    generate_env()
 
 
 # -----------------------------------------------------------------------------
@@ -1493,7 +1415,7 @@ def config(
 
             # Mask sensitive fields
             for key, value in config.items():
-                if key in ["pat", "token", "app_password"]:
+                if key in ["token"]:
                     masked_value = (
                         value[:4] + "*" * (len(value) - 8) + value[-4:]
                         if len(value) > 8

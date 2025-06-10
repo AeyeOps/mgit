@@ -32,14 +32,12 @@ class CredentialMasker:
 
     # Sensitive field names that should be masked
     SENSITIVE_FIELDS = {
-        "pat",
         "token",
         "password",
         "secret",
         "key",
         "auth",
         "credential",
-        "app_password",
         "oauth_token",
         "access_token",
         "refresh_token",
@@ -49,7 +47,7 @@ class CredentialMasker:
     }
 
     # URL parameters that should be masked
-    SENSITIVE_URL_PARAMS = {"token", "access_token", "auth", "key", "secret", "pat"}
+    SENSITIVE_URL_PARAMS = {"token", "access_token", "auth", "key", "secret"}
 
     def __init__(self, mask_char: str = "*", show_length: int = 4):
         """Initialize credential masker.
@@ -302,13 +300,14 @@ def validate_github_pat(token: str) -> bool:
     if not token or not isinstance(token, str):
         return False
 
-    # GitHub PAT formats: ghp_, gho_, ghu_, ghs_, ghr_
+    # GitHub PAT formats: ghp_, gho_, ghu_, ghs_, ghr_, github_pat_
     github_patterns = [
-        r"^ghp_[a-zA-Z0-9]{36}$",  # Personal access token
+        r"^ghp_[a-zA-Z0-9]{36}$",  # Personal access token (classic)
         r"^gho_[a-zA-Z0-9]{36}$",  # OAuth token
         r"^ghu_[a-zA-Z0-9]{36}$",  # User-to-server token
         r"^ghs_[a-zA-Z0-9]{36}$",  # Server-to-server token
         r"^ghr_[a-zA-Z0-9]{76}$",  # Refresh token
+        r"^github_pat_[a-zA-Z0-9_]{82}$",  # Fine-grained personal access token
     ]
 
     return any(re.match(pattern, token) for pattern in github_patterns)

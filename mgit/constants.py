@@ -4,7 +4,6 @@ __version__ = "0.3.1"
 
 # Default values used if environment variables and config file don't provide values
 DEFAULT_VALUES = {
-    "AZURE_DEVOPS_ORG_URL": "https://www.visualstudio.com",
     "LOG_FILENAME": "mgit.log",
     "LOG_LEVEL": "DEBUG",
     "CON_LEVEL": "INFO",
