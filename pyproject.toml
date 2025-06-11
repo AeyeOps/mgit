@@ -132,6 +132,7 @@ markers = [
     "slow: marks tests as slow (for long-running tests)",
     "requires_network: marks tests that require network access",
     "asyncio: marks tests as async tests",
+    "e2e: marks tests as end-to-end tests against real APIs",
 ]
 addopts = [
     "-v",
