@@ -606,6 +606,104 @@ mgit --debug list "myorg/*/*"
 mgit monitoring health --detailed
 ```
 
+## Technical Reference
+
+### Command Details: `mgit clone-all`
+
+The `clone-all` command is mgit's most powerful feature, enabling bulk repository operations across providers. This section provides comprehensive documentation for advanced usage.
+
+#### Command Syntax
+```bash
+mgit clone-all <project> <path> [OPTIONS]
+```
+
+#### Arguments and Options
+
+| Parameter | Required | Short | Description | Example |
+|-----------|----------|-------|-------------|---------|
+| `project` | Yes | - | Project, organization, or workspace name | `MyOrg`, `frontend-team` |
+| `path` | Yes | - | Target directory for cloning (relative or absolute) | `./repos`, `/home/user/code` |
+| `--config` | No | `-cfg` | Use specific provider configuration | `--config github_work` |
+| `--url` | No | `-u` | Provider URL (auto-detects type, overrides --config) | `--url https://dev.azure.com/myorg` |
+| `--concurrency` | No | `-c` | Number of parallel clone operations (default: 4) | `--concurrency 10` |
+| `--update-mode` | No | `-um` | How to handle existing directories | `--update-mode pull` |
+
+#### Update Modes Explained
+
+| Mode | Behavior | Use Case |
+|------|----------|----------|
+| `skip` (default) | Skip directories that already exist | Safe default, no data loss |
+| `pull` | Update existing Git repositories with `git pull` | Keep repos synchronized |
+| `force` | Delete existing directories and clone fresh | Clean slate, requires confirmation |
+
+#### Real-World Examples
+
+```bash
+# Basic usage - clone all repos from a project
+mgit clone-all MyProject ./myproject-repos
+
+# Clone with specific provider configuration
+mgit clone-all FrontendTeam ./frontend --config github_work
+
+# Update existing repositories
+mgit clone-all BackendServices ./backend --update-mode pull
+
+# High-performance cloning for large organizations
+mgit clone-all "AcmeCorp" ./acme --concurrency 20
+
+# Force fresh clones (with confirmation prompt)
+mgit clone-all DevOpsTools ./tools --update-mode force
+
+# Auto-detect provider from URL
+mgit clone-all MyOrg ./repos --url https://github.com/MyOrg
+```
+
+#### Behavior Matrix
+
+| Scenario | Existing Directory | Is Git Repo? | Update Mode | Action |
+|----------|-------------------|--------------|-------------|---------|
+| New clone | No | - | Any | Clone repository |
+| Directory exists | Yes | Yes | `skip` | Skip, no action |
+| Directory exists | Yes | Yes | `pull` | Execute `git pull` |
+| Directory exists | Yes | No | `pull` | Skip with warning |
+| Directory exists | Yes | Any | `force` | Prompt, then delete & clone |
+
+#### Performance Considerations
+
+- **Default concurrency (4)**: Balanced for most networks and systems
+- **High concurrency (10-20)**: For fast networks and many small repos
+- **Low concurrency (1-2)**: For large repos or limited bandwidth
+- **Provider limits**: GitHub (10), Azure DevOps (4), BitBucket (5)
+
+#### Error Handling
+
+The command handles various failure scenarios gracefully:
+
+- **Authentication failures**: Clear message with fix instructions
+- **Network timeouts**: Automatic retry with exponential backoff
+- **Disk space issues**: Fail fast with helpful error
+- **Permission denied**: Skip repo and continue with others
+- **Invalid project names**: Validate before starting operations
+
+#### Advanced Patterns
+
+```bash
+# Clone from multiple projects into organized structure
+for project in Frontend Backend Infrastructure; do
+  mgit clone-all "$project" "./code/$project" --config azdo_work
+done
+
+# Selective cloning with post-processing
+mgit list "MyOrg/*api*" --format json | \
+  jq -r '.[].repository' | \
+  xargs -I {} mgit clone-all MyOrg ./apis --filter {}
+
+# Parallel provider operations
+mgit clone-all WorkProject ./work --config github_work &
+mgit clone-all PersonalProject ./personal --config github_personal &
+wait
+```
+
 ## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:

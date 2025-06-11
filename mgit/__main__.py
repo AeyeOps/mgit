@@ -30,7 +30,6 @@ from mgit.config.yaml_manager import (
     get_provider_config,
     get_provider_configs,
     list_provider_names,
-    migrate_from_dotenv,
     remove_provider_config,
     set_default_provider,
 )
@@ -56,7 +55,6 @@ DEFAULT_VALUES = {
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Migrate old dotenv configuration if it exists
-migrate_from_dotenv()
 
 
 # Configuration loading with YAML system
