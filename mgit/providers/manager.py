@@ -287,9 +287,16 @@ class ProviderManager:
                     async for repo in provider.list_repositories(project, None):
                         repos.append(repo)
                 else:
-                    # Azure DevOps style: organization, project
-                    async for repo in provider.list_repositories("", project):
-                        repos.append(repo)
+                    # Azure DevOps style: parse org/project if needed
+                    if "/" in project:
+                        # Project is in format "org/project"
+                        org_name, project_name = project.split("/", 1)
+                        async for repo in provider.list_repositories(org_name, project_name):
+                            repos.append(repo)
+                    else:
+                        # Just project name
+                        async for repo in provider.list_repositories("", project):
+                            repos.append(repo)
                 return repos
             finally:
                 # Don't close provider here - it might be reused

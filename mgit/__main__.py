@@ -352,11 +352,8 @@ def clone_all(
     # List repositories using provider manager
     logger.debug(f"Fetching repository list for project: {project}...")
     try:
-
-        async def _collect_repos():
-            return [repo async for repo in provider_manager.list_repositories(project)]
-
-        repositories = asyncio.run(_collect_repos())
+        # list_repositories is a sync method that returns a list, not an async generator
+        repositories = provider_manager.list_repositories(project)
         logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
     except Exception as e:
         logger.error(f"Error fetching repository list: {e}")
@@ -694,11 +691,8 @@ def pull_all(
     # List repositories using provider manager
     logger.debug(f"Fetching repository list for project: {project}...")
     try:
-
-        async def _collect_repos():
-            return [repo async for repo in provider_manager.list_repositories(project)]
-
-        repositories = asyncio.run(_collect_repos())
+        # list_repositories is a sync method that returns a list, not an async generator
+        repositories = provider_manager.list_repositories(project)
         logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
     except Exception as e:
         logger.error(f"Error fetching repository list: {e}")
