@@ -130,7 +130,11 @@ poetry run mgit --version
 poetry run pytest tests/ -v                    # All tests
 poetry run pytest tests/unit/ -v               # Unit tests only
 poetry run pytest tests/integration/ -v        # Integration tests only
+poetry run pytest tests/e2e/ -v                # End-to-end tests (requires real APIs)
 poetry run pytest tests/unit/test_git.py::TestGitOperations::test_git_clone_success -v  # Single test
+poetry run pytest -m unit                       # Run only unit tests
+poetry run pytest -m "not requires_network"     # Skip network tests
+poetry run poe test                             # Run all tests via poe
 
 # Code quality
 poetry run poe lint                  # Ruff linting
@@ -150,6 +154,11 @@ poetry run pip-audit                 # Dependency vulnerabilities
 # Version management
 poetry run poe version-sync          # Sync version across files
 poetry run poe bump-patch            # Bump patch version
+poetry run poe bump-minor            # Bump minor version
+poetry run poe bump-major            # Bump major version
+
+# Cleanup
+poetry run poe clean                 # Remove build artifacts
 ```
 
 ### Common mgit Commands
@@ -265,8 +274,17 @@ __main__.py → Can import from all modules
 ### Test Organization
 - **Unit Tests** (`tests/unit/`): Test individual components in isolation
 - **Integration Tests** (`tests/integration/`): Test command execution
+- **End-to-End Tests** (`tests/e2e/`): Test against real APIs (requires credentials)
 - Mock external API calls to avoid network dependencies
 - Use pytest fixtures for common setup (`tests/conftest.py`)
+
+### Test Markers
+- `@pytest.mark.unit` - Unit tests
+- `@pytest.mark.integration` - Integration tests
+- `@pytest.mark.e2e` - End-to-end tests against real APIs
+- `@pytest.mark.slow` - Long-running tests
+- `@pytest.mark.requires_network` - Tests requiring network access
+- `@pytest.mark.asyncio` - Async tests
 
 ### Current Test Coverage
 - Overall: 22% (working to improve)
@@ -337,6 +355,9 @@ except NetworkError as e:
 - Python Support: 3.9, 3.10, 3.11, 3.12
 - Version synchronized across: `pyproject.toml`, `mgit/constants.py`, CLI output
 
+## Scripts and Utilities
+- `scripts/copy_linux_binary.py` - Helper for Linux binary distribution after PyInstaller build
+
 ## Critical Context for mgit Operations
 
 ### Query Pattern System
@@ -367,7 +388,11 @@ The monitoring system provides production-grade observability:
 - HTTP server with Prometheus metrics at `/metrics`
 - Health endpoints: `/health`, `/health/ready`, `/health/live`
 - Performance tracking and correlation analysis
-- Start with: `mgit monitoring server --port 8080`
+- Commands:
+  - `mgit monitoring server --port 8080` - Start full monitoring server
+  - `mgit monitoring server --simple --port 8080` - Start simple server (no aiohttp dependency)
+  - `mgit monitoring health` - Check system health
+  - `mgit monitoring health --detailed` - Detailed health check
 
 ### Common Workflow Patterns
 1. **Discovery First**: Always `list` before `clone-all`
