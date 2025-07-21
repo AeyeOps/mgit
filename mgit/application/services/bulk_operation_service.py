@@ -105,13 +105,9 @@ class BulkOperationService:
     
     async def _collect_repositories(self, project: str) -> List[Repository]:
         """Collect all repositories from the provider."""
-<<<<<<< HEAD
         # Provider adapter returns a sync list, not an async iterator
         repos = self.provider_adapter.list_repositories(project)
         return repos
-=======
-        return self.provider_adapter.list_repositories(project)
->>>>>>> 3a5c5d58c51697920c8136facbe4eddf857da240
     
     async def _handle_force_mode_precheck(self, context: OperationContext) -> None:
         """Check for existing directories that would be removed in force mode."""

@@ -67,10 +67,10 @@ def config_callback(show: bool = False) -> None:
         for provider in ["azure_devops", "github", "bitbucket"]:
             provider_config = config.get(provider, {})
             if provider_config:
-                table.add_row(f"{provider.title()} URL", provider_config.get("url", "Not set"))
+                table.add_row(f"{provider.title()} Org", provider_config.get("org", "Not set"))
                 table.add_row(
                     f"{provider.title()} Token", 
-                    "****" if provider_config.get("token") else "Not set"
+                    "****" if provider_config.get("pat") or provider_config.get("token") else "Not set"
                 )
         
         console.print(table)
@@ -108,9 +108,13 @@ def login(
         if provider_key not in config:
             config[provider_key] = {}
         
-        # Use unified field names for all providers
-        config[provider_key]["url"] = org
-        config[provider_key]["token"] = token
+        config[provider_key]["org"] = org
+        
+        # Use appropriate token field based on provider
+        if provider_key == "github":
+            config[provider_key]["token"] = token
+        else:
+            config[provider_key]["pat"] = token
         
         # Save configuration
         config_manager.save_config(config)
@@ -194,11 +198,11 @@ def list_projects(
             # List from all configured providers
             config = container.config_manager.config
             providers = []
-            if config.get("azure_devops", {}).get("token"):
+            if config.get("azure_devops", {}).get("pat"):
                 providers.append("azure-devops")
             if config.get("github", {}).get("token"):
                 providers.append("github")
-            if config.get("bitbucket", {}).get("token"):
+            if config.get("bitbucket", {}).get("pat"):
                 providers.append("bitbucket")
         
         if not providers:

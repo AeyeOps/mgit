@@ -177,21 +177,16 @@ class ProviderManager:
                 f"All providers must have: url, user, token, workspace (optional)"
             )
         
-        # Map unified configuration fields to provider-specific field names
-        # This maintains backward compatibility with existing provider implementations
-        # while allowing users to use standardized field names in their configs
+        # Map unified field names to provider-specific field names
         if self._provider_type == "azuredevops":
-            # Azure DevOps expects organization_url and pat
             self._config["organization_url"] = self._config["url"]
             self._config["pat"] = self._config["token"]
             
         elif self._provider_type == "github":
-            # GitHub expects pat instead of token
             self._config["pat"] = self._config["token"]
             self._config["base_url"] = "https://api.github.com"
                 
         elif self._provider_type == "bitbucket":
-            # BitBucket expects username and app_password
             self._config["username"] = self._config["user"]
             self._config["app_password"] = self._config["token"]
             self._config["base_url"] = "https://api.bitbucket.org/2.0"

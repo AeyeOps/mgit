@@ -353,14 +353,14 @@ def migrate_from_dotenv() -> bool:
         "DEFAULT_CONCURRENCY": ("global", "default_concurrency"),
         "DEFAULT_UPDATE_MODE": ("global", "default_update_mode"),
         # Azure DevOps settings
-        "AZURE_DEVOPS_ORG_URL": ("provider", "azuredevops", "url"),
-        "AZURE_DEVOPS_EXT_PAT": ("provider", "azuredevops", "token"),
+        "AZURE_DEVOPS_ORG_URL": ("provider", "azuredevops", "org_url"),
+        "AZURE_DEVOPS_EXT_PAT": ("provider", "azuredevops", "pat"),
         # GitHub settings
-        "GITHUB_ORG_URL": ("provider", "github", "url"),
+        "GITHUB_ORG_URL": ("provider", "github", "org_url"),
         "GITHUB_PAT": ("provider", "github", "token"),
         # BitBucket settings
-        "BITBUCKET_ORG_URL": ("provider", "bitbucket", "url"),
-        "BITBUCKET_APP_PASSWORD": ("provider", "bitbucket", "token"),
+        "BITBUCKET_ORG_URL": ("provider", "bitbucket", "org_url"),
+        "BITBUCKET_APP_PASSWORD": ("provider", "bitbucket", "app_password"),
         "BITBUCKET_USERNAME": ("provider", "bitbucket", "username"),
     }
 
