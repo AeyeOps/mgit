@@ -650,6 +650,34 @@ poetry run poe format   # Format code
 poetry run poe build-all # Build binaries
 ```
 
+### Release Process
+
+mgit uses an automated release process that triggers when the version changes:
+
+1. **Update Version**: Use the helper script
+   ```bash
+   python scripts/update_version.py patch  # For bug fixes (0.3.1 -> 0.3.2)
+   python scripts/update_version.py minor  # For features (0.3.1 -> 0.4.0)
+   python scripts/update_version.py major  # For breaking changes (0.3.1 -> 1.0.0)
+   python scripts/update_version.py 1.2.3  # Specific version
+   ```
+
+2. **Update CHANGELOG.md**: Document your changes under the new version
+
+3. **Commit and Push**:
+   ```bash
+   git add -A
+   git commit -m "chore: bump version to X.Y.Z"
+   git push origin main
+   ```
+
+The automated workflow will:
+- Create a git tag
+- Build Python packages and Docker images
+- Generate AI-powered release notes from CHANGELOG
+- Create GitHub release with binaries
+- Publish to PyPI (if configured)
+
 ## Security
 
 For security vulnerabilities, see our [Security Policy](SECURITY.md).
