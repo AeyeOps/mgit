@@ -2,8 +2,10 @@ name: Build & Release
 
 on:
   push:
+    branches:
+      - main
     tags:
-      - 'v*'  # ONLY trigger on version tags for releases
+      - 'v*'  # Run for version tags and main branch pushes
   pull_request:
     branches: [ main ]
     paths:
