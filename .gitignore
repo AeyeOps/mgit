@@ -58,3 +58,4 @@ Thumbs.db
 review-for-deletion/
 test-binary-run/
 test-repos/
+.claude/settings.local.json

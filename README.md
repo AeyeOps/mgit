@@ -2,7 +2,7 @@
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.13-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](#)
 
 **One CLI for all your Git repositories across Azure DevOps, GitHub, and BitBucket.**
 
@@ -52,7 +52,7 @@ poetry install
 **Verify installation:**
 ```bash
 poetry run mgit --version
-# Should show: mgit version: 0.2.13
+# Should show: mgit version: 0.4.0
 ```
 
 ### 2. Choose and configure one provider
@@ -109,115 +109,22 @@ poetry run mgit list "*/*/*" --limit 10
 
 ## Provider Setup
 
-Configure mgit for your complete environment. You can set up multiple providers.
+See detailed provider setup guides:
+- **[Azure DevOps Guide](docs/providers/azure-devops-usage-guide.md)** - Enterprise setup with organizations and projects
+- **[GitHub Guide](docs/providers/github-usage-guide.md)** - Open source and organization repositories  
+- **[BitBucket Guide](docs/providers/bitbucket-usage-guide.md)** - Workspace and team repositories
+- **[Provider Comparison](docs/providers/provider-comparison-guide.md)** - Feature comparison and selection guide
 
-### Azure DevOps
-
-**Best for**: Enterprise environments, Microsoft-centric organizations, project-based organization
-
-#### 1. Create Personal Access Token
-- Go to https://dev.azure.com/[your-organization]
-- Click your profile icon → "Personal access tokens"
-- Create token with scopes: **Code** (Read & Write), **Project and Team** (Read)
-- Copy the token immediately (you won't see it again)
-
-#### 2. Configure mgit
+### Quick Setup (All Providers)
 ```bash
+# Azure DevOps
 poetry run mgit login --provider azuredevops --name work_ado
-# Enter organization URL: https://dev.azure.com/myorg
-# Enter PAT when prompted
-```
 
-#### 3. Test and usage
-```bash
-# List projects (use Azure DevOps web interface to see available projects)
-# Clone all repos from a project
-poetry run mgit clone-all "myorg/DataEngineering/*" ./data-eng --config work_ado
-```
-
-**Azure DevOps uses project-based organization**: Repositories exist within projects, so you need the project name in your patterns.
-
-#### Azure DevOps Troubleshooting
-**"TF401019: Repository does not exist"**
-```bash
-# Check URL format - must include https://
-# ✓ Correct: https://dev.azure.com/myorg
-# ✗ Wrong: myorg.visualstudio.com
-# ✗ Wrong: dev.azure.com/myorg (missing https://)
-
-# Verify PAT scopes: Code (Read & Write), Project (Read)
-poetry run mgit config --show work_ado
-```
-
-### GitHub
-
-**Best for**: Open source development, modern CI/CD, developer experience
-
-#### 1. Create Personal Access Token
-- Go to GitHub → Settings → Developer settings → Personal access tokens
-- Create "Classic" token with scopes: **repo**, **read:org**, **read:user**
-- Copy the token (format: `ghp_` followed by 40 characters)
-
-#### 2. Configure mgit
-```bash
+# GitHub  
 poetry run mgit login --provider github --name personal_gh
-# Enter token when prompted
-```
 
-#### 3. Test and usage
-```bash
-# Clone personal repositories
-poetry run mgit clone-all "your-username/*/*" ./personal-repos --config personal_gh
-
-# Clone organization repositories  
-poetry run mgit clone-all "AeyeOps/*/*" ./aeyeops-repos --config personal_gh
-```
-
-**GitHub uses flat organization**: No projects, just organizations/users containing repositories directly.
-
-#### GitHub Troubleshooting
-**"Bad credentials" or "401 Unauthorized"**
-```bash
-# Verify token format (should be ghp_ + 40 characters)
-curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/user
-
-# Check token scopes
-curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/rate_limit
-```
-
-### BitBucket
-
-**Best for**: Atlassian ecosystem, small teams, workspace organization
-
-#### 1. Create App Password (NOT Personal Access Token)
-- Go to Bitbucket → Personal settings → App passwords
-- Create password with permissions: **Repositories** (Read, Write), **Workspaces** (Read)
-- Copy the app password immediately
-
-#### 2. Configure mgit
-```bash
+# BitBucket
 poetry run mgit login --provider bitbucket --name team_bb
-# Enter your BitBucket username (not email)
-# Enter app password when prompted
-```
-
-#### 3. Test and usage
-```bash
-# Clone all repos from a workspace
-poetry run mgit clone-all "myworkspace/*/*" ./workspace-repos --config team_bb
-```
-
-**BitBucket uses workspace organization**: Workspaces contain repositories (and optional projects).
-
-#### BitBucket Troubleshooting
-**"Invalid app password"**
-```bash
-# Use username, not email address
-# ✓ Correct: BITBUCKET_USERNAME=myusername  
-# ✗ Wrong: BITBUCKET_USERNAME=email@example.com
-
-# Verify app password (not regular password)
-curl -u YOUR_USERNAME:YOUR_APP_PASSWORD https://api.bitbucket.org/2.0/user
 ```
 
 ## Core Operations
@@ -233,108 +140,84 @@ These are the commands you'll use daily with mgit.
 
 ```bash
 # Find repositories across all configured providers
-mgit list "myorg/*/*"                    # All repos in organization
-mgit list "*/*/api-*"                    # All API repositories
-mgit list "*/*/*payment*"               # All payment-related repos
+poetry run mgit list "myorg/*/*"                    # All repos in organization
+poetry run mgit list "*/*/api-*"                    # All API repositories
+poetry run mgit list "*/*/*payment*"               # All payment-related repos
 
 # Provider-specific patterns
-mgit list "myorg/backend/*"              # Azure DevOps: specific project  
-mgit list "AeyeOps/*/*"                 # GitHub: all repos in org
-mgit list "myworkspace/*/*"             # BitBucket: all repos in workspace
+poetry run mgit list "myorg/backend/*"              # Azure DevOps: specific project  
+poetry run mgit list "AeyeOps/*/*"                 # GitHub: all repos in org
+poetry run mgit list "myworkspace/*/*"             # BitBucket: all repos in workspace
 
 # Output options
-mgit list "myorg/*/*" --format json     # JSON for automation
-mgit list "*/*/*" --limit 100           # Limit results
+poetry run mgit list "myorg/*/*" --format json     # JSON for automation
+poetry run mgit list "*/*/*" --limit 100           # Limit results
 ```
 
 ### Clone Multiple Repositories
 
 ```bash
 # Clone from specific provider
-mgit clone-all "myorg/backend/*" ./repos --config work_ado
+poetry run mgit clone-all "myorg/backend/*" ./repos --provider work_ado
 
 # Clone with custom concurrency (default: 4)
-mgit clone-all "myorg/*/*" ./repos --concurrency 10
+poetry run mgit clone-all "myorg/*/*" ./repos --concurrency 10
 
-# Clone with filtering
-mgit clone-all "myorg/*/*" ./repos --filter "*-service"
+# Update existing repositories during clone
+poetry run mgit clone-all "myorg/*/*" ./repos --update-mode pull
 ```
 
 ### Update Repositories
 
 ```bash
 # Update all repositories in a directory
-mgit pull-all "myproject" ./repos
+poetry run mgit pull-all "myproject" ./repos
 
 # Update with specific provider
-mgit pull-all "myorg" ./repos --config github_personal
+poetry run mgit pull-all "myorg" ./repos --provider github_personal
 
-# Update with strategy
-mgit pull-all "myproject" ./repos --strategy rebase
+# Update with concurrency control
+poetry run mgit pull-all "myproject" ./repos --concurrency 8
 ```
 
 ### Check Repository Status
 
 ```bash
 # Status of all repos in directory (only shows dirty repos)
-mgit status ./repos
+poetry run mgit status ./repos
 
 # Include clean repos in output
-mgit status ./repos --all
+poetry run mgit status ./repos --show-clean
 
 # Fetch from remote before checking status
-mgit status ./repos --fetch
+poetry run mgit status ./repos --fetch
 
 # Fail if any repo has uncommitted changes (useful for CI)
-mgit status ./repos --fail-on-dirty
+poetry run mgit status ./repos --fail-on-dirty
 ```
 
 ## Configuration
 
-mgit stores configuration in `~/.config/mgit/config.yaml`. You usually don't need to edit this directly - use `mgit login` instead.
+mgit stores configuration in `~/.config/mgit/config.yaml`. Use `mgit login` to configure providers automatically.
 
-### Multiple Provider Setup
-
-```yaml
-# ~/.config/mgit/config.yaml (created by 'mgit login')
-global:
-  default_provider: work_ado
-  default_concurrency: 8
-
-providers:
-  work_ado:
-    url: https://dev.azure.com/myorg
-    user: ""                                # Not used for Azure DevOps PAT auth
-    token: your-azure-devops-pat
-    workspace: ""                           # Optional workspace identifier
-    
-  personal_gh:
-    url: https://api.github.com
-    user: your-github-username
-    token: ghp_your-github-token
-    workspace: ""                           # Optional organization/workspace
-    
-  team_bb:
-    url: https://api.bitbucket.org/2.0
-    user: myusername
-    token: your-bitbucket-app-password
-    workspace: myworkspace
-```
+For detailed configuration examples and troubleshooting, see:
+- **[Configuration Examples](docs/configuration/mgit-configuration-examples.md)** - Complete YAML examples for all providers
+- **[Query Patterns Guide](docs/usage/query-patterns.md)** - Repository discovery patterns
 
 ### Configuration Management
 
 ```bash
 # List all configured providers
-mgit config --list
+poetry run mgit config --list
 
 # Show provider details (tokens automatically masked)
-mgit config --show work_ado
+poetry run mgit config --show work_ado
 
 # Set default provider
-mgit config --set-default personal_gh
+poetry run mgit config --set-default personal_gh
 
 # Remove old configuration
-mgit config --remove old_config
+poetry run mgit config --remove old_config
 ```
 
 ### Environment Variables (Limited)
@@ -427,7 +310,7 @@ mgit list "*/*/*-service" --format json
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--config NAME` | Use specific provider configuration | Default provider |
+| `--provider NAME` | Use specific provider configuration | Default provider |
 | `--concurrency N` | Number of parallel operations | 4 |
 | `--update-mode MODE` | Handle existing directories: skip/pull/force | skip |
 | `--format FORMAT` | Output format: table/json | table |
@@ -457,7 +340,7 @@ poetry run poe build-windows  # Windows binary
 poetry run poe build-all      # All platforms
 ```
 
-**Note**: PyPI packages and pre-built releases planned for future versions.
+**Note**: Currently source installation only. PyPI packages and pre-built releases planned for v1.0.
 
 ## Advanced Features
 
@@ -492,22 +375,17 @@ Default performance settings:
 - Rate limits: GitHub (10), Azure DevOps (4), BitBucket (5)  
 - Timeout: 30 seconds per API call
 
-### Monitoring
-
-Enable monitoring for production environments:
+### Performance Optimization
 
 ```bash
-# Start monitoring server
-mgit monitoring server --port 8080
+# Monitor performance with debug mode
+poetry run mgit --debug list "large-org/*/*"
 
-# Check health status  
-mgit monitoring health --detailed
+# Adjust concurrency for your environment
+poetry run mgit clone-all "myorg/*/*" ./repos --concurrency 8
 
-# Available endpoints:
-# /metrics - Prometheus metrics
-# /health - Overall health
-# /health/ready - Readiness probe (Kubernetes)
-# /health/live - Liveness probe (Kubernetes)
+# Use specific patterns for faster queries
+poetry run mgit list "myorg/specific-project/*"  # Better than broad wildcards
 ```
 
 ## Comprehensive Troubleshooting
@@ -517,10 +395,10 @@ mgit monitoring health --detailed
 **Rate limiting**
 ```bash
 # Reduce concurrency if hitting limits
-mgit clone-all "large-org/*/*" ./repos --concurrency 2
+poetry run mgit clone-all "large-org/*/*" ./repos --concurrency 2
 
-# Check current rate limit status
-mgit monitoring metrics | grep rate_limit
+# Use debug mode to see rate limit information
+poetry run mgit --debug list "large-org/*/*"
 ```
 
 **Corporate proxy/SSL**
@@ -538,12 +416,11 @@ export SSL_CERT_FILE=/path/to/corporate-ca.crt
 
 **Configuration not found**
 ```bash
-# Check configuration location
-mgit config --show-path
-# Should show: ~/.config/mgit/config.yaml
-
 # List current configuration
-mgit config --list
+poetry run mgit config --list
+
+# Check configuration file location (stored at ~/.config/mgit/config.yaml)
+ls -la ~/.config/mgit/config.yaml
 ```
 
 **Field name mismatches in YAML**
@@ -561,13 +438,13 @@ mgit config --list
 **Slow operations**
 ```bash
 # Reduce concurrency for stability
-mgit clone-all "large-org/*/*" ./repos --concurrency 3
+poetry run mgit clone-all "large-org/*/*" ./repos --concurrency 3
 
 # Use specific patterns (faster than wildcards)
-mgit list "myorg/specific-project/*"  # Better than "*/specific-project/*"
+poetry run mgit list "myorg/specific-project/*"  # Better than "*/specific-project/*"
 
-# Monitor performance
-mgit monitoring performance --hours 1
+# Monitor performance with debug mode
+poetry run mgit --debug clone-all "large-org/*/*" ./repos
 ```
 
 ### Advanced Pattern Matching
@@ -575,35 +452,35 @@ mgit monitoring performance --hours 1
 **Complex scenarios**
 ```bash
 # DevOps team scenarios
-mgit list "*/*/infra*"        # Infrastructure repos
-mgit list "*/*/terraform-*"   # Terraform modules  
-mgit list "*/*/*db*"          # Database-related repos
+poetry run mgit list "*/*/infra*"        # Infrastructure repos
+poetry run mgit list "*/*/terraform-*"   # Terraform modules  
+poetry run mgit list "*/*/*db*"          # Database-related repos
 
 # Development patterns
-mgit list "*/*/frontend-*"    # Frontend applications
-mgit list "*/*/*-ui"          # UI repositories
-mgit list "*/*/test-*"        # Test repositories
+poetry run mgit list "*/*/frontend-*"    # Frontend applications
+poetry run mgit list "*/*/*-ui"          # UI repositories
+poetry run mgit list "*/*/test-*"        # Test repositories
 
 # Cross-organization search
-mgit list "*/ProjectName/*"   # Find project across orgs
+poetry run mgit list "*/ProjectName/*"   # Find project across orgs
 
 # Performance optimization
-mgit list "myorg/backend/*"    # Specific (faster)
-mgit list "*/*/*" --limit 500  # Limit large searches
+poetry run mgit list "myorg/backend/*"    # Specific (faster)
+poetry run mgit list "*/*/*" --limit 500  # Limit large searches
 ```
 
 ### Getting Help
 
 ```bash
 # Command-specific help
-mgit --help
-mgit <command> --help
+poetry run mgit --help
+poetry run mgit <command> --help
 
 # Debug mode for troubleshooting
-mgit --debug list "myorg/*/*"
+poetry run mgit --debug list "myorg/*/*"
 
-# Check system health
-mgit monitoring health --detailed
+# Check configuration and provider status
+poetry run mgit config --list
 ```
 
 ## Technical Reference
@@ -614,19 +491,18 @@ The `clone-all` command is mgit's most powerful feature, enabling bulk repositor
 
 #### Command Syntax
 ```bash
-mgit clone-all <project> <path> [OPTIONS]
+mgit clone-all <pattern> <path> [OPTIONS]
 ```
 
 #### Arguments and Options
 
 | Parameter | Required | Short | Description | Example |
 |-----------|----------|-------|-------------|---------|
-| `project` | Yes | - | Project, organization, or workspace name | `MyOrg`, `frontend-team` |
+| `pattern` | Yes | - | Pattern to match repositories (org/project/repo) | `"myorg/*/*"`, `"*/*/api-*"` |
 | `path` | Yes | - | Target directory for cloning (relative or absolute) | `./repos`, `/home/user/code` |
-| `--config` | No | `-cfg` | Use specific provider configuration | `--config github_work` |
-| `--url` | No | `-u` | Provider URL (auto-detects type, overrides --config) | `--url https://dev.azure.com/myorg` |
+| `--provider` | No | `-p` | Use specific provider configuration | `--provider github_work` |
 | `--concurrency` | No | `-c` | Number of parallel clone operations (default: 4) | `--concurrency 10` |
-| `--update-mode` | No | `-um` | How to handle existing directories | `--update-mode pull` |
+| `--update-mode` | No | - | How to handle existing directories | `--update-mode pull` |
 
 #### Update Modes Explained
 
@@ -639,23 +515,20 @@ mgit clone-all <project> <path> [OPTIONS]
 #### Real-World Examples
 
 ```bash
-# Basic usage - clone all repos from a project
-mgit clone-all MyProject ./myproject-repos
+# Basic usage - clone repos matching pattern
+poetry run mgit clone-all "MyOrg/*/*" ./myproject-repos
 
 # Clone with specific provider configuration
-mgit clone-all FrontendTeam ./frontend --config github_work
+poetry run mgit clone-all "FrontendTeam/*/*" ./frontend --provider github_work
 
 # Update existing repositories
-mgit clone-all BackendServices ./backend --update-mode pull
+poetry run mgit clone-all "BackendServices/*/*" ./backend --update-mode pull
 
 # High-performance cloning for large organizations
-mgit clone-all "AcmeCorp" ./acme --concurrency 20
+poetry run mgit clone-all "AcmeCorp/*/*" ./acme --concurrency 20
 
 # Force fresh clones (with confirmation prompt)
-mgit clone-all DevOpsTools ./tools --update-mode force
-
-# Auto-detect provider from URL
-mgit clone-all MyOrg ./repos --url https://github.com/MyOrg
+poetry run mgit clone-all "DevOpsTools/*/*" ./tools --update-mode force
 ```
 
 #### Behavior Matrix
