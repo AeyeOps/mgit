@@ -484,8 +484,8 @@ jobs:
           type=sha,prefix={{branch}}-,enable=${{ github.ref_type != 'tag' }}
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
-          type=raw,value=latest,enable={{is_default_branch}},suffix=
-          type=raw,value=${{ join(matrix.tags, ',') }},enable={{is_default_branch}}
+          type=raw,value=latest,enable={{is_default_branch || github.ref_type == 'tag'}},suffix=
+          type=raw,value=${{ join(matrix.tags, ',') }},enable={{is_default_branch || github.ref_type == 'tag'}}
         labels: |
           org.opencontainers.image.title=mgit (${{ matrix.variant }})
           org.opencontainers.image.description=Multi-provider Git management tool (${{ matrix.variant }} variant)

@@ -397,7 +397,7 @@ poetry install
 poetry run mgit --version    # Use poetry run for development
 ```
 
-**Note**: Pre-built releases coming soon. Currently requires building from source.
+**Note**: Pre-built releases are available on the [GitHub Releases](https://github.com/AeyeOps/mgit/releases) page.
 
 ## Advanced Features
 
