@@ -45,9 +45,9 @@ Managing repositories across multiple Git providers is painful. You need differe
 **Option 1: Download Binary (Recommended)**
 ```bash
 # Download latest Linux binary
-wget https://github.com/AeyeOps/mgit/releases/latest/download/mgit-linux
-chmod +x mgit-linux
-sudo mv mgit-linux /usr/local/bin/mgit
+wget https://github.com/AeyeOps/mgit/releases/latest/download/mgit
+chmod +x mgit
+sudo mv mgit /usr/local/bin/mgit
 
 # Verify installation
 mgit --version
@@ -193,7 +193,7 @@ mgit list "*/*/*" --format json         # All repos in JSON format
 # Real-world examples (specify provider for organization access)
 mgit list "AeyeOps/*/*" --provider github_aeyeops     # GitHub: all AeyeOps repos
 mgit list "myworkspace/*/*" --provider bitbucket_team # BitBucket: all workspace repos  
-mgit list "pdidev/*/*" --provider ado_pdidev          # Azure DevOps: all pdidev repos
+mgit list "myorg/*/*" --provider work_ado             # Azure DevOps: all org repos
 ```
 
 ### Clone Multiple Repositories
@@ -364,8 +364,8 @@ mgit list "*/*/*-service" --format json
 
 ```bash
 # Linux
-wget https://github.com/AeyeOps/mgit/releases/latest/download/mgit-linux
-chmod +x mgit-linux && sudo mv mgit-linux /usr/local/bin/mgit
+wget https://github.com/AeyeOps/mgit/releases/latest/download/mgit
+chmod +x mgit && sudo mv mgit /usr/local/bin/mgit
 
 # macOS (when available)
 wget https://github.com/AeyeOps/mgit/releases/latest/download/mgit-macos

@@ -98,7 +98,7 @@ class TestCloneAllEssentials:
             if 'steveant' in provider_name:
                 return 'steveant'
             elif 'gasbuddy' in provider_name:
-                return 'gas-buddy'  # Smaller than PDI-Technologies
+                return 'gas-buddy'  # Smaller test organization
                 
         # For others, use workspace
         if 'workspace' in config:
