@@ -31,7 +31,7 @@ def get_provider_list() -> Dict[str, str]:
     
     providers = {}
     for line in stdout.split('\n'):
-        # Parse lines like: "  ado_pdidev (azuredevops)"
+        # Parse lines like: "  work_ado (azuredevops)"
         match = re.search(r'^\s+([^\s]+)\s+\(([^)]+)\)', line)
         if match:
             name, ptype = match.groups()

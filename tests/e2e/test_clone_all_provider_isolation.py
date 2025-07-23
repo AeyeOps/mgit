@@ -33,7 +33,7 @@ def get_provider_list() -> Dict[str, str]:
     
     providers = {}
     for line in stdout.split('\n'):
-        # Parse lines like: "  ado_pdidev (azuredevops)"
+        # Parse lines like: "  work_ado (azuredevops)"
         match = re.search(r'^\s+([^\s]+)\s+\(([^)]+)\)', line)
         if match:
             name, ptype = match.groups()
@@ -149,7 +149,7 @@ def test_clone_all_provider_isolation(tmp_path):
             clone_target = workspace
             
             # Skip large workspaces that are known to have many repos
-            if provider_type == "bitbucket" and workspace in ["pdisoftware", "p97networks"]:
+            if provider_type == "bitbucket" and workspace in ["large-workspace", "example-networks"]:
                 print(f"⚠️  Skipping {workspace} - known to have too many repos for timeout limit")
                 results[provider_type] = {"status": "skipped", "reason": "too many repos"}
                 continue

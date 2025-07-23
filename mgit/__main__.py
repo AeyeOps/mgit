@@ -668,7 +668,7 @@ def login(
         None,
         "--config",
         "-cfg",
-        help="Named provider configuration to test (e.g., 'ado_pdidev', 'github_personal').",
+        help="Named provider configuration to test (e.g., 'work_ado', 'github_personal').",
     ),
     provider_type: Optional[str] = typer.Option(
         None,

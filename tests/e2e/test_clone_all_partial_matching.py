@@ -34,7 +34,7 @@ def get_provider_list() -> Dict[str, str]:
     
     providers = {}
     for line in stdout.split('\n'):
-        # Parse lines like: "  ado_pdidev (azuredevops)"
+        # Parse lines like: "  work_ado (azuredevops)"
         match = re.search(r'^\s+([^\s]+)\s+\(([^)]+)\)', line)
         if match:
             name, ptype = match.groups()
@@ -58,7 +58,7 @@ def get_provider_workspace(provider_name: str) -> Optional[str]:
         # Fall back to parsing URL for GitHub
         elif 'url:' in line and 'github.com' in line:
             url = line.split('url:')[1].strip()
-            # Extract org from URL like https://github.com/PDI-Technologies/
+            # Extract org from URL like https://github.com/example-org/
             match = re.search(r'github\.com/([^/]+)', url)
             if match:
                 workspace = match.group(1)
