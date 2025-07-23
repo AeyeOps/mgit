@@ -7,22 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Nothing yet.
+- Claude Code Review workflow for automated AI-powered PR reviews
+- Claude PR Assistant workflow for enhanced GitHub Actions automation  
+- Comprehensive end-to-end test suite with 14 new test files covering authentication, clone operations, and configuration management
+- New bulk operations module (`mgit/commands/bulk_operations.py`) with async processing for clone/pull operations
+- Provider isolation tests for enhanced multi-provider scenario coverage
+- Detailed test documentation with implementation logs and success reports
 
 ### Changed
-- Nothing yet.
+- **Architecture refactoring**: Unified provider configuration structure with complete elimination of legacy field names
+- **Azure DevOps integration**: Updated to use synchronous methods for improved reliability and project parsing
+- **Provider manager**: Enhanced error handling, authentication flow, and automatic field mapping for legacy configurations
+- **Testing infrastructure**: Comprehensive E2E test coverage with provider-specific isolation testing
+- **Documentation**: Enhanced CLAUDE.md with behavioral guidelines and development patterns
 
 ### Deprecated
-- Nothing yet.
+- Legacy provider field names (automatically converted via field mapping)
 
 ### Removed
-- Nothing yet.
+- Obsolete provider test scripts and configuration files (350+ lines of deprecated code)
+- Deprecated `generate_env` command functionality
+- Legacy manager components replaced with unified structure
+- Obsolete documentation files and development artifacts
 
 ### Fixed
-- Nothing yet.
+- Repository listing now uses synchronous method for more stable Azure DevOps operations
+- Provider configuration field mapping handles all legacy scenarios consistently
+- Enhanced provider-specific error messages and authentication feedback
+- Improved handling of disabled/inaccessible repositories
 
 ### Security
-- Nothing yet.
+- Enhanced credential masking in logging and debug information
+
+## [0.3.2] - 2025-01-23
+
+### Added
+- Claude Code Review workflow for automated PR reviews
+- Claude PR Assistant workflow for enhanced GitHub Actions automation
+- Comprehensive end-to-end test suite for mgit CLI functionality
+
+### Changed
+- Enhanced Azure DevOps project parsing with synchronous method for improved reliability
+- Unified provider configuration structure with complete legacy field name elimination
+- Improved documentation for testing procedures and removed obsolete configuration files
+
+### Removed
+- Obsolete provider test scripts and configuration files
+- Deprecated generate_env command functionality
+- Legacy manager components replaced with unified structure
+
+### Fixed
+- Repository listing now uses synchronous method for more stable Azure DevOps operations
+- Provider configuration field mapping now handles all legacy scenarios consistently
 
 ## [0.2.9] - 2025-06-01
 

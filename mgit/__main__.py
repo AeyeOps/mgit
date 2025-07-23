@@ -18,6 +18,12 @@ from rich.progress import Progress
 from rich.prompt import Confirm
 
 from mgit import __version__
+from mgit.commands.bulk_operations import (
+    BulkOperationProcessor,
+    OperationType,
+    UpdateMode as BulkUpdateMode,
+    check_force_mode_confirmation,
+)
 from mgit.commands.listing import format_results, list_repositories
 from mgit.commands.status import display_status_results, get_repository_statuses
 from mgit.config.yaml_manager import (
@@ -258,10 +264,8 @@ def main_options(
 # -----------------------------------------------------------------------------
 
 
-class UpdateMode(str, Enum):
-    skip = "skip"
-    pull = "pull"
-    force = "force"
+# UpdateMode is now imported from bulk_operations as BulkUpdateMode
+UpdateMode = BulkUpdateMode
 
 
 @app.command()
@@ -307,7 +311,6 @@ def clone_all(
     Supports Azure DevOps, GitHub, and BitBucket providers.
     Provider is auto-detected from URL or can be specified explicitly.
     """
-
     # Initialize provider manager with named configuration support
     try:
         # Priority: URL auto-detection > named config > default
@@ -352,7 +355,6 @@ def clone_all(
     # List repositories using provider manager
     logger.debug(f"Fetching repository list for project: {project}...")
     try:
-        # list_repositories is a sync method that returns a list, not an async generator
         repositories = provider_manager.list_repositories(project)
         logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
     except Exception as e:
@@ -361,227 +363,19 @@ def clone_all(
 
     if not repositories:
         logger.info(f"No repositories found in project '{project}'.")
-        return  # Exit gracefully if no repos
+        return
 
-    failures = []
-    confirmed_force_remove = False  # Flag to track user confirmation
+    # Check for force mode confirmation
+    confirmed_force_remove, dirs_to_remove = check_force_mode_confirmation(
+        repositories, target_path, update_mode
+    )
 
-    # --- Pre-check for force mode ---
-    dirs_to_remove = []
-    if update_mode == UpdateMode.force:
-        logger.debug("Checking for existing directories to remove (force mode)...")
-        for repo in repositories:
-            repo_url = repo.clone_url
-            sanitized_name = sanitize_repo_name(repo_url)
-            repo_folder = target_path / sanitized_name
-            if repo_folder.exists():
-                dirs_to_remove.append((repo.name, sanitized_name, repo_folder))
-
-        if dirs_to_remove:
-            console.print(
-                "[bold yellow]Force mode selected. The following existing directories will be REMOVED:[/bold yellow]"
-            )
-            for _, s_name, _ in dirs_to_remove:
-                console.print(f" - {s_name}")
-            if Confirm.ask(
-                "Proceed with removing these directories and cloning fresh?",
-                default=False,
-            ):
-                confirmed_force_remove = True
-                logger.info("User confirmed removal of existing directories.")
-            else:
-                logger.warning(
-                    "User declined removal. Force mode aborted for existing directories."
-                )
-                # Optionally, switch mode or just let the tasks skip later
-                # For simplicity, we'll let the tasks handle skipping based on confirmed_force_remove flag
-    # --- End Pre-check ---
-
-    async def do_clones():
-        """
-        Process repos asynchronously with a concurrency
-        limit and a progress bar. lso embed the PAT in the remote URL.
-        Handle each repo's failure gracefully, storing it in 'failures'.
-        """
-        sem = asyncio.Semaphore(concurrency)
-
-        # Keep track of individual repo tasks
-        repo_tasks = {}
-
-        with Progress() as progress:
-            overall_task_id = progress.add_task(
-                "[green]Processing Repositories...",
-                total=len(repositories),
-            )
-
-            async def process_one_repo(repo):  # repo is now a Repository object
-                repo_name = repo.name
-                repo_url = repo.clone_url  # Use clone_url from Repository object
-                is_disabled = repo.is_disabled  # Use is_disabled attribute
-                display_name = (
-                    repo_name[:30] + "..." if len(repo_name) > 30 else repo_name
-                )
-
-                # Add a task for this specific repo early
-                repo_task_id = progress.add_task(
-                    f"[grey50]Pending: {display_name}[/grey50]", total=1, visible=True
-                )
-                repo_tasks[repo_name] = repo_task_id
-
-                async with sem:
-                    # Check if repository is disabled
-                    if is_disabled:
-                        logger.info(f"Skipping disabled repository: {repo_name}")
-                        failures.append((repo_name, "repository is disabled"))
-                        progress.update(
-                            repo_task_id,
-                            description=f"[yellow]Disabled: {display_name}[/yellow]",
-                            completed=1,
-                        )
-                        progress.advance(overall_task_id, 1)
-                        return
-
-                    # Sanitize the repository name for filesystem use
-                    # Use the actual repo name for the folder, sanitize the URL for logging/cloning if needed
-                    # but the folder name should match the repo name ideally.
-                    # Let's use the sanitized name based on the URL for consistency with previous behavior.
-                    sanitized_name = sanitize_repo_name(repo_url)
-                    if sanitized_name != repo_name:
-                        logger.debug(
-                            f"Using sanitized name '{sanitized_name}' for repository '{repo_name}' folder"
-                        )
-
-                    repo_folder = target_path / sanitized_name
-                    # Decide how to handle if folder already exists
-                    if repo_folder.exists():
-                        if update_mode == UpdateMode.skip:
-                            logger.info(
-                                f"Skipping existing repo folder: {sanitized_name}"
-                            )
-                            progress.update(
-                                repo_task_id,
-                                description=f"[blue]Skipped (exists): {display_name}[/blue]",
-                                completed=1,
-                            )
-                            progress.advance(overall_task_id, 1)
-                            return
-                        elif update_mode == UpdateMode.pull:
-                            progress.update(
-                                repo_task_id,
-                                description=f"[cyan]Pulling: {display_name}...",
-                                visible=True,
-                            )
-                            if (repo_folder / ".git").exists():
-                                # Attempt to do a pull
-                                try:
-                                    await git_manager.git_pull(repo_folder)
-                                    progress.update(
-                                        repo_task_id,
-                                        description=f"[green]Pulled (update): {display_name}[/green]",
-                                        completed=1,
-                                    )
-                                except subprocess.CalledProcessError as e:
-                                    logger.warning(f"Pull failed for {repo_name}: {e}")
-                                    failures.append((repo_name, "pull failed"))
-                                    progress.update(
-                                        repo_task_id,
-                                        description=f"[red]Pull Failed (update): {display_name}[/red]",
-                                        completed=1,
-                                    )
-                            else:
-                                msg = "Folder exists but is not a git repo."
-                                logger.warning(f"{repo_name}: {msg}")
-                                failures.append((repo_name, msg))
-                                progress.update(
-                                    repo_task_id,
-                                    description=f"[yellow]Skipped (not repo): {display_name}[/yellow]",
-                                    completed=1,
-                                )
-                            progress.advance(overall_task_id, 1)
-                            return
-                        elif update_mode == UpdateMode.force:
-                            # Check if removal was confirmed AND this dir was marked
-                            should_remove = confirmed_force_remove and any(
-                                rf == repo_folder for _, _, rf in dirs_to_remove
-                            )
-                            if should_remove:
-                                progress.update(
-                                    repo_task_id,
-                                    description=f"[magenta]Removing: {display_name}...",
-                                    visible=True,
-                                )
-                                logger.info(
-                                    f"Removing existing folder: {sanitized_name}"
-                                )
-                                try:
-                                    shutil.rmtree(repo_folder)
-                                    # Removal successful, fall through to clone
-                                except Exception as e:
-                                    failures.append(
-                                        (repo_name, f"Failed removing old folder: {e}")
-                                    )
-                                    progress.update(
-                                        repo_task_id,
-                                        description=f"[red]Remove Failed: {display_name}[/red]",
-                                        completed=1,
-                                    )
-                                    progress.advance(overall_task_id, 1)
-                                    return
-                            else:
-                                # Either user declined or this specific folder wasn't marked (shouldn't happen with current logic, but safe check)
-                                logger.warning(
-                                    f"Skipping removal of existing folder (not confirmed): {sanitized_name}"
-                                )
-                                progress.update(
-                                    repo_task_id,
-                                    description=f"[blue]Skipped (force declined/not applicable): {display_name}[/blue]",
-                                    completed=1,
-                                )
-                                progress.advance(overall_task_id, 1)
-                                return
-                    # If we made it here:
-                    # - Folder didn't exist OR
-                    # - Force mode was confirmed AND removal succeeded
-                    progress.update(
-                        repo_task_id,
-                        description=f"[cyan]Cloning: {display_name}...",
-                        visible=True,
-                    )
-                    # Get authenticated URL from provider manager
-                    pat_url = provider_manager.get_authenticated_clone_url(repo)
-                    try:
-                        # Use the sanitized name for the directory argument
-                        await git_manager.git_clone(
-                            pat_url, target_path, sanitized_name
-                        )
-                        progress.update(
-                            repo_task_id,
-                            description=f"[green]Cloned: {display_name}[/green]",
-                            completed=1,
-                        )
-                    except subprocess.CalledProcessError:
-                        # Use the sanitized name for the directory argument
-                        await git_manager.git_clone(
-                            pat_url, target_path, sanitized_name
-                        )
-                        progress.update(
-                            repo_task_id,
-                            description=f"[green]Cloned: {display_name}[/green]",
-                            completed=1,
-                        )
-                    except subprocess.CalledProcessError as e:
-                        logger.warning(f"Clone failed for {repo_name}: {e}")
-                        failures.append((repo_name, "clone failed"))
-                        progress.update(
-                            repo_task_id,
-                            description=f"[red]Clone Failed: {display_name}[/red]",
-                            completed=1,
-                        )
-
-                    progress.advance(overall_task_id, 1)
-
-            # Iterate through the Repository objects from provider manager
-            await asyncio.gather(*(process_one_repo(repo) for repo in repositories))
+    # Create processor and run bulk operation
+    processor = BulkOperationProcessor(
+        git_manager=git_manager,
+        provider_manager=provider_manager,
+        operation_type=OperationType.clone,
+    )
 
     logger.info(
         "Processing all repositories for project: "
@@ -590,7 +384,18 @@ def clone_all(
         target_path,
         update_mode,
     )
-    asyncio.run(do_clones())
+
+    # Run the async operation
+    failures = asyncio.run(
+        processor.process_repositories(
+            repositories=repositories,
+            target_path=target_path,
+            concurrency=concurrency,
+            update_mode=update_mode,
+            confirmed_force_remove=confirmed_force_remove,
+            dirs_to_remove=dirs_to_remove,
+        )
+    )
 
     # Summarize
     if failures:
@@ -601,8 +406,7 @@ def clone_all(
         logger.info("All repositories processed successfully with no errors.")
 
 
-# -----------------------------------------------------------------------------
-# pull_all Command
+
 # -----------------------------------------------------------------------------
 @app.command()
 def pull_all(
@@ -623,7 +427,7 @@ def pull_all(
         "-c",
         help="Number of concurrent pull operations.",
     ),
-    update_mode: UpdateMode = typer.Option(
+    update_mode: BulkUpdateMode = typer.Option(
         get_config_value("DEFAULT_UPDATE_MODE", "skip"),
         "--update-mode",
         "-um",
@@ -679,7 +483,7 @@ def pull_all(
     # Prepare local folder
     target_path = Path.cwd() / rel_path
     if not target_path.exists():
-        if update_mode == UpdateMode.force:
+        if update_mode == BulkUpdateMode.force:
             target_path.mkdir(parents=True, exist_ok=True)
         else:
             logger.error(f"Target path does not exist: {target_path}")
@@ -702,215 +506,17 @@ def pull_all(
         logger.info(f"No repositories found in project '{project}'.")
         return  # Exit gracefully if no repos
 
-    failures = []
-    confirmed_force_remove = False  # Flag to track user confirmation
+    # Check for force mode confirmation
+    confirmed_force_remove, dirs_to_remove = check_force_mode_confirmation(
+        repositories, target_path, update_mode
+    )
 
-    # --- Pre-check for force mode ---
-    dirs_to_remove = []
-    if update_mode == UpdateMode.force:
-        logger.debug("Checking for existing directories to remove (force mode)...")
-        for repo in repositories:
-            repo_url = repo.clone_url
-            sanitized_name = sanitize_repo_name(repo_url)
-            repo_folder = target_path / sanitized_name
-            if repo_folder.exists():
-                dirs_to_remove.append((repo.name, sanitized_name, repo_folder))
-
-        if dirs_to_remove:
-            console.print(
-                "[bold yellow]Force mode selected. The following existing directories will be REMOVED:[/bold yellow]"
-            )
-            for _, s_name, _ in dirs_to_remove:
-                console.print(f" - {s_name}")
-            if Confirm.ask(
-                "Proceed with removing these directories and cloning fresh?",
-                default=False,
-            ):
-                confirmed_force_remove = True
-                logger.info("User confirmed removal of existing directories.")
-            else:
-                logger.warning(
-                    "User declined removal. Force mode aborted for existing directories."
-                )
-                # Optionally, switch mode or just let the tasks skip later
-                # For simplicity, we'll let the tasks handle skipping based on confirmed_force_remove flag
-    # --- End Pre-check ---
-
-    async def do_operations():
-        """
-        Process repos asynchronously with a concurrency
-        limit and a progress bar. Also embed the PAT in the remote URL.
-        Handle each repo's failure gracefully, storing it in 'failures'.
-        """
-        sem = asyncio.Semaphore(concurrency)
-
-        # Keep track of individual repo tasks
-        repo_tasks = {}
-
-        with Progress() as progress:
-            overall_task_id = progress.add_task(
-                "[green]Processing Repositories...",
-                total=len(repositories),
-            )
-
-            async def process_one_repo(repo):  # repo is now a Repository object
-                repo_name = repo.name
-                repo_url = repo.clone_url  # Use clone_url from Repository object
-                is_disabled = repo.is_disabled  # Use is_disabled attribute
-                display_name = (
-                    repo_name[:30] + "..." if len(repo_name) > 30 else repo_name
-                )
-
-                # Add a task for this specific repo early
-                repo_task_id = progress.add_task(
-                    f"[grey50]Pending: {display_name}[/grey50]", total=1, visible=True
-                )
-                repo_tasks[repo_name] = repo_task_id
-
-                async with sem:
-                    # Check if repository is disabled
-                    if is_disabled:
-                        logger.info(f"Skipping disabled repository: {repo_name}")
-                        failures.append((repo_name, "repository is disabled"))
-                        progress.update(
-                            repo_task_id,
-                            description=f"[yellow]Disabled: {display_name}[/yellow]",
-                            completed=1,
-                        )
-                        progress.advance(overall_task_id, 1)
-                        return
-
-                    # Sanitize the repository name for filesystem use
-                    # Use the actual repo name for the folder, sanitize the URL for logging/cloning if needed
-                    # but the folder name should match the repo name ideally.
-                    # Let's use the sanitized name based on the URL for consistency with previous behavior.
-                    sanitized_name = sanitize_repo_name(repo_url)
-                    if sanitized_name != repo_name:
-                        logger.debug(
-                            f"Using sanitized name '{sanitized_name}' for repository '{repo_name}' folder"
-                        )
-
-                    repo_folder = target_path / sanitized_name
-                    # Decide how to handle if folder already exists
-                    if repo_folder.exists():
-                        if update_mode == UpdateMode.skip:
-                            logger.info(
-                                f"Skipping existing repo folder: {sanitized_name}"
-                            )
-                            progress.update(
-                                repo_task_id,
-                                description=f"[blue]Skipped (exists): {display_name}[/blue]",
-                                completed=1,
-                            )
-                            progress.advance(overall_task_id, 1)
-                            return
-                        elif update_mode == UpdateMode.pull:
-                            progress.update(
-                                repo_task_id,
-                                description=f"[cyan]Pulling: {display_name}...",
-                                visible=True,
-                            )
-                            if (repo_folder / ".git").exists():
-                                # Attempt to do a pull
-                                try:
-                                    await git_manager.git_pull(repo_folder)
-                                    progress.update(
-                                        repo_task_id,
-                                        description=f"[green]Pulled (update): {display_name}[/green]",
-                                        completed=1,
-                                    )
-                                except subprocess.CalledProcessError as e:
-                                    logger.warning(f"Pull failed for {repo_name}: {e}")
-                                    failures.append((repo_name, "pull failed"))
-                                    progress.update(
-                                        repo_task_id,
-                                        description=f"[red]Pull Failed (update): {display_name}[/red]",
-                                        completed=1,
-                                    )
-                            else:
-                                msg = "Folder exists but is not a git repo."
-                                logger.warning(f"{repo_name}: {msg}")
-                                failures.append((repo_name, msg))
-                                progress.update(
-                                    repo_task_id,
-                                    description=f"[yellow]Skipped (not repo): {display_name}[/yellow]",
-                                    completed=1,
-                                )
-                            progress.advance(overall_task_id, 1)
-                            return
-                        elif update_mode == UpdateMode.force:
-                            # Check if removal was confirmed AND this dir was marked
-                            should_remove = confirmed_force_remove and any(
-                                rf == repo_folder for _, _, rf in dirs_to_remove
-                            )
-                            if should_remove:
-                                progress.update(
-                                    repo_task_id,
-                                    description=f"[magenta]Removing: {display_name}...",
-                                    visible=True,
-                                )
-                                logger.info(
-                                    f"Removing existing folder: {sanitized_name}"
-                                )
-                                try:
-                                    shutil.rmtree(repo_folder)
-                                    # Removal successful, fall through to clone
-                                except Exception as e:
-                                    failures.append(
-                                        (repo_name, f"Failed removing old folder: {e}")
-                                    )
-                                    progress.update(
-                                        repo_task_id,
-                                        description=f"[red]Remove Failed: {display_name}[/red]",
-                                        completed=1,
-                                    )
-                                    progress.advance(overall_task_id, 1)
-                                    return
-                            else:
-                                # Either user declined or this specific folder wasn't marked (shouldn't happen with current logic, but safe check)
-                                logger.warning(
-                                    f"Skipping removal of existing folder (not confirmed): {sanitized_name}"
-                                )
-                                progress.update(
-                                    repo_task_id,
-                                    description=f"[blue]Skipped (force declined/not applicable): {display_name}[/blue]",
-                                    completed=1,
-                                )
-                                progress.advance(overall_task_id, 1)
-                                return
-                    # If we made it here:
-                    # - Folder didn't exist OR
-                    # - Force mode was confirmed AND removal succeeded
-                    progress.update(
-                        repo_task_id,
-                        description=f"[cyan]Cloning: {display_name}...",
-                        visible=True,
-                    )
-                    # Get authenticated URL from provider manager
-                    pat_url = provider_manager.get_authenticated_clone_url(repo)
-                    try:
-                        # Use the sanitized name for the directory argument
-                        await git_manager.git_clone(
-                            pat_url, target_path, sanitized_name
-                        )
-                        progress.update(
-                            repo_task_id,
-                            description=f"[green]Cloned: {display_name}[/green]",
-                            completed=1,
-                        )
-                    except subprocess.CalledProcessError as e:
-                        logger.warning(f"Clone failed for {repo_name}: {e}")
-                        failures.append((repo_name, "clone failed"))
-                        progress.update(
-                            repo_task_id,
-                            description=f"[red]Clone Failed: {display_name}[/red]",
-                            completed=1,
-                        )
-
-                    progress.advance(overall_task_id, 1)
-
-            # Iterate through the Repository objects from provider manager
-            await asyncio.gather(*(process_one_repo(repo) for repo in repositories))
+    # Create processor and process repositories
+    processor = BulkOperationProcessor(
+        git_manager=git_manager,
+        provider_manager=provider_manager,
+        operation_type=OperationType.pull,
+    )
 
     logger.info(
         "Processing all repositories for project: "
@@ -919,7 +525,17 @@ def pull_all(
         target_path,
         update_mode,
     )
-    asyncio.run(do_operations())
+
+    failures = asyncio.run(
+        processor.process_repositories(
+            repositories=repositories,
+            target_path=target_path,
+            concurrency=concurrency,
+            update_mode=update_mode,
+            confirmed_force_remove=confirmed_force_remove,
+            dirs_to_remove=dirs_to_remove,
+        )
+    )
 
     # Summarize
     if failures:
