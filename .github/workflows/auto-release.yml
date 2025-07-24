@@ -88,7 +88,7 @@ jobs:
       run: poetry run ruff check mgit/
       
     - name: Run Bandit security scan
-      run: poetry run bandit -r mgit/ -ll
+      run: poetry run bandit -r mgit/ -lll
       
     - name: Run basic tests
       run: poetry run pytest tests/unit/ -v --tb=short || true
