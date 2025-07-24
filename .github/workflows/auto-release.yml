@@ -321,8 +321,8 @@ jobs:
         context: .
         push: true
         tags: |
-          ghcr.io/${{ github.repository }}:latest
-          ghcr.io/${{ github.repository }}:${{ needs.check-version.outputs.new-version }}
+          ghcr.io/aeyeops/mgit:latest
+          ghcr.io/aeyeops/mgit:${{ needs.check-version.outputs.new-version }}
         platforms: linux/amd64,linux/arm64
         cache-from: type=gha
         cache-to: type=gha,mode=max
