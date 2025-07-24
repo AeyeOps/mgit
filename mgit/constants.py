@@ -1,7 +1,5 @@
 """Constants module for mgit."""
 
-__version__ = "0.4.0"
-
 # Default values used if environment variables and config file don't provide values
 DEFAULT_VALUES = {
     "LOG_FILENAME": "mgit.log",
