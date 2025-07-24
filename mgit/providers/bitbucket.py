@@ -74,8 +74,8 @@ class BitBucketProvider(GitProvider):
             # Convert bitbucket.org URLs to API URLs
             self.url = "https://api.bitbucket.org/2.0"
         else:
-            self.url = url.rstrip('/')  # Remove trailing slash
-            
+            self.url = url.rstrip("/")  # Remove trailing slash
+
         self.user = config.get("user", "")
         self.token = config.get("token", "")
         self.workspace = config.get("workspace", "")
@@ -110,14 +110,9 @@ class BitBucketProvider(GitProvider):
             )
 
         if not self.user:
-            raise ConfigurationError(
-                "BitBucket username is required"
-            )
+            raise ConfigurationError("BitBucket username is required")
         if not self.token:
-            raise ConfigurationError(
-                "BitBucket token (app password) is required"
-            )
-        
+            raise ConfigurationError("BitBucket token (app password) is required")
 
     async def _ensure_session(self) -> None:
         """Ensure we have a valid session for the current event loop."""
@@ -463,7 +458,9 @@ class BitBucketProvider(GitProvider):
             # URL encode credentials to handle special characters
             encoded_username = quote(self.user, safe="")
             encoded_token = quote(self.token, safe="")
-            return f"https://{encoded_username}:{encoded_token}@bitbucket.org/{repo_path}"
+            return (
+                f"https://{encoded_username}:{encoded_token}@bitbucket.org/{repo_path}"
+            )
 
         # Fallback to original URL if we can't authenticate it
         return repository.clone_url

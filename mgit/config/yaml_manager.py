@@ -141,7 +141,7 @@ class ConfigurationManager:
                 f"Missing 'url' field in provider '{provider_name}'. "
                 f"Available fields: {list(config.keys())}"
             )
-            
+
         url_lower = config["url"].lower()
         if "dev.azure.com" in url_lower or "visualstudio.com" in url_lower:
             return "azuredevops"
@@ -308,5 +308,3 @@ def set_default_provider(name: str) -> None:
 def set_global_setting(key: str, value: Any) -> None:
     """Set a global configuration setting."""
     config_manager.set_global_setting(key, value)
-
-

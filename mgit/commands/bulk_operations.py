@@ -25,6 +25,7 @@ console = Console()
 
 class UpdateMode(str, Enum):
     """Update mode for existing folders."""
+
     skip = "skip"
     pull = "pull"
     force = "force"
@@ -32,6 +33,7 @@ class UpdateMode(str, Enum):
 
 class OperationType(str, Enum):
     """Type of bulk operation."""
+
     clone = "clone"
     pull = "pull"
 
@@ -61,7 +63,7 @@ class BulkOperationProcessor:
     ) -> List[Tuple[str, str]]:
         """
         Process repositories asynchronously with progress tracking.
-        
+
         Args:
             repositories: List of repositories to process
             target_path: Target directory for operations
@@ -69,7 +71,7 @@ class BulkOperationProcessor:
             update_mode: How to handle existing directories
             confirmed_force_remove: Whether user confirmed force removal
             dirs_to_remove: List of directories marked for removal in force mode
-            
+
         Returns:
             List of (repo_name, error_reason) tuples for failed operations
         """
@@ -93,9 +95,7 @@ class BulkOperationProcessor:
 
                 # Add a task for this specific repo
                 repo_task_id = progress.add_task(
-                    f"[grey50]Pending: {display_name}[/grey50]", 
-                    total=1, 
-                    visible=True
+                    f"[grey50]Pending: {display_name}[/grey50]", total=1, visible=True
                 )
                 repo_tasks[repo_name] = repo_task_id
 
@@ -169,7 +169,7 @@ class BulkOperationProcessor:
     ) -> bool:
         """
         Handle existing directory based on update mode.
-        
+
         Returns:
             True if the operation should be skipped, False to continue
         """
@@ -284,9 +284,7 @@ class BulkOperationProcessor:
             # Get authenticated URL from provider manager
             pat_url = self.provider_manager.get_authenticated_clone_url(repo)
             try:
-                await self.git_manager.git_clone(
-                    pat_url, target_path, sanitized_name
-                )
+                await self.git_manager.git_clone(pat_url, target_path, sanitized_name)
                 progress.update(
                     repo_task_id,
                     description=f"[green]Cloned: {display_name}[/green]",
@@ -300,7 +298,7 @@ class BulkOperationProcessor:
                     description=f"[red]Clone Failed: {display_name}[/red]",
                     completed=1,
                 )
-        
+
         elif self.operation_type == OperationType.pull:
             if repo_folder.exists() and (repo_folder / ".git").exists():
                 progress.update(
@@ -338,13 +336,13 @@ def check_force_mode_confirmation(
 ) -> Tuple[bool, List[Tuple[str, str, Path]]]:
     """
     Check for existing directories in force mode and get user confirmation.
-    
+
     Returns:
         Tuple of (confirmed, dirs_to_remove)
     """
     dirs_to_remove = []
     confirmed_force_remove = False
-    
+
     if update_mode == UpdateMode.force:
         logger.debug("Checking for existing directories to remove (force mode)...")
         for repo in repositories:
@@ -370,5 +368,5 @@ def check_force_mode_confirmation(
                 logger.warning(
                     "User declined removal. Force mode aborted for existing directories."
                 )
-    
+
     return confirmed_force_remove, dirs_to_remove

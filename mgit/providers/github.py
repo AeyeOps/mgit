@@ -73,15 +73,15 @@ class GitHubProvider(GitProvider):
         # Fail-fast: require unified fields to be present
         if "token" not in config:
             raise ValueError("Missing required field: token")
-            
+
         # Normalize URL - if it's github.com, use api.github.com
         url = config.get("url", "https://api.github.com")
         if "github.com" in url and "api.github.com" not in url:
             # Convert github.com URLs to API URLs
             self.url = "https://api.github.com"
         else:
-            self.url = url.rstrip('/')  # Remove trailing slash
-            
+            self.url = url.rstrip("/")  # Remove trailing slash
+
         self.user = config.get("user", "")
         self.token = config["token"]
         self.workspace = config.get("workspace", "")
@@ -111,9 +111,7 @@ class GitHubProvider(GitProvider):
             )
 
         if not self.token:
-            raise ConfigurationError(
-                "GitHub token is required", self.PROVIDER_NAME
-            )
+            raise ConfigurationError("GitHub token is required", self.PROVIDER_NAME)
 
     async def _ensure_session(self) -> None:
         """Ensure we have a valid session for the current event loop."""
