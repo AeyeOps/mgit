@@ -127,106 +127,102 @@ jobs:
         # Extract changes from CHANGELOG.md
         echo "Extracting changes from CHANGELOG.md..."
         
-        # Create extraction script
-        cat << 'EOF' > extract_changelog.py
-import re
-import sys
-import os
-import subprocess
-
-version = os.environ.get('VERSION', '0.0.0')
-
-# Read CHANGELOG.md
-try:
-    with open('CHANGELOG.md', 'r') as f:
-        content = f.read()
-except FileNotFoundError:
-    print('No CHANGELOG.md found')
-    sys.exit(0)
-
-# Extract section for this version
-pattern = rf'## \[?{re.escape(version)}\]?.*?\n(.*?)(?=\n## |\Z)'
-match = re.search(pattern, content, re.DOTALL)
-
-if match:
-    changes = match.group(1).strip()
-    with open('version_changes.txt', 'w') as f:
-        f.write(changes)
-    print(f'Extracted {len(changes)} characters of changes')
-else:
-    print(f'No changes found for version {version}')
-    # Fall back to recent commits
-    commits = subprocess.run(['git', 'log', '--oneline', '-n', '20'], 
-                           capture_output=True, text=True)
-    with open('version_changes.txt', 'w') as f:
-        f.write('Recent commits:\n' + commits.stdout)
-EOF
+        # Create and run extraction script
+        python3 << 'PYTHON_SCRIPT'
+        import re
+        import sys
+        import os
+        import subprocess
         
-        python3 extract_changelog.py
+        version = os.environ.get('VERSION', '0.0.0')
+        
+        # Read CHANGELOG.md
+        try:
+            with open('CHANGELOG.md', 'r') as f:
+                content = f.read()
+        except FileNotFoundError:
+            print('No CHANGELOG.md found')
+            sys.exit(0)
+        
+        # Extract section for this version
+        pattern = rf'## \[?{re.escape(version)}\]?.*?\n(.*?)(?=\n## |\Z)'
+        match = re.search(pattern, content, re.DOTALL)
+        
+        if match:
+            changes = match.group(1).strip()
+            with open('version_changes.txt', 'w') as f:
+                f.write(changes)
+            print(f'Extracted {len(changes)} characters of changes')
+        else:
+            print(f'No changes found for version {version}')
+            # Fall back to recent commits
+            commits = subprocess.run(['git', 'log', '--oneline', '-n', '20'], 
+                                   capture_output=True, text=True)
+            with open('version_changes.txt', 'w') as f:
+                f.write('Recent commits:\n' + commits.stdout)
+        PYTHON_SCRIPT
         
         # Generate release notes with AI or fallback
         if [ -n "$OPENAI_API_KEY" ]; then
           echo "Generating AI release notes..."
           
-          # Create AI generation script
-          cat << 'EOF' > generate_ai_notes.py
-import openai
-import os
-import sys
-
-try:
-    client = openai.OpenAI()
-    
-    # Read changes
-    with open('version_changes.txt', 'r') as f:
-        changes = f.read()
-    
-    # Read README for context
-    with open('README.md', 'r') as f:
-        readme_lines = f.readlines()[:50]
-        project_context = ''.join([line for line in readme_lines if line.strip()])
-    
-    version = os.environ.get('VERSION', '0.0.0')
-    prompt = f'''Generate concise GitHub release notes for mgit version {version}.
-    
-    Project: mgit - A multi-provider Git repository management CLI tool.
-    Context: {project_context[:500]}
-    
-    Changes:
-    {changes}
-    
-    Create professional release notes with:
-    1. A brief summary of what this release includes
-    2. Key improvements or features (if any)
-    3. Bug fixes (if any)
-    4. One-line installation command
-    
-    Keep it concise and focused on what matters to users.
-    '''
-    
-    response = client.chat.completions.create(
-        model='gpt-3.5-turbo',
-        messages=[
-            {'role': 'system', 'content': 'You are a technical writer creating GitHub release notes.'},
-            {'role': 'user', 'content': prompt}
-        ],
-        temperature=0.3,
-        max_tokens=500
-    )
-    
-    notes = response.choices[0].message.content
-    
-    # Save to file
-    with open('ai_release_notes.txt', 'w') as f:
-        f.write(notes)
+          # Run AI generation script
+          python3 << 'AI_SCRIPT' >/dev/null 2>&1 || true
+        import openai
+        import os
+        import sys
         
-except Exception as e:
-    # Write error marker
-    with open('ai_release_notes.txt', 'w') as f:
-        f.write('AI_GENERATION_FAILED')
-EOF
-          
-          python3 generate_ai_notes.py >/dev/null 2>&1 || true
+        try:
+            client = openai.OpenAI()
+            
+            # Read changes
+            with open('version_changes.txt', 'r') as f:
+                changes = f.read()
+            
+            # Read README for context
+            with open('README.md', 'r') as f:
+                readme_lines = f.readlines()[:50]
+                project_context = ''.join([line for line in readme_lines if line.strip()])
+            
+            version = os.environ.get('VERSION', '0.0.0')
+            prompt = f'''Generate concise GitHub release notes for mgit version {version}.
+            
+            Project: mgit - A multi-provider Git repository management CLI tool.
+            Context: {project_context[:500]}
+            
+            Changes:
+            {changes}
+            
+            Create professional release notes with:
+            1. A brief summary of what this release includes
+            2. Key improvements or features (if any)
+            3. Bug fixes (if any)
+            4. One-line installation command
+            
+            Keep it concise and focused on what matters to users.
+            '''
+            
+            response = client.chat.completions.create(
+                model='gpt-3.5-turbo',
+                messages=[
+                    {'role': 'system', 'content': 'You are a technical writer creating GitHub release notes.'},
+                    {'role': 'user', 'content': prompt}
+                ],
+                temperature=0.3,
+                max_tokens=500
+            )
+            
+            notes = response.choices[0].message.content
+            
+            # Save to file
+            with open('ai_release_notes.txt', 'w') as f:
+                f.write(notes)
+                
+        except Exception as e:
+            # Write error marker
+            with open('ai_release_notes.txt', 'w') as f:
+                f.write('AI_GENERATION_FAILED')
+        AI_SCRIPT
         fi
         
         # Create final release notes
