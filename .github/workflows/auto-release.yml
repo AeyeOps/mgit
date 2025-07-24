@@ -126,10 +126,13 @@ jobs:
         
         # Extract changes from CHANGELOG.md
         echo "Extracting changes from CHANGELOG.md..."
-        python3 -c "
+        
+        # Create extraction script
+        cat << 'EOF' > extract_changelog.py
 import re
 import sys
 import os
+import subprocess
 
 version = os.environ.get('VERSION', '0.0.0')
 
@@ -153,17 +156,20 @@ if match:
 else:
     print(f'No changes found for version {version}')
     # Fall back to recent commits
-    import subprocess
     commits = subprocess.run(['git', 'log', '--oneline', '-n', '20'], 
                            capture_output=True, text=True)
     with open('version_changes.txt', 'w') as f:
-        f.write('Recent commits:\\n' + commits.stdout)
-"
+        f.write('Recent commits:\n' + commits.stdout)
+EOF
+        
+        python3 extract_changelog.py
         
         # Generate release notes with AI or fallback
         if [ -n "$OPENAI_API_KEY" ]; then
           echo "Generating AI release notes..."
-          python3 -c "
+          
+          # Create AI generation script
+          cat << 'EOF' > generate_ai_notes.py
 import openai
 import os
 import sys
@@ -218,7 +224,9 @@ except Exception as e:
     # Write error marker
     with open('ai_release_notes.txt', 'w') as f:
         f.write('AI_GENERATION_FAILED')
-" >/dev/null 2>&1 || true
+EOF
+          
+          python3 generate_ai_notes.py >/dev/null 2>&1 || true
         fi
         
         # Create final release notes
