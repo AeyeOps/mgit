@@ -126,39 +126,39 @@ jobs:
         
         # Extract changes from CHANGELOG.md
         echo "Extracting changes from CHANGELOG.md..."
-        cat > extract_changes.py << EOF
-        import re
-        import sys
-        import os
-        
-        version = os.environ.get('VERSION', '0.0.0')
-        
-        # Read CHANGELOG.md
-        try:
-            with open('CHANGELOG.md', 'r') as f:
-                content = f.read()
-        except FileNotFoundError:
-            print("No CHANGELOG.md found")
-            sys.exit(0)
-        
-        # Extract section for this version
-        pattern = rf'## \[?{re.escape(version)}\]?.*?\n(.*?)(?=\n## |\Z)'
-        match = re.search(pattern, content, re.DOTALL)
-        
-        if match:
-            changes = match.group(1).strip()
-            with open('version_changes.txt', 'w') as f:
-                f.write(changes)
-            print(f"Extracted {len(changes)} characters of changes")
-        else:
-            print(f"No changes found for version {version}")
-            # Fall back to recent commits
-            import subprocess
-            commits = subprocess.run(['git', 'log', '--oneline', '-n', '20'], 
-                                   capture_output=True, text=True)
-            with open('version_changes.txt', 'w') as f:
-                f.write("Recent commits:\n" + commits.stdout)
-        EOF
+        cat > extract_changes.py << 'EXTRACT_SCRIPT_EOF'
+import re
+import sys
+import os
+
+version = os.environ.get('VERSION', '0.0.0')
+
+# Read CHANGELOG.md
+try:
+    with open('CHANGELOG.md', 'r') as f:
+        content = f.read()
+except FileNotFoundError:
+    print("No CHANGELOG.md found")
+    sys.exit(0)
+
+# Extract section for this version
+pattern = rf'## \[?{re.escape(version)}\]?.*?\n(.*?)(?=\n## |\Z)'
+match = re.search(pattern, content, re.DOTALL)
+
+if match:
+    changes = match.group(1).strip()
+    with open('version_changes.txt', 'w') as f:
+        f.write(changes)
+    print(f"Extracted {len(changes)} characters of changes")
+else:
+    print(f"No changes found for version {version}")
+    # Fall back to recent commits
+    import subprocess
+    commits = subprocess.run(['git', 'log', '--oneline', '-n', '20'], 
+                           capture_output=True, text=True)
+    with open('version_changes.txt', 'w') as f:
+        f.write("Recent commits:\n" + commits.stdout)
+EXTRACT_SCRIPT_EOF
         
         python extract_changes.py
         
