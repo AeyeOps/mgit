@@ -296,7 +296,7 @@ class MonitoringServer:
     async def _info_handler(self, request: Request) -> Response:
         """Handle /info endpoint."""
         try:
-            from ..constants import __version__
+            from .. import __version__
 
             uptime = time.time() - self._start_time
 
@@ -515,7 +515,7 @@ class SimpleMonitoringServer:
 
             def _handle_info(self):
                 try:
-                    from ..constants import __version__
+                    from .. import __version__
 
                     info_data = {
                         "application": "mgit",

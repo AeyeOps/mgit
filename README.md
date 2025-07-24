@@ -654,12 +654,19 @@ poetry run poe build-all # Build binaries
 
 mgit uses an automated release process that triggers when the version changes:
 
-1. **Update Version**: Use the helper script
+1. **Update Version**: Use either Poetry or the helper script
    ```bash
-   python scripts/update_version.py patch  # For bug fixes (0.3.1 -> 0.3.2)
-   python scripts/update_version.py minor  # For features (0.3.1 -> 0.4.0)
-   python scripts/update_version.py major  # For breaking changes (0.3.1 -> 1.0.0)
-   python scripts/update_version.py 1.2.3  # Specific version
+   # Using Poetry directly:
+   poetry version patch  # For bug fixes (0.3.1 -> 0.3.2)
+   poetry version minor  # For features (0.3.1 -> 0.4.0)
+   poetry version major  # For breaking changes (0.3.1 -> 1.0.0)
+   poetry version 1.2.3  # Specific version
+   
+   # Or using the helper script (wraps Poetry):
+   python scripts/update_version.py patch
+   python scripts/update_version.py minor
+   python scripts/update_version.py major
+   python scripts/update_version.py 1.2.3
    ```
 
 2. **Update CHANGELOG.md**: Document your changes under the new version
