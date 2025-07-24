@@ -11,7 +11,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 
 import aiohttp
 
-from ..security.credentials import mask_sensitive_data, validate_bitbucket_app_password
+from ..security.credentials import mask_sensitive_data
 
 # Security imports
 from ..security.logging import SecurityLogger
