@@ -17,7 +17,6 @@ This documentation provides complete guidance for using mgit across Azure DevOps
 | **Set up a provider** | [Provider Guides](#provider-specific-guides) |
 | **Configure mgit** | [Configuration Guide](configuration/mgit-configuration-examples.md) |
 | **Learn query patterns** | [Query Patterns Guide](usage/query-patterns.md) |
-| **Monitor operations** | [Monitoring Guide](monitoring/README.md) |
 | **Compare providers** | [Provider Comparison](providers/provider-comparison-guide.md) |
 
 ## 📖 Documentation Structure
@@ -44,17 +43,6 @@ Advanced usage patterns and techniques.
   - Real-world query examples
   - DevOps team workflows
 
-#### 📊 [Monitoring & Observability](monitoring/)
-Enterprise-grade monitoring and observability features.
-
-- **[Monitoring Guide](monitoring/README.md)**
-  - Structured logging with correlation IDs
-  - Prometheus metrics collection
-  - Health checks for Kubernetes
-  - Performance monitoring
-  - Grafana dashboards
-  - Alert configuration
-
 ### Provider-Specific Guides
 
 #### 🔗 [Provider Documentation](providers/)
@@ -72,7 +60,6 @@ Detailed guides for each supported Git provider.
 ### DevOps Teams
 - [Clone all microservices](usage/query-patterns.md#devops-team-patterns) - `mgit clone-all "*/backend/*-service" ./services`
 - [Update infrastructure repos](usage/query-patterns.md#infrastructure-management) - `mgit pull-all "*/*/terraform-*" ./infra`
-- [Monitor repository health](monitoring/README.md#health-checks) - `mgit status ./repos --all`
 
 ### Enterprise Organizations
 - [Multi-provider setup](configuration/mgit-configuration-examples.md#multiple-provider-configuration) - Configure Azure DevOps + GitHub
@@ -89,16 +76,13 @@ Detailed guides for each supported Git provider.
 ### Performance & Scale
 - [Concurrency tuning](configuration/mgit-configuration-examples.md#performance-tuning) - Optimize for your network
 - [Rate limit handling](providers/provider-feature-matrix.md#rate-limits) - Provider-specific limits
-- [Memory optimization](monitoring/README.md#performance-monitoring) - Handle large repository sets
 
 ### Security & Compliance
 - [Credential security](configuration/mgit-configuration-examples.md#security-best-practices) - Token management
-- [Audit logging](monitoring/README.md#structured-logging) - Track all operations
 - [Network security](configuration/mgit-configuration-examples.md#proxy-configuration) - Proxy and SSL setup
 
 ### Integration & Automation
 - [CI/CD integration](usage/query-patterns.md#cicd-integration-patterns) - Pipeline examples
-- [Monitoring integration](monitoring/README.md#prometheus-integration) - Export metrics
 - [Scripting examples](configuration/mgit-configuration-examples.md#automation-scripts) - Automation patterns
 
 ## 📋 Quick Reference
@@ -138,7 +122,6 @@ mgit status ./repos --all
 ### Common Issues
 - **[Authentication failures](configuration/mgit-configuration-examples.md#authentication-issues)** - Token and permission problems
 - **[Network issues](configuration/mgit-configuration-examples.md#network-and-connectivity)** - Proxy and SSL configuration
-- **[Performance problems](monitoring/README.md#performance-monitoring)** - Slow operations
 - **[Configuration errors](configuration/mgit-configuration-examples.md#configuration-file-issues)** - YAML syntax and field names
 
 ### Getting Help
