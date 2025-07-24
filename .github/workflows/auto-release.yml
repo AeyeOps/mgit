@@ -163,86 +163,92 @@ jobs:
         python extract_changes.py
         
         # Generate release notes with AI or fallback
-        # Temporarily disabled AI generation due to output parsing issues
-        if [ -n "$OPENAI_API_KEY" ] && false; then
+        if [ -n "$OPENAI_API_KEY" ]; then
           echo "Generating AI release notes..."
-          cat > generate_notes.py << EOF
-        import openai
-        import os
+          cat > generate_notes.py << 'PYTHON_EOF'
+import openai
+import os
+import sys
+
+try:
+    client = openai.OpenAI()
+    
+    # Read changes
+    with open('version_changes.txt', 'r') as f:
+        changes = f.read()
+    
+    # Read README for context
+    with open('README.md', 'r') as f:
+        readme_lines = f.readlines()[:50]
+        project_context = ''.join([line for line in readme_lines if line.strip()])
+    
+    prompt = f"""Generate concise GitHub release notes for mgit version {os.environ.get('VERSION', '0.0.0')}.
+    
+    Project: mgit - A multi-provider Git repository management CLI tool.
+    Context: {project_context[:500]}
+    
+    Changes:
+    {changes}
+    
+    Create professional release notes with:
+    1. A brief summary of what this release includes
+    2. Key improvements or features (if any)
+    3. Bug fixes (if any)
+    4. One-line installation command
+    
+    Keep it concise and focused on what matters to users.
+    """
+    
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a technical writer creating GitHub release notes."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.3,
+        max_tokens=500
+    )
+    
+    notes = response.choices[0].message.content
+    
+    # Save to file
+    with open('ai_release_notes.txt', 'w') as f:
+        f.write(notes)
         
-        client = openai.OpenAI()
-        
-        # Read changes
-        with open('version_changes.txt', 'r') as f:
-            changes = f.read()
-        
-        # Read README for context
-        with open('README.md', 'r') as f:
-            readme_lines = f.readlines()[:50]
-            project_context = ''.join([line for line in readme_lines if line.strip()])
-        
-        prompt = f"""Generate concise GitHub release notes for mgit version {os.environ.get('VERSION', '0.0.0')}.
-        
-        Project: mgit - A multi-provider Git repository management CLI tool.
-        Context: {project_context[:500]}
-        
-        Changes:
-        {changes}
-        
-        Create professional release notes with:
-        1. A brief summary of what this release includes
-        2. Key improvements or features (if any)
-        3. Bug fixes (if any)
-        4. One-line installation command
-        
-        Keep it concise and focused on what matters to users.
-        """
-        
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a technical writer creating GitHub release notes."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3,
-            max_tokens=500
-        )
-        
-        notes = response.choices[0].message.content
-        
-        # Save to file
-        with open('release_notes.md', 'w') as f:
-            f.write(f"# mgit v{os.environ.get('VERSION', '0.0.0')}\n\n")
-            f.write(notes)
-        EOF
+except Exception as e:
+    # Write error marker
+    with open('ai_release_notes.txt', 'w') as f:
+        f.write("AI_GENERATION_FAILED")
+PYTHON_EOF
           
-          python generate_notes.py || echo "AI generation failed"
+          # Run python script completely silently
+          python generate_notes.py >/dev/null 2>&1 || true
         fi
         
-        # Fallback if no AI or if it failed
-        if [ ! -f release_notes.md ]; then
-          echo "Creating fallback release notes..."
-          cat > release_notes.md << EOF
-        # mgit v${VERSION}
+        # Create final release notes
+        echo "# mgit v${VERSION}" > release_notes.md
+        echo "" >> release_notes.md
         
-        ## Changes in this release:
-        
-        $(cat version_changes.txt)
-        
-        ## Installation
-        
-        \`\`\`bash
-        pip install mgit==${VERSION}
-        \`\`\`
-        EOF
+        # Check if AI generation succeeded
+        if [ -f ai_release_notes.txt ] && [ "$(cat ai_release_notes.txt)" != "AI_GENERATION_FAILED" ]; then
+          cat ai_release_notes.txt >> release_notes.md
+        else
+          # Fallback release notes
+          echo "## Changes in this release:" >> release_notes.md
+          echo "" >> release_notes.md
+          cat version_changes.txt >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Installation" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "\`\`\`bash" >> release_notes.md
+          echo "pip install mgit==${VERSION}" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
         fi
         
-        # Output to GitHub
-        {
-          echo 'notes<<GITHUB_OUTPUT_EOF'
-          cat release_notes.md
-          echo 'GITHUB_OUTPUT_EOF'
-        } >> $GITHUB_OUTPUT
+        # Output to GitHub using a simpler approach
+        echo "notes<<EOF_DELIMITER" >> $GITHUB_OUTPUT
+        cat release_notes.md >> $GITHUB_OUTPUT
+        echo "EOF_DELIMITER" >> $GITHUB_OUTPUT
 
   build-and-release:
     name: Build and Release
