@@ -163,7 +163,8 @@ jobs:
         python extract_changes.py
         
         # Generate release notes with AI or fallback
-        if [ -n "$OPENAI_API_KEY" ]; then
+        # Temporarily disabled AI generation due to output parsing issues
+        if [ -n "$OPENAI_API_KEY" ] && false; then
           echo "Generating AI release notes..."
           cat > generate_notes.py << EOF
         import openai
