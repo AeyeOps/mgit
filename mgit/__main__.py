@@ -406,7 +406,6 @@ def clone_all(
         logger.info("All repositories processed successfully with no errors.")
 
 
-
 # -----------------------------------------------------------------------------
 @app.command()
 def pull_all(
@@ -544,8 +543,6 @@ def pull_all(
             logger.warning(f" - {repo_name}: {reason}")
     else:
         logger.info("All repositories processed successfully with no errors.")
-
-
 
 
 # -----------------------------------------------------------------------------
@@ -784,7 +781,7 @@ def login(
             "url": organization,
             "user": "azure",  # Azure DevOps doesn't require username
             "token": token,
-            "provider_type": "azuredevops"
+            "provider_type": "azuredevops",
         }
 
     elif provider_type == "github":
@@ -824,17 +821,17 @@ def login(
 
         if not token:
             token = typer.prompt("Enter GitHub token", hide_input=True)
-        
+
         # Prompt for username if not provided via --org
         if not organization:
             organization = typer.prompt("Enter GitHub username or organization")
-            
+
         # Use unified field structure
         provider_config = {
             "url": "https://github.com",
             "user": organization,
             "token": token,
-            "provider_type": "github"
+            "provider_type": "github",
         }
 
     elif provider_type == "bitbucket":
@@ -876,18 +873,20 @@ def login(
 
         if not token:
             token = typer.prompt("Enter BitBucket app password", hide_input=True)
-            
+
         # Optionally prompt for workspace
-        workspace = typer.prompt("Enter BitBucket workspace (optional, press Enter to skip)", default="")
-        
+        workspace = typer.prompt(
+            "Enter BitBucket workspace (optional, press Enter to skip)", default=""
+        )
+
         # Use unified field structure
         provider_config = {
             "url": "https://bitbucket.org",
             "user": organization,
             "token": token,
-            "provider_type": "bitbucket"
+            "provider_type": "bitbucket",
         }
-        
+
         # Add workspace if provided
         if workspace:
             provider_config["workspace"] = workspace

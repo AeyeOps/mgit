@@ -49,7 +49,7 @@ class AzureDevOpsProvider(GitProvider):
             raise ValueError("Missing required field: url")
         if "token" not in config:
             raise ValueError("Missing required field: token")
-            
+
         self.url = config["url"]
         self.user = config.get("user", "")  # Not used for PAT auth
         self.token = config["token"]
@@ -92,9 +92,7 @@ class AzureDevOpsProvider(GitProvider):
         try:
             # Initialize connection
             credentials = BasicAuthentication("", self.token)
-            self.connection = Connection(
-                base_url=self.url, creds=credentials
-            )
+            self.connection = Connection(base_url=self.url, creds=credentials)
 
             # Get clients
             self.core_client = self.connection.clients.get_core_client()
@@ -104,9 +102,7 @@ class AzureDevOpsProvider(GitProvider):
             self.core_client.get_projects()
 
             self._authenticated = True
-            logger.debug(
-                "Azure DevOps authentication successful for %s", self.url
-            )
+            logger.debug("Azure DevOps authentication successful for %s", self.url)
             return True
 
         except (AzureDevOpsAuthenticationError, ClientRequestError) as e:

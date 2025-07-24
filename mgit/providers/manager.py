@@ -176,7 +176,7 @@ class ProviderManager:
                 f"Missing required unified fields: {missing}. "
                 f"All providers must have: url, user, token, workspace (optional)"
             )
-        
+
         # No field mapping needed - providers now use unified fields directly
         if self._provider_type not in ["azuredevops", "github", "bitbucket"]:
             raise ConfigurationError(f"Unknown provider type: {self._provider_type}")
@@ -291,7 +291,9 @@ class ProviderManager:
                     if "/" in project:
                         # Project is in format "org/project"
                         org_name, project_name = project.split("/", 1)
-                        async for repo in provider.list_repositories(org_name, project_name):
+                        async for repo in provider.list_repositories(
+                            org_name, project_name
+                        ):
                             repos.append(repo)
                     else:
                         # Just project name
