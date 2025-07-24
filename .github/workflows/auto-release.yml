@@ -99,8 +99,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: [check-version, quality-checks]
     if: needs.check-version.outputs.version-changed == 'true'
-    outputs:
-      release-notes: ${{ steps.generate.outputs.notes }}
       
     steps:
     - name: Checkout code
@@ -245,10 +243,15 @@ jobs:
           echo "\`\`\`" >> release_notes.md
         fi
         
-        # Output to GitHub using a simpler approach
-        echo "notes<<EOF_DELIMITER" >> $GITHUB_OUTPUT
-        cat release_notes.md >> $GITHUB_OUTPUT
-        echo "EOF_DELIMITER" >> $GITHUB_OUTPUT
+        # Upload release notes as artifact to avoid output parsing issues
+        echo "Release notes created successfully"
+        
+    - name: Upload release notes
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-notes
+        path: release_notes.md
+        retention-days: 1
 
   build-and-release:
     name: Build and Release
@@ -274,6 +277,11 @@ jobs:
       run: |
         poetry build
         
+    - name: Download release notes
+      uses: actions/download-artifact@v4
+      with:
+        name: release-notes
+        
     - name: Create and push tag
       env:
         VERSION: ${{ needs.check-version.outputs.new-version }}
@@ -288,7 +296,7 @@ jobs:
       with:
         tag_name: v${{ needs.check-version.outputs.new-version }}
         name: Release v${{ needs.check-version.outputs.new-version }}
-        body: ${{ needs.generate-release-notes.outputs.release-notes }}
+        body_path: release_notes.md
         files: |
           dist/*.whl
           dist/*.tar.gz
