@@ -687,7 +687,7 @@ The automated workflow will:
 
 ## Security
 
-For security vulnerabilities, see our [Security Policy](SECURITY.md).
+Please report vulnerabilities using the process outlined in our [Security Policy](SECURITY.md).
 
 **Security features include:**
 - Comprehensive threat model and risk analysis
