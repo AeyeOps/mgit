@@ -135,7 +135,7 @@ mgit status ./repos --all
 We welcome contributions to both code and documentation!
 
 - **[Contributing Guide](../CONTRIBUTING.md)** - How to contribute
-- **[Security Policy](../SECURITY.md)** - Report security issues
+- **[Security Policy](../SECURITY.md)** - How to report vulnerabilities and our procedures
 - **[Code of Conduct](../CODE_OF_CONDUCT.md)** - Community guidelines
 
 ### Improving Documentation
