@@ -11,7 +11,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 
 import aiohttp
 
-from ..security.credentials import mask_sensitive_data, validate_github_pat
+from ..security.credentials import mask_sensitive_data
 
 # Security imports
 from ..security.logging import SecurityLogger

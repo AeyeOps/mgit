@@ -3,10 +3,7 @@
 import asyncio
 import logging
 import os
-import shutil
-import subprocess  # Needed for CalledProcessError exception
 import warnings
-from enum import Enum
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -14,15 +11,16 @@ from typing import Any, Dict, Optional
 import typer
 from rich.console import Console
 from rich.logging import RichHandler
-from rich.progress import Progress
 from rich.prompt import Confirm
 
 from mgit import __version__
 from mgit.commands.bulk_operations import (
     BulkOperationProcessor,
     OperationType,
-    UpdateMode as BulkUpdateMode,
     check_force_mode_confirmation,
+)
+from mgit.commands.bulk_operations import (
+    UpdateMode as BulkUpdateMode,
 )
 from mgit.commands.listing import format_results, list_repositories
 from mgit.commands.status import display_status_results, get_repository_statuses
@@ -40,7 +38,7 @@ from mgit.config.yaml_manager import (
     set_default_provider,
 )
 from mgit.exceptions import MgitError
-from mgit.git import GitManager, sanitize_repo_name
+from mgit.git import GitManager
 from mgit.providers.manager import ProviderManager
 
 # Suppress the specific UserWarning from PyInstaller's bootloader
