@@ -5,6 +5,13 @@ on:
     branches: [ main ]
     paths:
       - 'pyproject.toml'
+  workflow_dispatch:
+    inputs:
+      force-release:
+        description: 'Force a release even if version unchanged'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -38,10 +45,14 @@ jobs:
         echo "Current version: $CURRENT_VERSION"
         echo "Previous version: $PREVIOUS_VERSION"
         
-        if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+        if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ] || [ "${{ inputs.force-release }}" == "true" ]; then
           echo "changed=true" >> $GITHUB_OUTPUT
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
+          if [ "${{ inputs.force-release }}" == "true" ]; then
+            echo "Force release requested for version $CURRENT_VERSION"
+          else
+            echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
+          fi
         else
           echo "changed=false" >> $GITHUB_OUTPUT
           echo "Version unchanged"
