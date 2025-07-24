@@ -126,7 +126,7 @@ jobs:
         
         # Extract changes from CHANGELOG.md
         echo "Extracting changes from CHANGELOG.md..."
-        cat > extract_changes.py << 'EXTRACT_SCRIPT_EOF'
+        python3 -c "
 import re
 import sys
 import os
@@ -138,7 +138,7 @@ try:
     with open('CHANGELOG.md', 'r') as f:
         content = f.read()
 except FileNotFoundError:
-    print("No CHANGELOG.md found")
+    print('No CHANGELOG.md found')
     sys.exit(0)
 
 # Extract section for this version
@@ -149,23 +149,21 @@ if match:
     changes = match.group(1).strip()
     with open('version_changes.txt', 'w') as f:
         f.write(changes)
-    print(f"Extracted {len(changes)} characters of changes")
+    print(f'Extracted {len(changes)} characters of changes')
 else:
-    print(f"No changes found for version {version}")
+    print(f'No changes found for version {version}')
     # Fall back to recent commits
     import subprocess
     commits = subprocess.run(['git', 'log', '--oneline', '-n', '20'], 
                            capture_output=True, text=True)
     with open('version_changes.txt', 'w') as f:
-        f.write("Recent commits:\n" + commits.stdout)
-EXTRACT_SCRIPT_EOF
-        
-        python extract_changes.py
+        f.write('Recent commits:\\n' + commits.stdout)
+"
         
         # Generate release notes with AI or fallback
         if [ -n "$OPENAI_API_KEY" ]; then
           echo "Generating AI release notes..."
-          cat > generate_notes.py << 'PYTHON_EOF'
+          python3 -c "
 import openai
 import os
 import sys
@@ -182,7 +180,8 @@ try:
         readme_lines = f.readlines()[:50]
         project_context = ''.join([line for line in readme_lines if line.strip()])
     
-    prompt = f"""Generate concise GitHub release notes for mgit version {os.environ.get('VERSION', '0.0.0')}.
+    version = os.environ.get('VERSION', '0.0.0')
+    prompt = f'''Generate concise GitHub release notes for mgit version {version}.
     
     Project: mgit - A multi-provider Git repository management CLI tool.
     Context: {project_context[:500]}
@@ -197,13 +196,13 @@ try:
     4. One-line installation command
     
     Keep it concise and focused on what matters to users.
-    """
+    '''
     
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model='gpt-3.5-turbo',
         messages=[
-            {"role": "system", "content": "You are a technical writer creating GitHub release notes."},
-            {"role": "user", "content": prompt}
+            {'role': 'system', 'content': 'You are a technical writer creating GitHub release notes.'},
+            {'role': 'user', 'content': prompt}
         ],
         temperature=0.3,
         max_tokens=500
@@ -218,11 +217,8 @@ try:
 except Exception as e:
     # Write error marker
     with open('ai_release_notes.txt', 'w') as f:
-        f.write("AI_GENERATION_FAILED")
-PYTHON_EOF
-          
-          # Run python script completely silently
-          python generate_notes.py >/dev/null 2>&1 || true
+        f.write('AI_GENERATION_FAILED')
+" >/dev/null 2>&1 || true
         fi
         
         # Create final release notes
