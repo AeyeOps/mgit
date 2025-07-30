@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from mgit.__main__ import app
+from mgit.git.utils import build_repo_path
 from mgit.providers.base import Repository
 
 
@@ -86,8 +87,10 @@ class TestCloneAllCommand:
         dest_dir.mkdir()
 
         # Create an existing repo
-        existing_repo = dest_dir / "https-dev.azure.com-test-org-_git-repo-1"
-        existing_repo.mkdir()
+        existing_repo = dest_dir / build_repo_path(
+            "https://dev.azure.com/test-org/_git/repo-1"
+        )
+        existing_repo.mkdir(parents=True)
         (existing_repo / ".git").mkdir()
 
         with patch("mgit.__main__.ProviderManager") as mock_manager:
@@ -124,10 +127,10 @@ class TestPullAllCommand:
         workspace = tmp_path / "pull_workspace"
         workspace.mkdir()
 
-        # Create repos with the sanitized names that match what the code expects
+        # Create repos using build_repo_path to match actual clone paths
         for i in range(3):
-            repo_dir = workspace / f"http-a.com-repo-{i}"  # Match sanitized URL
-            repo_dir.mkdir()
+            repo_dir = workspace / build_repo_path(f"http://a.com/repo-{i}")
+            repo_dir.mkdir(parents=True)
             subprocess.run(["git", "init"], cwd=repo_dir, check=True)
             (repo_dir / "README.md").write_text(f"repo-{i}")
             subprocess.run(["git", "add", "."], cwd=repo_dir, check=True)
