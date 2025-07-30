@@ -3,7 +3,8 @@
 import os
 import re
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
+from urllib.parse import unquote, urlparse
 
 
 def embed_pat_in_url(url: str, pat: str) -> str:
@@ -109,3 +110,41 @@ def validate_url(url: str) -> bool:
     if not url:
         return False
     return url.startswith(("http://", "https://"))
+
+
+def sanitize_path_segment(segment: str) -> str:
+    """Sanitize a single path segment for safe filesystem usage."""
+    segment = segment.strip()
+    segment = re.sub(r"[<>:\"|?*]", "", segment)
+    segment = segment.replace("/", "-").replace("\\", "-")
+    segment = segment.rstrip(".")
+    return segment or "unnamed"
+
+
+def build_repo_path(clone_url: str) -> Path:
+    """Create a relative path from a repository clone URL.
+
+    Decodes percent-encoded characters and retains hierarchical structure
+    as ``host/org/project/repo``.
+    """
+
+    parsed = urlparse(clone_url)
+    host = parsed.hostname or "unknown-host"
+    path = unquote(parsed.path.lstrip("/"))
+
+    segments: List[str] = [s for s in path.split("/") if s and not s.startswith("_")]
+
+    # Remove 'DefaultCollection' for older Azure DevOps URLs
+    if parsed.hostname and (
+        parsed.hostname.endswith("visualstudio.com")
+        or parsed.hostname.endswith("dev.azure.com")
+    ):
+        if segments and segments[0].lower() == "defaultcollection":
+            segments.pop(0)
+
+    if segments and segments[-1].endswith(".git"):
+        segments[-1] = segments[-1][:-4]
+
+    safe_segments = [sanitize_path_segment(seg) for seg in segments]
+
+    return Path(sanitize_path_segment(host), *safe_segments)

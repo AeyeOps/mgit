@@ -15,7 +15,7 @@ from rich.console import Console
 from rich.progress import Progress
 from rich.prompt import Confirm
 
-from ..git import GitManager, sanitize_repo_name
+from ..git import GitManager, build_repo_path
 from ..providers.base import Repository
 from ..providers.manager import ProviderManager
 
@@ -112,14 +112,13 @@ class BulkOperationProcessor:
                         progress.advance(overall_task_id, 1)
                         return
 
-                    # Sanitize repository name for filesystem
-                    sanitized_name = sanitize_repo_name(repo_url)
+                    repo_relative = build_repo_path(repo_url)
+                    repo_folder = target_path / repo_relative
+                    sanitized_name = repo_folder.name
                     if sanitized_name != repo_name:
                         logger.debug(
                             f"Using sanitized name '{sanitized_name}' for repository '{repo_name}' folder"
                         )
-
-                    repo_folder = target_path / sanitized_name
 
                     # Handle existing directory
                     if repo_folder.exists():
@@ -347,8 +346,9 @@ def check_force_mode_confirmation(
         logger.debug("Checking for existing directories to remove (force mode)...")
         for repo in repositories:
             repo_url = repo.clone_url
-            sanitized_name = sanitize_repo_name(repo_url)
-            repo_folder = target_path / sanitized_name
+            repo_relative = build_repo_path(repo_url)
+            repo_folder = target_path / repo_relative
+            sanitized_name = repo_folder.name
             if repo_folder.exists():
                 dirs_to_remove.append((repo.name, sanitized_name, repo_folder))
 

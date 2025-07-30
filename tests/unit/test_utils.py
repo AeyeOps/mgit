@@ -11,6 +11,7 @@ from mgit.git.utils import (
     normalize_path,
     sanitize_repo_name,
     validate_url,
+    build_repo_path,
 )
 
 
@@ -216,3 +217,31 @@ class TestConfigurationHelpers:
         assert validate_url("example.com") is False
         assert validate_url("") is False
         assert validate_url(None) is False
+
+
+class TestBuildRepoPath:
+    """Test cases for build_repo_path utility."""
+
+    def test_azure_devops_visualstudio_path(self):
+        """DefaultCollection segment should be removed."""
+        url = (
+            "https://pdidev.visualstudio.com/DefaultCollection/Blue%20Cow/_git/"
+            "Ignite%20Web%20Services"
+        )
+        result = build_repo_path(url)
+        assert result == Path(
+            "pdidev.visualstudio.com",
+            "Blue Cow",
+            "Ignite Web Services",
+        )
+
+    def test_azure_devops_dev_url(self):
+        """dev.azure.com URLs retain org/project structure."""
+        url = "https://dev.azure.com/myorg/myproject/_git/myrepo"
+        result = build_repo_path(url)
+        assert result == Path(
+            "dev.azure.com",
+            "myorg",
+            "myproject",
+            "myrepo",
+        )
