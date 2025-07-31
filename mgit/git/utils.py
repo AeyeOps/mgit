@@ -1,10 +1,13 @@
 """Git utility functions."""
 
+import logging
 import os
 import re
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import unquote, urlparse
+
+logger = logging.getLogger(__name__)
 
 
 def embed_pat_in_url(url: str, pat: str) -> str:
@@ -113,38 +116,94 @@ def validate_url(url: str) -> bool:
 
 
 def sanitize_path_segment(segment: str) -> str:
-    """Sanitize a single path segment for safe filesystem usage."""
-    segment = segment.strip()
-    segment = re.sub(r"[<>:\"|?*]", "", segment)
-    segment = segment.replace("/", "-").replace("\\", "-")
-    segment = segment.rstrip(".")
-    return segment or "unnamed"
+    """
+    Sanitize a single path segment to be filesystem-safe while preserving spaces.
+    
+    Args:
+        segment: Path segment to sanitize
+        
+    Returns:
+        Sanitized path segment safe for filesystem use
+    """
+    if not segment:
+        return ""
+    
+    # Remove invalid characters for directory names but preserve spaces
+    segment = re.sub(r'[<>:"|?*]', "", segment)
+    # Replace forward/back slashes with hyphens  
+    segment = re.sub(r"[/\\]+", "-", segment)
+    # Replace multiple hyphens with single hyphen
+    segment = re.sub(r"-+", "-", segment)
+    # Remove leading/trailing hyphens, dots, and spaces
+    segment = segment.strip("-. ")
+    
+    # Handle Windows reserved names
+    reserved_names = [
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ]
+    if segment.upper() in reserved_names:
+        segment += "_"
+    
+    return segment
 
 
 def build_repo_path(clone_url: str) -> Path:
-    """Create a relative path from a repository clone URL.
-
+    """
+    Build hierarchical repository path from Git URL.
+    
     Decodes percent-encoded characters and retains hierarchical structure
     as ``host/org/project/repo``.
+    
+    For Azure DevOps: host/org/project/repo (skips DefaultCollection)
+    For GitHub: host/owner/repo  
+    For BitBucket: host/workspace/project/repo or host/workspace/repo
+    
+    Args:
+        clone_url: Git repository URL (HTTPS or SSH)
+        
+    Returns:
+        Path object with hierarchical structure.
+        Falls back to sanitized repo name if parsing fails.
     """
-
-    parsed = urlparse(clone_url)
-    host = parsed.hostname or "unknown-host"
-    path = unquote(parsed.path.lstrip("/"))
-
-    segments: List[str] = [s for s in path.split("/") if s and not s.startswith("_")]
-
-    # Remove 'DefaultCollection' for older Azure DevOps URLs
-    if parsed.hostname and (
-        parsed.hostname.endswith("visualstudio.com")
-        or parsed.hostname.endswith("dev.azure.com")
-    ):
-        if segments and segments[0].lower() == "defaultcollection":
-            segments.pop(0)
-
-    if segments and segments[-1].endswith(".git"):
-        segments[-1] = segments[-1][:-4]
-
-    safe_segments = [sanitize_path_segment(seg) for seg in segments]
-
-    return Path(sanitize_path_segment(host), *safe_segments)
+    try:
+        from urllib.parse import urlparse, unquote
+        
+        # Parse the URL
+        parsed = urlparse(clone_url)
+        host = parsed.hostname or "unknown-host"
+        path = unquote(parsed.path.lstrip("/"))
+        
+        if not path:
+            # Fallback to sanitized repo name if no path
+            return Path(sanitize_repo_name(clone_url))
+        
+        # Split path into segments
+        segments = [seg for seg in path.split("/") if seg]
+        
+        # Remove 'DefaultCollection' for older Azure DevOps URLs
+        if segments and segments[0] == "DefaultCollection":
+            segments = segments[1:]
+        
+        # Handle different Git URL patterns
+        if segments and segments[-1] == "_git" and len(segments) > 1:
+            # Azure DevOps: remove "_git" suffix, last segment is repo
+            segments = segments[:-1]
+        elif segments and segments[-1].endswith(".git"):
+            # Remove .git suffix from repository name
+            segments[-1] = segments[-1][:-4]
+        
+        # Sanitize each path segment
+        safe_segments = [sanitize_path_segment(seg) for seg in segments if seg]
+        
+        if not safe_segments:
+            # Fallback if no valid segments
+            return Path(sanitize_repo_name(clone_url))
+            
+        return Path(sanitize_path_segment(host), *safe_segments)
+        
+    except Exception as e:
+        # Fallback to existing logic if URL parsing fails
+        logger.debug(f"Failed to build hierarchical path for {clone_url}: {e}")
+        return Path(sanitize_repo_name(clone_url))

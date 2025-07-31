@@ -10,8 +10,9 @@ from mgit.git.utils import (
     embed_pat_in_url,
     normalize_path,
     sanitize_repo_name,
-    validate_url,
     build_repo_path,
+    sanitize_path_segment,
+    validate_url,
 )
 
 
@@ -220,28 +221,108 @@ class TestConfigurationHelpers:
 
 
 class TestBuildRepoPath:
-    """Test cases for build_repo_path utility."""
+    """Test cases for build_repo_path function."""
 
-    def test_azure_devops_visualstudio_path(self):
-        """DefaultCollection segment should be removed."""
-        url = (
-            "https://pdidev.visualstudio.com/DefaultCollection/Blue%20Cow/_git/"
-            "Ignite%20Web%20Services"
-        )
+    def test_azure_devops_url_with_defaultcollection(self):
+        """Test Azure DevOps URL with DefaultCollection segment."""
+        url = "https://pdidev.visualstudio.com/DefaultCollection/Blue%20Cow/_git/Ignite%20Web%20Services"
         result = build_repo_path(url)
-        assert result == Path(
-            "pdidev.visualstudio.com",
-            "Blue Cow",
-            "Ignite Web Services",
-        )
+        expected = Path("pdidev.visualstudio.com", "Blue Cow", "Ignite Web Services")
+        assert result == expected
 
-    def test_azure_devops_dev_url(self):
-        """dev.azure.com URLs retain org/project structure."""
-        url = "https://dev.azure.com/myorg/myproject/_git/myrepo"
+    def test_azure_devops_url_without_defaultcollection(self):
+        """Test modern Azure DevOps URL without DefaultCollection."""
+        url = "https://dev.azure.com/myorg/MyProject/_git/my-repo"
         result = build_repo_path(url)
-        assert result == Path(
-            "dev.azure.com",
-            "myorg",
-            "myproject",
-            "myrepo",
-        )
+        expected = Path("dev.azure.com", "myorg", "MyProject", "my-repo")
+        assert result == expected
+
+    def test_github_url(self):
+        """Test GitHub URL parsing."""
+        url = "https://github.com/myorg/cool-repo"
+        result = build_repo_path(url)
+        expected = Path("github.com", "myorg", "cool-repo")
+        assert result == expected
+
+    def test_github_url_with_git_suffix(self):
+        """Test GitHub URL with .git suffix."""
+        url = "https://github.com/myorg/cool-repo.git"
+        result = build_repo_path(url)
+        expected = Path("github.com", "myorg", "cool-repo")
+        assert result == expected
+
+    def test_bitbucket_url(self):
+        """Test BitBucket URL parsing."""
+        url = "https://bitbucket.org/workspace/project/repo"
+        result = build_repo_path(url)
+        expected = Path("bitbucket.org", "workspace", "project", "repo")
+        assert result == expected
+
+    def test_url_decoding(self):
+        """Test URL percent-decoding of special characters."""
+        url = "https://pdidev.visualstudio.com/My%20Project/_git/Special%20Repo%20Name"
+        result = build_repo_path(url)
+        expected = Path("pdidev.visualstudio.com", "My Project", "Special Repo Name")
+        assert result == expected
+
+    def test_special_characters_sanitization(self):
+        """Test sanitization of filesystem-unsafe characters."""
+        url = "https://example.com/org/project/repo<with>invalid:chars"
+        result = build_repo_path(url)
+        expected = Path("example.com", "org", "project", "repowithvalidchars")
+        assert result == expected
+
+    def test_windows_reserved_names(self):
+        """Test handling of Windows reserved names."""
+        url = "https://example.com/org/CON/AUX"
+        result = build_repo_path(url)
+        expected = Path("example.com", "org", "CON_", "AUX_")
+        assert result == expected
+
+    def test_ssh_url_parsing(self):
+        """Test SSH URL parsing (should fallback to sanitized name)."""
+        url = "git@github.com:myorg/repo.git"
+        result = build_repo_path(url)
+        # SSH URLs should fallback to sanitized name
+        assert isinstance(result, Path)
+        assert len(result.parts) == 1  # Should be flat, not hierarchical
+
+    def test_malformed_url_fallback(self):
+        """Test fallback behavior for malformed URLs."""
+        url = "not-a-valid-url"
+        result = build_repo_path(url)
+        # Should fallback to sanitized repo name
+        assert isinstance(result, Path)
+        assert len(result.parts) == 1
+
+    def test_empty_path_fallback(self):
+        """Test fallback for URLs with empty paths."""
+        url = "https://example.com/"
+        result = build_repo_path(url)
+        # Should fallback to sanitized repo name
+        assert isinstance(result, Path)
+
+    def test_azure_devops_git_suffix_removal(self):
+        """Test removal of _git suffix for Azure DevOps URLs."""
+        url = "https://dev.azure.com/org/project/_git/repo"
+        result = build_repo_path(url)
+        expected = Path("dev.azure.com", "org", "project", "repo")
+        assert result == expected
+
+    def test_complex_path_structure(self):
+        """Test complex path with multiple segments."""
+        url = "https://custom-git.company.com/division/team/project/repository"
+        result = build_repo_path(url)
+        expected = Path("custom-git.company.com", "division", "team", "project", "repository")
+        assert result == expected
+
+    def test_path_segment_sanitization(self):
+        """Test individual path segment sanitization."""
+        # Test sanitize_path_segment function directly
+        assert sanitize_path_segment("normal-name") == "normal-name"
+        assert sanitize_path_segment("name with spaces") == "name with spaces"
+        assert sanitize_path_segment("name/with/slashes") == "name-with-slashes"
+        assert sanitize_path_segment("name<>:\"|?*chars") == "namechars"
+        assert sanitize_path_segment("CON") == "CON_"
+        assert sanitize_path_segment("  ..name..  ") == "name"
+        assert sanitize_path_segment("name---with---dashes") == "name-with-dashes"
