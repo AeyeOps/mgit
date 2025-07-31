@@ -302,6 +302,12 @@ def clone_all(
             "'force' => remove the folder and clone fresh."
         ),
     ),
+    hierarchical: bool = typer.Option(
+        False,
+        "--hierarchical",
+        "-h",
+        help="Use hierarchical directory structure (host/org/project/repo) instead of flat naming.",
+    ),
 ):
     """
     Clone all repositories from a git provider project/organization.
@@ -365,7 +371,7 @@ def clone_all(
 
     # Check for force mode confirmation
     confirmed_force_remove, dirs_to_remove = check_force_mode_confirmation(
-        repositories, target_path, update_mode
+        repositories, target_path, update_mode, hierarchical
     )
 
     # Create processor and run bulk operation
@@ -373,6 +379,7 @@ def clone_all(
         git_manager=git_manager,
         provider_manager=provider_manager,
         operation_type=OperationType.clone,
+        hierarchical=hierarchical,
     )
 
     logger.info(

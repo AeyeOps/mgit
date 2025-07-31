@@ -31,5 +31,9 @@ else:
             __version__ = version("mgit")
         except ImportError:
             # Fallback for Python < 3.8
-            from importlib_metadata import version
-            __version__ = version("mgit")
+            try:
+                from importlib_metadata import version
+                __version__ = version("mgit")
+            except ImportError:
+                # Final fallback
+                __version__ = "unknown"

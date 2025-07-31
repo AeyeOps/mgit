@@ -15,7 +15,7 @@ from rich.console import Console
 from rich.progress import Progress
 from rich.prompt import Confirm
 
-from ..git import GitManager, build_repo_path
+from ..git import GitManager, sanitize_repo_name, build_repo_path
 from ..providers.base import Repository
 from ..providers.manager import ProviderManager
 
@@ -46,10 +46,12 @@ class BulkOperationProcessor:
         git_manager: GitManager,
         provider_manager: ProviderManager,
         operation_type: OperationType,
+        hierarchical: bool = False,
     ):
         self.git_manager = git_manager
         self.provider_manager = provider_manager
         self.operation_type = operation_type
+        self.hierarchical = hierarchical
         self.failures: List[Tuple[str, str]] = []
 
     async def process_repositories(
@@ -112,14 +114,18 @@ class BulkOperationProcessor:
                         progress.advance(overall_task_id, 1)
                         return
 
-                    repo_relative = build_repo_path(repo_url)
-                    repo_folder = target_path / repo_relative
-                    sanitized_name = repo_folder.name
-                    if sanitized_name != repo_name:
-                        logger.debug(
-                            f"Using sanitized name '{sanitized_name}' for repository '{repo_name}' folder"
-                        )
+                    # Determine repository folder path
+                    if self.hierarchical:
+                        repo_path = build_repo_path(repo_url)
+                        logger.debug(f"Using hierarchical path '{repo_path}' for repository '{repo_name}'")
+                    else:
+                        repo_path = Path(sanitize_repo_name(repo_url))
+                        if str(repo_path) != repo_name:
+                            logger.debug(
+                                f"Using sanitized name '{repo_path}' for repository '{repo_name}' folder"
+                            )
 
+                    repo_folder = target_path / repo_path
                     # Handle existing directory
                     if repo_folder.exists():
                         handled = await self._handle_existing_directory(
@@ -141,7 +147,7 @@ class BulkOperationProcessor:
                         repo=repo,
                         repo_folder=repo_folder,
                         target_path=target_path,
-                        sanitized_name=sanitized_name,
+                        repo_path=repo_path,
                         progress=progress,
                         repo_task_id=repo_task_id,
                         display_name=display_name,
@@ -266,7 +272,7 @@ class BulkOperationProcessor:
         repo: Repository,
         repo_folder: Path,
         target_path: Path,
-        sanitized_name: str,
+        repo_path: Path,
         progress: Progress,
         repo_task_id: int,
         display_name: str,
@@ -283,7 +289,12 @@ class BulkOperationProcessor:
             # Get authenticated URL from provider manager
             pat_url = self.provider_manager.get_authenticated_clone_url(repo)
             try:
-                await self.git_manager.git_clone(pat_url, target_path, sanitized_name)
+                # Ensure parent directories exist for hierarchical paths
+                if self.hierarchical:
+                    repo_folder.parent.mkdir(parents=True, exist_ok=True)
+                    await self.git_manager.git_clone(pat_url, repo_folder.parent, repo_folder.name)
+                else:
+                    await self.git_manager.git_clone(pat_url, target_path, str(repo_path))
                 progress.update(
                     repo_task_id,
                     description=f"[green]Cloned: {display_name}[/green]",
@@ -332,6 +343,7 @@ def check_force_mode_confirmation(
     repositories: List[Repository],
     target_path: Path,
     update_mode: UpdateMode,
+    hierarchical: bool = False,
 ) -> Tuple[bool, List[Tuple[str, str, Path]]]:
     """
     Check for existing directories in force mode and get user confirmation.
@@ -346,11 +358,13 @@ def check_force_mode_confirmation(
         logger.debug("Checking for existing directories to remove (force mode)...")
         for repo in repositories:
             repo_url = repo.clone_url
-            repo_relative = build_repo_path(repo_url)
-            repo_folder = target_path / repo_relative
-            sanitized_name = repo_folder.name
+            if hierarchical:
+                repo_path = build_repo_path(repo_url)
+            else:
+                repo_path = Path(sanitize_repo_name(repo_url))
+            repo_folder = target_path / repo_path
             if repo_folder.exists():
-                dirs_to_remove.append((repo.name, sanitized_name, repo_folder))
+                dirs_to_remove.append((repo.name, str(repo_path), repo_folder))
 
         if dirs_to_remove:
             console.print(
