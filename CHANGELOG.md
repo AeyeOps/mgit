@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.9] - 2025-08-01
+
+### Added
+- **Multi-Provider Pattern Matching**: Revolutionary wildcard discovery across all configured providers
+  - Pattern matching on leftmost query segment (e.g., `*/*/*`, `*pdi/*/*`, `GITHUB*/*/*`)
+  - Case-insensitive glob pattern matching with `*` and `?` wildcards
+  - Concurrent processing of multiple providers with progress reporting
+  - Extended to all bulk operations: `list`, `clone-all`, and `pull-all`
+- **CLI Validation**: Prevents contradictory usage of wildcard patterns with explicit provider flags
+  - Clear error messages guide users to correct usage patterns
+  - Validates query consistency across all commands
+
+### Changed
+- **Directory Structure**: Standardized hierarchical directory structure (host/org/project/repo) for all operations
+  - Removed `--hierarchical` flag from clone-all (now default behavior)
+  - Consistent path structure across clone-all and pull-all operations
+- **Bulk Operations Architecture**: Enhanced to support multi-provider workflows
+  - `clone-all` and `pull-all` now support multi-provider pattern matching
+  - Automatic detection of multi-provider patterns vs single-provider operations
+  - Improved error handling and progress reporting across provider boundaries
+
+### Removed
+- **Hierarchical Flag**: Removed `--hierarchical` option from clone-all command
+  - Hierarchical structure is now the default and only option
+  - Simplifies CLI interface and ensures consistent behavior
+
+### Fixed
+- **Provider Discovery**: Multi-provider discovery now searches across all configured providers
+  - Previously wildcard patterns only searched default provider
+  - Now properly matches provider names using case-insensitive glob patterns
+- **Query Validation**: Added comprehensive validation to prevent contradictory command usage
+  - Blocks combining wildcard discovery (`*/*/*`) with explicit provider flags (`--provider`)
+  - Provides helpful error messages with correct usage examples
+
 ## [0.4.5] - 2025-01-24
 
 ### Fixed
