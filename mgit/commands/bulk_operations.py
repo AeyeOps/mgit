@@ -15,7 +15,7 @@ from rich.console import Console
 from rich.progress import Progress
 from rich.prompt import Confirm
 
-from ..git import GitManager, sanitize_repo_name, build_repo_path
+from ..git import GitManager, build_repo_path
 from ..providers.base import Repository
 from ..providers.manager import ProviderManager
 
@@ -46,12 +46,10 @@ class BulkOperationProcessor:
         git_manager: GitManager,
         provider_manager: ProviderManager,
         operation_type: OperationType,
-        hierarchical: bool = False,
     ):
         self.git_manager = git_manager
         self.provider_manager = provider_manager
         self.operation_type = operation_type
-        self.hierarchical = hierarchical
         self.failures: List[Tuple[str, str]] = []
 
     async def process_repositories(
@@ -115,15 +113,8 @@ class BulkOperationProcessor:
                         return
 
                     # Determine repository folder path
-                    if self.hierarchical:
-                        repo_path = build_repo_path(repo_url)
-                        logger.debug(f"Using hierarchical path '{repo_path}' for repository '{repo_name}'")
-                    else:
-                        repo_path = Path(sanitize_repo_name(repo_url))
-                        if str(repo_path) != repo_name:
-                            logger.debug(
-                                f"Using sanitized name '{repo_path}' for repository '{repo_name}' folder"
-                            )
+                    repo_path = build_repo_path(repo_url)
+                    logger.debug(f"Using path '{repo_path}' for repository '{repo_name}'")
 
                     repo_folder = target_path / repo_path
                     # Handle existing directory
@@ -289,12 +280,9 @@ class BulkOperationProcessor:
             # Get authenticated URL from provider manager
             pat_url = self.provider_manager.get_authenticated_clone_url(repo)
             try:
-                # Ensure parent directories exist for hierarchical paths
-                if self.hierarchical:
-                    repo_folder.parent.mkdir(parents=True, exist_ok=True)
-                    await self.git_manager.git_clone(pat_url, repo_folder.parent, repo_folder.name)
-                else:
-                    await self.git_manager.git_clone(pat_url, target_path, str(repo_path))
+                # Ensure parent directories exist
+                repo_folder.parent.mkdir(parents=True, exist_ok=True)
+                await self.git_manager.git_clone(pat_url, repo_folder.parent, repo_folder.name)
                 progress.update(
                     repo_task_id,
                     description=f"[green]Cloned: {display_name}[/green]",
@@ -343,7 +331,6 @@ def check_force_mode_confirmation(
     repositories: List[Repository],
     target_path: Path,
     update_mode: UpdateMode,
-    hierarchical: bool = False,
 ) -> Tuple[bool, List[Tuple[str, str, Path]]]:
     """
     Check for existing directories in force mode and get user confirmation.
@@ -358,10 +345,7 @@ def check_force_mode_confirmation(
         logger.debug("Checking for existing directories to remove (force mode)...")
         for repo in repositories:
             repo_url = repo.clone_url
-            if hierarchical:
-                repo_path = build_repo_path(repo_url)
-            else:
-                repo_path = Path(sanitize_repo_name(repo_url))
+            repo_path = build_repo_path(repo_url)
             repo_folder = target_path / repo_path
             if repo_folder.exists():
                 dirs_to_remove.append((repo.name, str(repo_path), repo_folder))

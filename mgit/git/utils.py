@@ -153,57 +153,222 @@ def build_repo_path(clone_url: str) -> Path:
     """
     Build hierarchical repository path from Git URL.
     
-    Decodes percent-encoded characters and retains hierarchical structure
-    as ``host/org/project/repo``.
+    Always creates a 4-level hierarchical structure: host/org/project/repo
+    Handles URL encoding/decoding and provider-specific patterns.
+    Throws ValueError if URL cannot be parsed into the required structure.
     
-    For Azure DevOps: host/org/project/repo (skips DefaultCollection)
-    For GitHub: host/owner/repo  
-    For BitBucket: host/workspace/project/repo or host/workspace/repo
+    Supported providers:
+    - Azure DevOps: Extracts org/project/repo from various URL formats
+    - GitHub: Uses owner as org, "repos" as project placeholder
+    - BitBucket: Handles workspace/project/repo or workspace/repo patterns
     
     Args:
-        clone_url: Git repository URL (HTTPS or SSH)
+        clone_url: Git repository URL (HTTPS or SSH format)
         
     Returns:
-        Path object with hierarchical structure.
-        Falls back to sanitized repo name if parsing fails.
-    """
-    try:
-        from urllib.parse import urlparse, unquote
+        Path object with exactly 4 levels: host/org/project/repo
         
-        # Parse the URL
+    Raises:
+        ValueError: If URL cannot be parsed or doesn't contain required components
+    """
+    if not clone_url or not isinstance(clone_url, str):
+        raise ValueError("clone_url must be a non-empty string")
+    
+    clone_url = clone_url.strip()
+    if not clone_url:
+        raise ValueError("clone_url cannot be empty or whitespace")
+    
+    # Handle SSH vs HTTPS URL formats
+    if clone_url.startswith("git@"):
+        host, org, project, repo = _parse_ssh_url(clone_url)
+    elif clone_url.startswith(("http://", "https://")):
+        host, org, project, repo = _parse_https_url(clone_url)
+    else:
+        raise ValueError(f"Unsupported URL format. Must start with 'git@', 'http://', or 'https://': {clone_url}")
+    
+    # Validate all components are present and non-empty
+    if not all([host, org, project, repo]):
+        raise ValueError(f"Failed to extract all required components (host/org/project/repo) from URL: {clone_url}")
+    
+    # Sanitize each component for filesystem safety
+    safe_host = sanitize_path_segment(host)
+    safe_org = sanitize_path_segment(org)
+    safe_project = sanitize_path_segment(project)
+    safe_repo = sanitize_path_segment(repo)
+    
+    # Validate sanitized components are still non-empty
+    if not all([safe_host, safe_org, safe_project, safe_repo]):
+        raise ValueError(f"One or more path components became empty after sanitization: {clone_url}")
+    
+    return Path(safe_host, safe_org, safe_project, safe_repo)
+
+
+def _parse_ssh_url(clone_url: str) -> tuple[str, str, str, str]:
+    """Parse SSH format Git URL (git@host:path)."""
+    # Extract host and path from SSH format
+    ssh_pattern = r"^git@([^:]+):(.+)$"
+    match = re.match(ssh_pattern, clone_url)
+    if not match:
+        raise ValueError(f"Invalid SSH URL format: {clone_url}")
+    
+    host = match.group(1)
+    path = match.group(2)
+    
+    if not host or not path:
+        raise ValueError(f"Invalid SSH URL - missing host or path: {clone_url}")
+    
+    # Remove .git suffix if present
+    if path.endswith(".git"):
+        path = path[:-4]
+    
+    return _parse_repository_path(host, path, clone_url)
+
+
+def _parse_https_url(clone_url: str) -> tuple[str, str, str, str]:
+    """Parse HTTPS format Git URL."""
+    try:
         parsed = urlparse(clone_url)
-        host = parsed.hostname or "unknown-host"
-        path = unquote(parsed.path.lstrip("/"))
+        
+        if not parsed.hostname:
+            raise ValueError(f"No hostname found in URL: {clone_url}")
+        
+        if not parsed.path or parsed.path == "/":
+            raise ValueError(f"No path found in URL: {clone_url}")
+        
+        host = parsed.hostname
+        # URL decode the path and remove leading/trailing slashes
+        path = unquote(parsed.path.strip("/"))
         
         if not path:
-            # Fallback to sanitized repo name if no path
-            return Path(sanitize_repo_name(clone_url))
+            raise ValueError(f"Empty path after URL decoding: {clone_url}")
         
-        # Split path into segments
-        segments = [seg for seg in path.split("/") if seg]
-        
-        # Remove 'DefaultCollection' for older Azure DevOps URLs
-        if segments and segments[0] == "DefaultCollection":
-            segments = segments[1:]
-        
-        # Handle different Git URL patterns
-        if segments and segments[-1] == "_git" and len(segments) > 1:
-            # Azure DevOps: remove "_git" suffix, last segment is repo
-            segments = segments[:-1]
-        elif segments and segments[-1].endswith(".git"):
-            # Remove .git suffix from repository name
-            segments[-1] = segments[-1][:-4]
-        
-        # Sanitize each path segment
-        safe_segments = [sanitize_path_segment(seg) for seg in segments if seg]
-        
-        if not safe_segments:
-            # Fallback if no valid segments
-            return Path(sanitize_repo_name(clone_url))
-            
-        return Path(sanitize_path_segment(host), *safe_segments)
+        return _parse_repository_path(host, path, clone_url)
         
     except Exception as e:
-        # Fallback to existing logic if URL parsing fails
-        logger.debug(f"Failed to build hierarchical path for {clone_url}: {e}")
-        return Path(sanitize_repo_name(clone_url))
+        if isinstance(e, ValueError):
+            raise
+        raise ValueError(f"Failed to parse HTTPS URL: {clone_url} - {str(e)}")
+
+
+def _parse_repository_path(host: str, path: str, original_url: str) -> tuple[str, str, str, str]:
+    """Parse repository path based on Git provider patterns."""
+    # Split path into segments and filter out empty ones
+    segments = [seg.strip() for seg in path.split("/") if seg.strip()]
+    
+    if not segments:
+        raise ValueError(f"No valid path segments found: {original_url}")
+    
+    # Normalize host for provider detection
+    host_lower = host.lower()
+    
+    # Azure DevOps patterns
+    if "dev.azure.com" in host_lower or "visualstudio.com" in host_lower:
+        return _parse_azure_devops_path(host, segments, original_url)
+    
+    # GitHub patterns
+    elif "github.com" in host_lower:
+        return _parse_github_path(host, segments, original_url)
+    
+    # BitBucket patterns
+    elif "bitbucket.org" in host_lower:
+        return _parse_bitbucket_path(host, segments, original_url)
+    
+    # Generic Git provider - assume owner/repo pattern with placeholder project
+    else:
+        return _parse_generic_path(host, segments, original_url)
+
+
+def _parse_azure_devops_path(host: str, segments: List[str], original_url: str) -> tuple[str, str, str, str]:
+    """Parse Azure DevOps repository path patterns."""
+    # Remove common Azure DevOps path elements
+    filtered_segments = []
+    for segment in segments:
+        if segment not in ["DefaultCollection", "_git"]:
+            filtered_segments.append(segment)
+    
+    if len(filtered_segments) < 2:
+        raise ValueError(f"Azure DevOps URL must have at least project/repo: {original_url}")
+    
+    if len(filtered_segments) == 2:
+        # Legacy format: project/repo (missing org)
+        # Extract org from hostname if possible, otherwise use host as org
+        if "dev.azure.com" in host.lower():
+            # Modern format should have org in path, this shouldn't happen
+            raise ValueError(f"Modern Azure DevOps URL missing organization: {original_url}")
+        else:
+            # Legacy visualstudio.com format: use hostname base as org
+            org = host.split('.')[0]  # e.g., "pdidev" from "pdidev.visualstudio.com"
+            project = filtered_segments[0]
+            repo = filtered_segments[1]
+    elif len(filtered_segments) >= 3:
+        # Standard format: org/project/repo
+        org = filtered_segments[0]
+        project = filtered_segments[1]
+        repo = filtered_segments[2]
+    else:
+        raise ValueError(f"Invalid Azure DevOps URL structure: {original_url}")
+    
+    return host, org, project, repo
+
+
+def _parse_github_path(host: str, segments: List[str], original_url: str) -> tuple[str, str, str, str]:
+    """Parse GitHub repository path patterns."""
+    if len(segments) < 2:
+        raise ValueError(f"GitHub URL must have at least owner/repo: {original_url}")
+    
+    # GitHub structure: owner/repo (no natural project level)
+    org = segments[0]  # owner
+    repo = segments[1]  # repository name
+    
+    # Remove .git suffix if present
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    
+    # Use "repos" as project placeholder for consistent 4-level structure
+    project = "repos"
+    
+    return host, org, project, repo
+
+
+def _parse_bitbucket_path(host: str, segments: List[str], original_url: str) -> tuple[str, str, str, str]:
+    """Parse BitBucket repository path patterns."""
+    if len(segments) < 2:
+        raise ValueError(f"BitBucket URL must have at least workspace/repo: {original_url}")
+    
+    # Remove .git suffix from last segment if present
+    if segments[-1].endswith(".git"):
+        segments[-1] = segments[-1][:-4]
+    
+    if len(segments) == 2:
+        # BitBucket structure: workspace/repo (no project)
+        workspace = segments[0]
+        repo = segments[1]
+        project = "repos"  # Use placeholder for consistent structure
+    elif len(segments) >= 3:
+        # BitBucket structure: workspace/project/repo
+        workspace = segments[0]
+        project = segments[1]
+        repo = segments[2]
+    else:
+        raise ValueError(f"Invalid BitBucket URL structure: {original_url}")
+    
+    return host, workspace, project, repo
+
+
+def _parse_generic_path(host: str, segments: List[str], original_url: str) -> tuple[str, str, str, str]:
+    """Parse generic Git provider path (assumes owner/repo pattern)."""
+    if len(segments) < 2:
+        raise ValueError(f"Generic Git URL must have at least owner/repo: {original_url}")
+    
+    # Generic structure: owner/repo
+    org = segments[0]
+    repo = segments[1]
+    
+    # Remove .git suffix if present
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    
+    # Use "repos" as project placeholder
+    project = "repos"
+    
+    return host, org, project, repo

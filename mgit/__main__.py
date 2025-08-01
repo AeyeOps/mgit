@@ -302,12 +302,6 @@ def clone_all(
             "'force' => remove the folder and clone fresh."
         ),
     ),
-    hierarchical: bool = typer.Option(
-        False,
-        "--hierarchical",
-        "-h",
-        help="Use hierarchical directory structure (host/org/project/repo) instead of flat naming.",
-    ),
 ):
     """
     Clone all repositories from a git provider project/organization.
@@ -356,11 +350,39 @@ def clone_all(
     target_path = Path.cwd() / rel_path
     target_path.mkdir(parents=True, exist_ok=True)
 
-    # List repositories using provider manager
+    # Check if this is a multi-provider pattern
+    query_segments = project.split("/")
+    first_segment = query_segments[0] if query_segments else ""
+    is_multi_provider_pattern = (
+        config is None and url is None and 
+        ("*" in first_segment or "?" in first_segment)
+    )
+    
+    # List repositories using provider manager or multi-provider discovery
     logger.debug(f"Fetching repository list for project: {project}...")
     try:
-        repositories = provider_manager.list_repositories(project)
-        logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
+        
+        if is_multi_provider_pattern:
+            # Use multi-provider discovery from list command
+            from .commands.listing import list_repositories
+            repository_results = asyncio.run(list_repositories(
+                query=project,
+                provider_name=None,
+                format_type="json",
+                limit=None
+            ))
+            
+            # Convert RepositoryResult objects to Repository objects
+            repositories = []
+            for result in repository_results:
+                repositories.append(result.repo)
+            
+            logger.info(f"Found {len(repositories)} repositories across multiple providers using pattern '{project}'.")
+        else:
+            # Single provider mode
+            repositories = provider_manager.list_repositories(project)
+            logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
+            
     except Exception as e:
         logger.error(f"Error fetching repository list: {e}")
         raise typer.Exit(code=1)
@@ -371,15 +393,22 @@ def clone_all(
 
     # Check for force mode confirmation
     confirmed_force_remove, dirs_to_remove = check_force_mode_confirmation(
-        repositories, target_path, update_mode, hierarchical
+        repositories, target_path, update_mode
     )
 
     # Create processor and run bulk operation
+    # For multi-provider mode, we'll use a default provider manager for the processor
+    # The actual clone URLs will come from the repositories themselves
+    if is_multi_provider_pattern:
+        # Use a default provider manager - the repositories already have their correct clone URLs
+        default_provider_manager = ProviderManager()
+    else:
+        default_provider_manager = provider_manager
+        
     processor = BulkOperationProcessor(
         git_manager=git_manager,
-        provider_manager=provider_manager,
+        provider_manager=default_provider_manager,
         operation_type=OperationType.clone,
-        hierarchical=hierarchical,
     )
 
     logger.info(
@@ -496,12 +525,38 @@ def pull_all(
         logger.error(f"Target path is not a directory: {target_path}")
         raise typer.Exit(code=1)
 
-    # List repositories using provider manager
+    # Check if this is a multi-provider pattern
+    query_segments = project.split("/")
+    first_segment = query_segments[0] if query_segments else ""
+    is_multi_provider_pattern = (
+        config is None and 
+        ("*" in first_segment or "?" in first_segment)
+    )
+    
+    # List repositories using provider manager or multi-provider discovery
     logger.debug(f"Fetching repository list for project: {project}...")
     try:
-        # list_repositories is a sync method that returns a list, not an async generator
-        repositories = provider_manager.list_repositories(project)
-        logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
+        if is_multi_provider_pattern:
+            # Use multi-provider discovery from list command
+            from .commands.listing import list_repositories
+            repository_results = asyncio.run(list_repositories(
+                query=project,
+                provider_name=None,
+                format_type="json",
+                limit=None
+            ))
+            
+            # Convert RepositoryResult objects to Repository objects
+            repositories = []
+            for result in repository_results:
+                repositories.append(result.repo)
+            
+            logger.info(f"Found {len(repositories)} repositories across multiple providers using pattern '{project}'.")
+        else:
+            # Single provider mode
+            repositories = provider_manager.list_repositories(project)
+            logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
+            
     except Exception as e:
         logger.error(f"Error fetching repository list: {e}")
         raise typer.Exit(code=1)
@@ -516,9 +571,16 @@ def pull_all(
     )
 
     # Create processor and process repositories
+    # For multi-provider mode, we'll use a default provider manager for the processor
+    if is_multi_provider_pattern:
+        # Use a default provider manager - the repositories already have their correct clone URLs
+        default_provider_manager = ProviderManager()
+    else:
+        default_provider_manager = provider_manager
+        
     processor = BulkOperationProcessor(
         git_manager=git_manager,
-        provider_manager=provider_manager,
+        provider_manager=default_provider_manager,
         operation_type=OperationType.pull,
     )
 
@@ -1092,6 +1154,38 @@ def config(
 
 
 # -----------------------------------------------------------------------------
+# Validation Functions
+# -----------------------------------------------------------------------------
+def _validate_query_provider_consistency(query_pattern: str, provider_name: Optional[str], command_name: str) -> None:
+    """Validate that query pattern and provider flag are not contradictory.
+    
+    Args:
+        query_pattern: Query like "*/*/*" or "org/project/repo"
+        provider_name: Explicit provider name from --provider flag
+        command_name: Name of the command being validated
+        
+    Raises:
+        typer.Exit: If validation fails with helpful error message
+    """
+    # Check if this is a wildcard discovery pattern
+    is_wildcard_discovery = query_pattern.startswith("*")
+    
+    # If both wildcard discovery AND explicit provider specified = contradiction  
+    if is_wildcard_discovery and provider_name:
+        console.print("[yellow]Heads up: These options don't work together[/yellow]")
+        console.print()
+        console.print("You're using wildcard discovery with a specific provider:")
+        console.print(f"   Query: [cyan]{query_pattern}[/cyan] (searches all providers)")
+        console.print(f"   Provider: [cyan]--provider {provider_name}[/cyan] (uses only one provider)")
+        console.print()
+        console.print("Try one of these instead:")
+        console.print(f"   [green]mgit {command_name} \"{query_pattern}\"[/green]  # Search across all providers")
+        console.print(f"   [green]mgit {command_name} \"org/project/repo\" --provider {provider_name}[/green]  # Search specific provider")
+        console.print()
+        raise typer.Exit(1)
+
+
+# -----------------------------------------------------------------------------
 # list Command
 # -----------------------------------------------------------------------------
 @app.command(name="list")
@@ -1116,6 +1210,9 @@ def list_command(
       mgit list "*/*/pay*"                 # List repos ending in 'pay' from any org
       mgit list "myorg/MyProject/*"        # List all repos in specific project
     """
+
+    # Validate query pattern and provider flag consistency
+    _validate_query_provider_consistency(query, provider, "list")
 
     async def do_list():
         try:
