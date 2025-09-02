@@ -29,8 +29,6 @@ class TestConfigCommand:
         pytest.skip("Skipping outdated test.")
 
 
-
-
 @pytest.mark.integration
 @pytest.mark.requires_network
 class TestEndToEndScenarios:

@@ -28,11 +28,13 @@ else:
         # Wheel installation - use importlib.metadata
         try:
             from importlib.metadata import version
+
             __version__ = version("mgit")
         except ImportError:
             # Fallback for Python < 3.8
             try:
                 from importlib_metadata import version
+
                 __version__ = version("mgit")
             except ImportError:
                 # Final fallback

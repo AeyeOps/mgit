@@ -4,7 +4,7 @@ import asyncio
 import logging
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any, List
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -63,41 +63,144 @@ class GitManager:
         cmd = [self.GIT_EXECUTABLE, "pull"]
         await self._run_subprocess(cmd, cwd=repo_dir)
 
-    @staticmethod
-    async def _run_subprocess(cmd: list, cwd: Path):
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=str(cwd),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await process.communicate()
-        if stdout:
-            for line in stdout.decode().splitlines():
-                logger.debug(f"[stdout] {line}")
-        if stderr:
-            for line in stderr.decode().splitlines():
-                logger.debug(f"[stderr] {line}")
-        if process.returncode != 0:
-            # Ensure returncode is an int for CalledProcessError
-            return_code = process.returncode
-            if return_code is None:
-                # This case should ideally not happen after communicate()
-                logger.error(
-                    f"Command '{' '.join(cmd)}' finished but return code is None. Assuming error."
-                )
-                return_code = 1  # Assign a default error code
+    async def get_current_branch(self, repo_dir: Path) -> Optional[str]:
+        """
+        Get the current branch name for the repository.
 
-            logger.error(
-                f"Command '{' '.join(cmd)}' failed " f"with return code {return_code}."
+        Args:
+            repo_dir: Path to the repository
+
+        Returns:
+            Current branch name or None if detached HEAD or error
+        """
+        try:
+            cmd = [self.GIT_EXECUTABLE, "branch", "--show-current"]
+            result = await self._run_subprocess(cmd, cwd=repo_dir, capture_output=True)
+
+            branch_name = result.stdout.strip()
+            return branch_name if branch_name else None
+
+        except subprocess.CalledProcessError:
+            logger.debug(f"Could not get current branch for {repo_dir}")
+            return None
+        except Exception as e:
+            logger.debug(f"Get current branch failed in {repo_dir}: {e}")
+            return None
+
+    async def get_recent_commits(
+        self, repo_dir: Path, limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Get recent commit information from the repository.
+
+        Args:
+            repo_dir: Path to repository
+            limit: Maximum number of commits to return
+
+        Returns:
+            List of commit information dictionaries
+        """
+        try:
+            # Use git log with custom format for structured output
+            format_str = "--format=%H|%an|%ae|%ai|%s"
+            cmd = [self.GIT_EXECUTABLE, "log", f"-{limit}", format_str, "--no-merges"]
+
+            result = await self._run_subprocess(cmd, cwd=repo_dir, capture_output=True)
+
+            commits = []
+            for line in result.stdout.strip().split("\n"):
+                if line:
+                    parts = line.split("|", 4)
+                    if len(parts) == 5:
+                        commits.append(
+                            {
+                                "hash": parts[0],
+                                "author_name": parts[1],
+                                "author_email": parts[2],
+                                "date": parts[3],
+                                "message": parts[4],
+                            }
+                        )
+
+            return commits
+
+        except subprocess.CalledProcessError as e:
+            logger.debug(f"Git log failed in {repo_dir}: {e}")
+            return []
+        except Exception as e:
+            logger.debug(f"Get recent commits failed in {repo_dir}: {e}")
+            return []
+
+    async def diff_files(self, repo_dir: Path) -> Dict[str, Any]:
+        """
+        Get diff information for a repository including git status.
+
+        Args:
+            repo_dir: Path to the repository
+
+        Returns:
+            Dictionary with diff information including:
+            - has_changes: bool indicating if there are uncommitted changes
+            - status_output: raw git status --porcelain output
+            - diff_output: raw git diff output (optional)
+        """
+        try:
+            # Check for uncommitted changes using git status
+            status_cmd = [self.GIT_EXECUTABLE, "status", "--porcelain"]
+            status_result = await self._run_subprocess(
+                status_cmd, cwd=repo_dir, capture_output=True
             )
-            # Raise the specific error for the caller to handle
-            # Ensure stderr is bytes if stdout is bytes for CalledProcessError
-            stderr_bytes = (
-                stderr
-                if isinstance(stderr, bytes)
-                else stderr.encode("utf-8", errors="replace")
-            )
-            raise subprocess.CalledProcessError(
-                return_code, cmd, output=stdout, stderr=stderr_bytes
-            )
+
+            status_output = status_result.stdout.strip()
+            has_changes = len(status_output) > 0
+
+            return {
+                "has_changes": has_changes,
+                "status_output": status_output,
+            }
+
+        except subprocess.CalledProcessError as e:
+            logger.debug(f"Git status failed in {repo_dir}: {e}")
+            raise
+        except Exception as e:
+            logger.debug(f"Diff files operation failed in {repo_dir}: {e}")
+            raise
+
+    async def _run_subprocess(
+        self, cmd: list, cwd: Path, capture_output: bool = False
+    ) -> subprocess.CompletedProcess:
+        """
+        Run a subprocess command with proper error handling.
+
+        Args:
+            cmd: Command and arguments to run
+            cwd: Working directory for the command
+            capture_output: Whether to capture stdout/stderr
+
+        Returns:
+            CompletedProcess result if capture_output=True
+        """
+        try:
+            if capture_output:
+                result = subprocess.run(
+                    cmd, cwd=cwd, capture_output=True, text=True, check=True
+                )
+                return result
+            else:
+                # Original behavior for non-capturing calls
+                subprocess.run(cmd, cwd=cwd, check=True)
+                return None
+
+        except subprocess.CalledProcessError as e:
+            # Log the error with context
+            cmd_str = " ".join(cmd)
+            logger.error(f"Command '{cmd_str}' failed in {cwd}: {e}")
+            if capture_output and e.stdout:
+                logger.debug(f"stdout: {e.stdout}")
+            if capture_output and e.stderr:
+                logger.debug(f"stderr: {e.stderr}")
+            raise
+        except Exception as e:
+            cmd_str = " ".join(cmd)
+            logger.error(f"Unexpected error running '{cmd_str}' in {cwd}: {e}")
+            raise

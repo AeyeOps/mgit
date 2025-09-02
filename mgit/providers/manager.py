@@ -356,17 +356,44 @@ class ProviderManager:
             Authenticated clone URL
         """
         try:
-            provider = self.get_provider()
+            # Try to use provider specific to repository provider type if present
+            repo_provider_type = None
+            clone_url = None
+            name = None
+            is_disabled = False
+            if hasattr(repository, "provider"):
+                repo_provider_type = getattr(repository, "provider")
+                clone_url = getattr(repository, "clone_url", None)
+                name = getattr(repository, "name", None)
+                is_disabled = getattr(repository, "is_disabled", False)
+            elif isinstance(repository, dict):
+                repo_provider_type = repository.get("provider")
+                clone_url = repository.get("clone_url")
+                name = repository.get("name")
+                is_disabled = repository.get("is_disabled", False)
 
-            # Convert dict to Repository object if needed
+            # If repo indicates a different provider type, create a temp manager
+            manager = self
+            if repo_provider_type and repo_provider_type != self._provider_type:
+                try:
+                    temp_config = self._find_config_by_type(repo_provider_type)
+                    manager = ProviderManager(provider_name=self.provider_name)
+                    manager._provider_type = repo_provider_type
+                    manager._config = temp_config
+                except Exception:
+                    manager = self
+
+            provider = manager.get_provider()
+
+            # Convert to Repository object if needed
             if isinstance(repository, dict):
                 from mgit.providers.base import Repository
 
                 repo = Repository(
-                    name=repository.get("name", ""),
-                    clone_url=repository.get("clone_url", ""),
-                    is_disabled=repository.get("is_disabled", False),
-                    provider=self._provider_type,
+                    name=name or "",
+                    clone_url=clone_url or "",
+                    is_disabled=is_disabled,
+                    provider=repo_provider_type or self._provider_type,
                 )
             else:
                 repo = repository

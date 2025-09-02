@@ -117,7 +117,7 @@ def _parse_status_output(repo_path: Path, output: str) -> RepositoryStatus:
 
 
 async def get_repository_statuses(
-    path: Path, concurrency: int, fetch: bool
+    path: Path, concurrency: int, fetch: bool, json_mode: bool = False
 ) -> List[RepositoryStatus]:
     """Finds all git repos in a path and gets their status concurrently."""
     logger.info(f"Getting statuses for repos in: {path}")
@@ -136,8 +136,17 @@ async def get_repository_statuses(
     if not repos_to_check:
         return []
 
-    # Pass the console to the executor to ensure progress bars go to stderr
-    executor = AsyncExecutor(concurrency=concurrency, rich_console=console)
+    # For JSON mode, disable progress output to avoid mixing with JSON output
+    from rich.console import Console
+    import io
+
+    if json_mode:
+        # Create a null console that discards all output
+        progress_console = Console(file=io.StringIO(), force_terminal=False)
+    else:
+        progress_console = console
+
+    executor = AsyncExecutor(concurrency=concurrency, rich_console=progress_console)
 
     async def process_repo(repo_path: Path):
         return await _get_single_repo_status(repo_path, fetch)
@@ -192,7 +201,8 @@ def display_status_results(
             }
             for r in results
         ]
-        console.print(json.dumps(json_output, indent=2))
+        # Use print() instead of console.print() for JSON to avoid Rich formatting issues
+        print(json.dumps(json_output, indent=2))
     else:
         table = Table(show_header=True, header_style="bold magenta", expand=True)
         table.add_column("Repository", style="cyan", max_width=50, overflow="fold")

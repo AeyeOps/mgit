@@ -22,6 +22,9 @@ from mgit.commands.bulk_operations import (
 from mgit.commands.bulk_operations import (
     UpdateMode as BulkUpdateMode,
 )
+from mgit.utils.multi_provider_resolver import MultiProviderResolver
+
+# diff import will be added inside the command function
 from mgit.commands.listing import format_results, list_repositories
 from mgit.commands.status import display_status_results, get_repository_statuses
 from mgit.config.yaml_manager import (
@@ -215,11 +218,70 @@ logger.addHandler(console_handler)
 console = Console()
 app = typer.Typer(
     name="mgit",
-    help=f"Multi-Git CLI Tool v{__version__} - A utility for managing repositories across "  # Updated version will be picked up here automatically
+    help=f"Multi-Git CLI Tool v{__version__} - A utility for managing repositories across "
     "multiple git platforms (Azure DevOps, GitHub, BitBucket) with bulk operations.",
     add_completion=False,
     no_args_is_help=True,
 )
+
+
+def _infer_provider_from_query(query: str) -> Optional[str]:
+    try:
+        from mgit.config.yaml_manager import get_provider_configs
+
+        org = (query.split("/")[0] if query else "").strip()
+        if not org or any(ch in org for ch in ["*", "?"]):
+            return None
+        candidates = []
+        providers = get_provider_configs()
+        for name, cfg in providers.items():
+            try:
+                ptype = detect_provider_type(name)
+            except Exception:
+                continue
+            user = str(cfg.get("user", "")).strip().lower()
+            url = str(cfg.get("url", "")).strip().lower()
+            o = org.lower()
+            if ptype in ("github", "bitbucket") and user and user.lower() == o:
+                candidates.append(name)
+                continue
+            if (
+                ptype == "azuredevops"
+                and o
+                and (f"/{o}" in url or url.endswith(f"/{o}"))
+            ):
+                candidates.append(name)
+        if len(candidates) == 1:
+            return candidates[0]
+        return None
+    except Exception:
+        return None
+
+
+def _ensure_repo_list(repos):
+    try:
+        if isinstance(repos, list):
+            return repos
+        # Async iterable
+        if hasattr(repos, "__aiter__"):
+
+            async def collect(ait):
+                return [item async for item in ait]
+
+            try:
+                return asyncio.run(collect(repos))
+            except RuntimeError:
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor() as ex:
+                    fut = ex.submit(lambda: asyncio.run(collect(repos)))
+                    return fut.result()
+        # Sync iterable
+        if hasattr(repos, "__iter__"):
+            return list(repos)
+        return []
+    except Exception:
+        return []
 
 
 def version_callback(value: bool):
@@ -318,7 +380,12 @@ def clone_all(
             provider_manager = ProviderManager(provider_name=config)
         else:
             # Use default provider from config
-            provider_manager = ProviderManager()
+            inferred = _infer_provider_from_query(project)
+            provider_manager = (
+                ProviderManager(provider_name=inferred)
+                if inferred
+                else ProviderManager()
+            )
 
         logger.debug(
             f"Using provider '{provider_manager.provider_name}' of type '{provider_manager.provider_type}'"
@@ -350,39 +417,30 @@ def clone_all(
     target_path = Path.cwd() / rel_path
     target_path.mkdir(parents=True, exist_ok=True)
 
-    # Check if this is a multi-provider pattern
-    query_segments = project.split("/")
-    first_segment = query_segments[0] if query_segments else ""
-    is_multi_provider_pattern = (
-        config is None and url is None and 
-        ("*" in first_segment or "?" in first_segment)
-    )
-    
-    # List repositories using provider manager or multi-provider discovery
+    # Use multi-provider resolver for repository discovery
     logger.debug(f"Fetching repository list for project: {project}...")
     try:
-        
-        if is_multi_provider_pattern:
-            # Use multi-provider discovery from list command
-            from .commands.listing import list_repositories
-            repository_results = asyncio.run(list_repositories(
-                query=project,
-                provider_name=None,
-                format_type="json",
-                limit=None
-            ))
-            
-            # Convert RepositoryResult objects to Repository objects
-            repositories = []
-            for result in repository_results:
-                repositories.append(result.repo)
-            
-            logger.info(f"Found {len(repositories)} repositories across multiple providers using pattern '{project}'.")
-        else:
-            # Single provider mode
-            repositories = provider_manager.list_repositories(project)
-            logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
-            
+        resolver = MultiProviderResolver(concurrency_limit=concurrency)
+        result = asyncio.run(
+            resolver.resolve_repositories(
+                project=project,
+                provider_manager=provider_manager,
+                config=config,
+                url=url,
+            )
+        )
+
+        repositories = result.repositories
+
+        # Log results
+        if result.successful_providers:
+            logger.info(
+                f"Found {len(repositories)} repositories from {len(result.successful_providers)} providers."
+            )
+
+        if result.duplicates_removed > 0:
+            logger.info(f"Removed {result.duplicates_removed} duplicate repositories")
+
     except Exception as e:
         logger.error(f"Error fetching repository list: {e}")
         raise typer.Exit(code=1)
@@ -399,12 +457,15 @@ def clone_all(
     # Create processor and run bulk operation
     # For multi-provider mode, we'll use a default provider manager for the processor
     # The actual clone URLs will come from the repositories themselves
+    is_multi_provider_pattern = (
+        len(result.successful_providers) + len(result.failed_providers) > 1
+    )
     if is_multi_provider_pattern:
         # Use a default provider manager - the repositories already have their correct clone URLs
         default_provider_manager = ProviderManager()
     else:
         default_provider_manager = provider_manager
-        
+
     processor = BulkOperationProcessor(
         git_manager=git_manager,
         provider_manager=default_provider_manager,
@@ -525,38 +586,30 @@ def pull_all(
         logger.error(f"Target path is not a directory: {target_path}")
         raise typer.Exit(code=1)
 
-    # Check if this is a multi-provider pattern
-    query_segments = project.split("/")
-    first_segment = query_segments[0] if query_segments else ""
-    is_multi_provider_pattern = (
-        config is None and 
-        ("*" in first_segment or "?" in first_segment)
-    )
-    
-    # List repositories using provider manager or multi-provider discovery
+    # Use multi-provider resolver for repository discovery
     logger.debug(f"Fetching repository list for project: {project}...")
     try:
-        if is_multi_provider_pattern:
-            # Use multi-provider discovery from list command
-            from .commands.listing import list_repositories
-            repository_results = asyncio.run(list_repositories(
-                query=project,
-                provider_name=None,
-                format_type="json",
-                limit=None
-            ))
-            
-            # Convert RepositoryResult objects to Repository objects
-            repositories = []
-            for result in repository_results:
-                repositories.append(result.repo)
-            
-            logger.info(f"Found {len(repositories)} repositories across multiple providers using pattern '{project}'.")
-        else:
-            # Single provider mode
-            repositories = provider_manager.list_repositories(project)
-            logger.info(f"Found {len(repositories)} repositories in project '{project}'.")
-            
+        resolver = MultiProviderResolver(concurrency_limit=concurrency)
+        result = asyncio.run(
+            resolver.resolve_repositories(
+                project=project,
+                provider_manager=provider_manager,
+                config=config,
+                url=None,  # pull_all doesn't support url parameter
+            )
+        )
+
+        repositories = result.repositories
+
+        # Log results
+        if result.successful_providers:
+            logger.info(
+                f"Found {len(repositories)} repositories from {len(result.successful_providers)} providers."
+            )
+
+        if result.duplicates_removed > 0:
+            logger.info(f"Removed {result.duplicates_removed} duplicate repositories")
+
     except Exception as e:
         logger.error(f"Error fetching repository list: {e}")
         raise typer.Exit(code=1)
@@ -572,12 +625,15 @@ def pull_all(
 
     # Create processor and process repositories
     # For multi-provider mode, we'll use a default provider manager for the processor
+    is_multi_provider_pattern = (
+        len(result.successful_providers) + len(result.failed_providers) > 1
+    )
     if is_multi_provider_pattern:
         # Use a default provider manager - the repositories already have their correct clone URLs
         default_provider_manager = ProviderManager()
     else:
         default_provider_manager = provider_manager
-        
+
     processor = BulkOperationProcessor(
         git_manager=git_manager,
         provider_manager=default_provider_manager,
@@ -1154,38 +1210,6 @@ def config(
 
 
 # -----------------------------------------------------------------------------
-# Validation Functions
-# -----------------------------------------------------------------------------
-def _validate_query_provider_consistency(query_pattern: str, provider_name: Optional[str], command_name: str) -> None:
-    """Validate that query pattern and provider flag are not contradictory.
-    
-    Args:
-        query_pattern: Query like "*/*/*" or "org/project/repo"
-        provider_name: Explicit provider name from --provider flag
-        command_name: Name of the command being validated
-        
-    Raises:
-        typer.Exit: If validation fails with helpful error message
-    """
-    # Check if this is a wildcard discovery pattern
-    is_wildcard_discovery = query_pattern.startswith("*")
-    
-    # If both wildcard discovery AND explicit provider specified = contradiction  
-    if is_wildcard_discovery and provider_name:
-        console.print("[yellow]Heads up: These options don't work together[/yellow]")
-        console.print()
-        console.print("You're using wildcard discovery with a specific provider:")
-        console.print(f"   Query: [cyan]{query_pattern}[/cyan] (searches all providers)")
-        console.print(f"   Provider: [cyan]--provider {provider_name}[/cyan] (uses only one provider)")
-        console.print()
-        console.print("Try one of these instead:")
-        console.print(f"   [green]mgit {command_name} \"{query_pattern}\"[/green]  # Search across all providers")
-        console.print(f"   [green]mgit {command_name} \"org/project/repo\" --provider {provider_name}[/green]  # Search specific provider")
-        console.print()
-        raise typer.Exit(1)
-
-
-# -----------------------------------------------------------------------------
 # list Command
 # -----------------------------------------------------------------------------
 @app.command(name="list")
@@ -1211,9 +1235,6 @@ def list_command(
       mgit list "myorg/MyProject/*"        # List all repos in specific project
     """
 
-    # Validate query pattern and provider flag consistency
-    _validate_query_provider_consistency(query, provider, "list")
-
     async def do_list():
         try:
             results = await list_repositories(query, provider, format_type, limit)
@@ -1223,6 +1244,222 @@ def list_command(
             raise typer.Exit(1)
 
     asyncio.run(do_list())
+
+
+# -----------------------------------------------------------------------------
+# diff Command
+# -----------------------------------------------------------------------------
+@app.command(name="diff")
+def diff_command(
+    path: Path = typer.Argument(
+        ".",
+        help="Path to repository or directory containing repositories.",
+        exists=True,
+        resolve_path=True,
+    ),
+    output: Path = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output file for change data (JSONL format). If not specified, prints to stdout.",
+    ),
+    recursive: bool = typer.Option(
+        False,
+        "--recursive",
+        "-r",
+        help="Recursively scan directories for repositories.",
+    ),
+    concurrency: int = typer.Option(
+        5,
+        "--concurrency",
+        "-c",
+        help="Number of concurrent repository operations.",
+        min=1,
+        max=50,
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Enable verbose output"
+    ),
+    save_changeset: bool = typer.Option(
+        False,
+        "--save-changeset",
+        "-s",
+        help="Save changesets to persistent storage for incremental processing.",
+    ),
+    changeset_name: str = typer.Option(
+        "default",
+        "--changeset-name",
+        "-n",
+        help="Name of changeset collection to use for storage.",
+    ),
+    incremental: bool = typer.Option(
+        False,
+        "--incremental",
+        "-i",
+        help="Only report changes since last saved changeset.",
+    ),
+    embed_content: bool = typer.Option(
+        False,
+        "--embed-content",
+        help="Embed file content in the output for changed files.",
+    ),
+    content_strategy: str = typer.Option(
+        "sample",
+        "--content-strategy",
+        help="Content embedding strategy: 'none', 'summary', 'sample', or 'full'.",
+    ),
+    content_memory_mb: int = typer.Option(
+        100,
+        "--content-memory-mb",
+        help="Memory budget for content embedding in MB.",
+        min=10,
+        max=1000,
+    ),
+    discover_pattern: str = typer.Option(
+        None,
+        "--discover-pattern",
+        help="Discover additional repositories using this pattern before scanning.",
+    ),
+    discover_provider: str = typer.Option(
+        None,
+        "--discover-provider",
+        help="Provider to use for repository discovery.",
+    ),
+    merge_discovered: bool = typer.Option(
+        False,
+        "--merge-discovered/--no-merge-discovered",
+        help="Merge discovered repositories with local scan results.",
+    ),
+) -> None:
+    """
+    Detect changes in Git repositories and output structured change information.
+
+    This command scans repositories for uncommitted changes, recent commits,
+    and repository metadata, outputting the results in JSONL format for
+    further processing or analysis.
+
+    Enhanced with repository discovery capabilities to automatically find
+    and include additional repositories matching patterns.
+
+    Examples:
+      mgit diff /path/to/repos --output changes.jsonl --recursive
+      mgit diff . --verbose
+      mgit diff /single/repo --concurrency 1
+      mgit diff . --embed-content --content-strategy=sample
+      mgit diff . --embed-content --content-memory-mb=50
+      mgit diff . --discover-pattern "myorg/*/*" --merge-discovered
+    """
+    from mgit.commands.diff import execute_diff_command
+
+    execute_diff_command(
+        path,
+        output,
+        recursive,
+        concurrency,
+        verbose,
+        save_changeset,
+        changeset_name,
+        incremental,
+        embed_content,
+        content_strategy,
+        content_memory_mb,
+        discover_pattern,
+        discover_provider,
+        merge_discovered,
+    )
+
+
+# -----------------------------------------------------------------------------
+# diff-remote Command
+# -----------------------------------------------------------------------------
+@app.command(name="diff-remote")
+def diff_remote_command(
+    pattern: str = typer.Argument(
+        ...,
+        help="Repository search pattern (e.g., 'myorg/*/*', 'github/*/*', '*pdi/*').",
+    ),
+    local_root: Path = typer.Option(
+        None,
+        "--local-root",
+        "-l",
+        help="Root directory to scan for local repository clones.",
+        exists=True,
+        file_okay=False,
+        resolve_path=True,
+    ),
+    provider: str = typer.Option(
+        None,
+        "--provider",
+        "-p",
+        help="Specific provider to query (overrides pattern-based provider detection).",
+    ),
+    output: Path = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output file for discovery results (JSONL format). If not specified, prints to stdout.",
+    ),
+    save_changeset: bool = typer.Option(
+        False,
+        "--save-changeset",
+        "-s",
+        help="Save changesets to persistent storage.",
+    ),
+    changeset_name: str = typer.Option(
+        "remote-discovery",
+        "--changeset-name",
+        "-n",
+        help="Name of changeset collection for storage.",
+    ),
+    include_remote_only: bool = typer.Option(
+        True,
+        "--include-remote-only/--local-only",
+        help="Include repositories found remotely but not locally cloned.",
+    ),
+    concurrency: int = typer.Option(
+        10,
+        "--concurrency",
+        "-c",
+        help="Number of concurrent repository operations.",
+        min=1,
+        max=50,
+    ),
+    limit: int = typer.Option(
+        None,
+        "--limit",
+        help="Maximum number of repositories to process.",
+        min=1,
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Enable verbose output"
+    ),
+) -> None:
+    """
+    Discover repositories through provider queries and detect their changes.
+
+    This command combines repository discovery across Git providers with
+    change detection, allowing you to track changes in repositories matching
+    specific patterns across multiple providers.
+
+    Examples:
+      mgit diff-remote "myorg/*/*" --local-root ./repos --save-changeset
+      mgit diff-remote "github*/*/*" --provider github_work --verbose
+      mgit diff-remote "*pdi/*" --include-remote-only --output discovery.jsonl
+    """
+    from mgit.commands.diff_remote import execute_remote_diff_command
+
+    execute_remote_diff_command(
+        pattern,
+        local_root,
+        provider,
+        output,
+        save_changeset,
+        changeset_name,
+        include_remote_only,
+        concurrency,
+        limit,
+        verbose,
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -1264,8 +1501,13 @@ def status_command(
 
     async def do_status():
         try:
-            results = await get_repository_statuses(path, concurrency, fetch)
-            logger.info(f"Got {len(results)} results, displaying in {output} format.")
+            results = await get_repository_statuses(
+                path, concurrency, fetch, json_mode=(output == "json")
+            )
+            if output != "json":
+                logger.info(
+                    f"Got {len(results)} results, displaying in {output} format."
+                )
             display_status_results(results, output, show_clean)
             if fail_on_dirty and any(not r.is_clean for r in results):
                 raise typer.Exit(code=1)
