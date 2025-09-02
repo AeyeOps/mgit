@@ -55,20 +55,20 @@ async def _process_single_provider(
     provider_task_id: Optional[int] = None,
 ) -> List[RepositoryResult]:
     """Process a single provider for repository discovery.
-    
+
     Args:
         provider_name: Name of the provider to process
         query: Query pattern (org/project/repo)
         limit: Maximum number of results to return
         progress: Progress object for updates
         provider_task_id: Task ID for provider-level progress updates
-        
+
     Returns:
         List of matching repository results from this provider
     """
     # Parse query pattern
     pattern = parse_query(query)
-    
+
     # Get provider
     provider_manager = ProviderManager(provider_name=provider_name)
     provider = provider_manager.get_provider()
@@ -151,9 +151,7 @@ async def _process_single_provider(
                             ):
                                 if matches_pattern(repo.name, pattern.repo_pattern):
                                     results.append(
-                                        RepositoryResult(
-                                            repo, org.name, project_name
-                                        )
+                                        RepositoryResult(repo, org.name, project_name)
                                     )
 
                                     if limit and len(results) >= limit:
@@ -163,13 +161,9 @@ async def _process_single_provider(
                                 break
                     else:
                         # Handle case with no projects (use None)
-                        async for repo in provider.list_repositories(
-                            org.name, None
-                        ):
+                        async for repo in provider.list_repositories(org.name, None):
                             if matches_pattern(repo.name, pattern.repo_pattern):
-                                results.append(
-                                    RepositoryResult(repo, org.name, None)
-                                )
+                                results.append(RepositoryResult(repo, org.name, None))
 
                                 if limit and len(results) >= limit:
                                     break
@@ -183,7 +177,9 @@ async def _process_single_provider(
                                 break
 
             except Exception as e:
-                logger.warning(f"Failed to list repositories for {org.name} in {provider_name}: {e}")
+                logger.warning(
+                    f"Failed to list repositories for {org.name} in {provider_name}: {e}"
+                )
                 continue
 
             # Update progress
@@ -191,7 +187,9 @@ async def _process_single_provider(
                 progress.update(provider_task_id, completed=i + 1)
 
     except Exception as e:
-        logger.warning(f"Error during repository listing for provider {provider_name}: {e}")
+        logger.warning(
+            f"Error during repository listing for provider {provider_name}: {e}"
+        )
     finally:
         # Clean up provider resources
         if hasattr(provider, "cleanup"):
@@ -230,116 +228,202 @@ async def list_repositories(
     # Multi-provider mode when no specific provider and first segment has wildcards
     query_segments = query.split("/")
     first_segment = query_segments[0] if query_segments else ""
-    is_multi_provider_pattern = (
-        provider_name is None and 
-        ("*" in first_segment or "?" in first_segment)
-    )
-    
+    is_multi_provider_pattern = provider_name is None and ("*" in query or "?" in query)
+
     if is_multi_provider_pattern:
         # Parse provider pattern from leftmost segment of query
         query_segments = query.split("/")
-        provider_pattern = query_segments[0] if query_segments else "*"
-        
-        # Extract the org/project/repo part for each provider
-        remaining_query = "/".join(query_segments[1:]) if len(query_segments) > 1 else "*/*"
-        
+
+        # Check if first segment has wildcards - if so, it's a provider pattern
+        # Otherwise, use all providers with the full query
+        if "*" in first_segment or "?" in first_segment:
+            # First segment is a provider pattern (e.g., "*/*/*" or "github*/*/*")
+            provider_pattern = query_segments[0] if query_segments else "*"
+            # Extract the org/project/repo part for each provider
+            remaining_query = (
+                "/".join(query_segments[1:]) if len(query_segments) > 1 else "*/*"
+            )
+        else:
+            # First segment is an org name, use all providers with full query
+            provider_pattern = "*"  # Match all providers
+            remaining_query = query  # Use the full original query
+
         # Get all provider names and filter by pattern
         all_provider_names = list_provider_names()
         matching_providers = []
-        
+
         for provider_name_candidate in all_provider_names:
-            if matches_pattern(provider_name_candidate, provider_pattern, case_sensitive=False):
+            if matches_pattern(
+                provider_name_candidate, provider_pattern, case_sensitive=False
+            ):
                 matching_providers.append(provider_name_candidate)
-        
+
         logger.debug(
             f"Provider pattern '{provider_pattern}' matches {len(matching_providers)} providers: {matching_providers}"
         )
-        
+
         if not matching_providers:
-            console.print(f"[yellow]No providers match pattern '{provider_pattern}'[/yellow]")
+            if format_type != "json":
+                console.print(
+                    f"[yellow]No providers match pattern '{provider_pattern}'[/yellow]"
+                )
             return []
-        
+
         # Process multiple providers concurrently
         all_results = []
-        sem = asyncio.Semaphore(min(4, len(matching_providers)))  # Limit concurrent providers
-        
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            MofNCompleteColumn(),
-            TextColumn("• {task.fields[repos_found]} repos found"),
-            console=console,
-            transient=False,
-        ) as progress:
-            # Overall discovery task
-            overall_task = progress.add_task(
-                f"Discovering across {len(matching_providers)} providers...", 
-                total=len(matching_providers), 
-                repos_found=0
-            )
-            
-            async def process_provider(provider_name_item: str) -> List[RepositoryResult]:
-                """Process a single provider and return its results."""
+        sem = asyncio.Semaphore(
+            min(4, len(matching_providers))
+        )  # Limit concurrent providers
+
+        show_progress = format_type != "json"
+        if show_progress:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                MofNCompleteColumn(),
+                TextColumn("• {task.fields[repos_found]} repos found"),
+                console=console,
+                transient=False,
+            ) as progress:
+                # Overall discovery task
+                overall_task = progress.add_task(
+                    f"Discovering across {len(matching_providers)} providers...",
+                    total=len(matching_providers),
+                    repos_found=0,
+                )
+
+                async def process_provider(
+                    provider_name_item: str,
+                ) -> List[RepositoryResult]:
+                    """Process a single provider and return its results."""
+                    async with sem:
+                        # Add provider-specific task
+                        provider_task = progress.add_task(
+                            f"  └─ {provider_name_item}: Initializing...",
+                            total=None,
+                            repos_found=0,
+                        )
+
+                        try:
+                            # Process this provider
+                            provider_results = await _process_single_provider(
+                                provider_name=provider_name_item,
+                                query=remaining_query,
+                                limit=limit,
+                                progress=progress,
+                                provider_task_id=provider_task,
+                            )
+
+                            # Update overall progress
+                            progress.update(
+                                overall_task,
+                                repos_found=len(all_results) + len(provider_results),
+                            )
+                            progress.advance(overall_task, 1)
+
+                            return provider_results
+
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to process provider {provider_name_item}: {e}"
+                            )
+                            progress.update(
+                                provider_task,
+                                description=f"  └─ {provider_name_item}: Error - {str(e)[:50]}",
+                                completed=True,
+                            )
+                            progress.advance(overall_task, 1)
+                            return []
+
+                # Process all providers concurrently
+                provider_results = await asyncio.gather(
+                    *(process_provider(pname) for pname in matching_providers),
+                    return_exceptions=True,
+                )
+
+                # Collect all results
+                for result in provider_results:
+                    if isinstance(result, list):
+                        all_results.extend(result)
+                    elif isinstance(result, Exception):
+                        logger.warning(f"Provider processing failed: {result}")
+
+                # Final update
+                progress.update(
+                    overall_task,
+                    completed=len(matching_providers),
+                    repos_found=len(all_results),
+                    description=f"Completed - processed {len(matching_providers)} providers",
+                )
+        else:
+            # JSON mode: no progress output
+            async def process_provider(
+                provider_name_item: str,
+            ) -> List[RepositoryResult]:
                 async with sem:
-                    # Add provider-specific task
-                    provider_task = progress.add_task(
-                        f"  └─ {provider_name_item}: Initializing...", 
-                        total=None,
-                        repos_found=0
-                    )
-                    
                     try:
-                        # Process this provider
-                        provider_results = await _process_single_provider(
+                        return await _process_single_provider(
                             provider_name=provider_name_item,
                             query=remaining_query,
                             limit=limit,
-                            progress=progress,
-                            provider_task_id=provider_task,
+                            progress=None,
+                            provider_task_id=None,
                         )
-                        
-                        # Update overall progress
-                        progress.update(overall_task, repos_found=len(all_results) + len(provider_results))
-                        progress.advance(overall_task, 1)
-                        
-                        return provider_results
-                    
                     except Exception as e:
-                        logger.warning(f"Failed to process provider {provider_name_item}: {e}")
-                        progress.update(
-                            provider_task,
-                            description=f"  └─ {provider_name_item}: Error - {str(e)[:50]}",
-                            completed=True,
+                        logger.warning(
+                            f"Failed to process provider {provider_name_item}: {e}"
                         )
-                        progress.advance(overall_task, 1)
                         return []
-            
-            # Process all providers concurrently
+
             provider_results = await asyncio.gather(
                 *(process_provider(pname) for pname in matching_providers),
-                return_exceptions=True
+                return_exceptions=True,
             )
-            
-            # Collect all results
             for result in provider_results:
                 if isinstance(result, list):
                     all_results.extend(result)
                 elif isinstance(result, Exception):
                     logger.warning(f"Provider processing failed: {result}")
-            
-            # Final update
-            progress.update(
-                overall_task,
-                completed=len(matching_providers),
-                repos_found=len(all_results),
-                description=f"Completed - processed {len(matching_providers)} providers",
-            )
-        
-        logger.debug(f"Found {len(all_results)} total repositories from {len(matching_providers)} providers")
-        return all_results
-        
+
+        logger.debug(
+            f"Found {len(all_results)} total repositories from {len(matching_providers)} providers"
+        )
+
+        # Deduplicate repositories by URL, then by org/name
+        seen_urls = set()
+        seen_org_names = set()
+        deduplicated_results = []
+        duplicates_removed = 0
+
+        for result in all_results:
+            repo = result.repo
+
+            # Primary deduplication by clone URL
+            if repo.clone_url in seen_urls:
+                duplicates_removed += 1
+                continue
+
+            # Secondary deduplication by org/name combination
+            org_name_key = f"{result.org_name}/{repo.name}"
+            if org_name_key in seen_org_names:
+                duplicates_removed += 1
+                continue
+
+            # Add to deduplicated list
+            seen_urls.add(repo.clone_url)
+            seen_org_names.add(org_name_key)
+            deduplicated_results.append(result)
+
+        logger.info(
+            f"Multi-provider query: Found {len(deduplicated_results)} unique repositories "
+            f"({len(all_results)} total, {duplicates_removed} duplicates removed) "
+            f"across {len(matching_providers)} providers"
+        )
+
+        return deduplicated_results
+
     # Single provider mode (existing logic)
     else:
         # Parse query pattern
@@ -369,21 +453,23 @@ async def list_repositories(
         results = []
 
         try:
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(),
-                MofNCompleteColumn(),
-                TextColumn("• {task.fields[repos_found]} repos found"),
-                console=console,
-                transient=False,
-            ) as progress:
-                # Step 1: List organizations
-                discovery_task = progress.add_task(
-                    "Discovering organizations...", total=None, repos_found=0
-                )
-                organizations = await provider.list_organizations()
+            show_progress = format_type != "json"
+            if show_progress:
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(),
+                    TaskProgressColumn(),
+                    MofNCompleteColumn(),
+                    TextColumn("• {task.fields[repos_found]} repos found"),
+                    console=console,
+                    transient=False,
+                ) as progress:
+                    # Step 1: List organizations
+                    discovery_task = progress.add_task(
+                        "Discovering organizations...", total=None, repos_found=0
+                    )
+                    organizations = await provider.list_organizations()
 
                 # Filter organizations by pattern
                 matching_orgs = []
@@ -425,7 +511,9 @@ async def list_repositories(
 
                     # Add organization-specific task
                     org_task = progress.add_task(
-                        f"  └─ Scanning {org.name}", total=None, repos_found=len(results)
+                        f"  └─ Scanning {org.name}",
+                        total=None,
+                        repos_found=len(results),
                     )
 
                     try:
@@ -436,7 +524,9 @@ async def list_repositories(
                             matching_projects = []
 
                             for project in projects:
-                                if matches_pattern(project.name, pattern.project_pattern):
+                                if matches_pattern(
+                                    project.name, pattern.project_pattern
+                                ):
                                     matching_projects.append(project)
 
                             # If no projects match, skip this org
@@ -472,7 +562,9 @@ async def list_repositories(
                                     async for repo in provider.list_repositories(
                                         org.name, project_name
                                     ):
-                                        if matches_pattern(repo.name, pattern.repo_pattern):
+                                        if matches_pattern(
+                                            repo.name, pattern.repo_pattern
+                                        ):
                                             results.append(
                                                 RepositoryResult(
                                                     repo, org.name, project_name
@@ -512,7 +604,9 @@ async def list_repositories(
                                         )
 
                                         # Update counters
-                                        progress.update(org_task, repos_found=len(results))
+                                        progress.update(
+                                            org_task, repos_found=len(results)
+                                        )
                                         progress.update(
                                             discovery_task, repos_found=len(results)
                                         )
@@ -545,7 +639,9 @@ async def list_repositories(
                             progress.update(org_task, completed=True)
 
                     except Exception as e:
-                        logger.warning(f"Failed to list repositories for {org.name}: {e}")
+                        logger.warning(
+                            f"Failed to list repositories for {org.name}: {e}"
+                        )
                         progress.update(
                             org_task,
                             description=f"  └─ {org.name}: Error - {str(e)[:50]}",
@@ -580,7 +676,10 @@ def format_results(results: List[RepositoryResult], format_type: str = "table") 
         format_type: Output format ('table' or 'json')
     """
     if not results:
-        console.print("[yellow]No repositories found matching query.[/yellow]")
+        if format_type == "json":
+            print("[]")  # Empty JSON array
+        else:
+            console.print("[yellow]No repositories found matching query.[/yellow]")
         return
 
     if format_type == "json":
@@ -588,19 +687,49 @@ def format_results(results: List[RepositoryResult], format_type: str = "table") 
 
         output = []
         for result in results:
+            # Ensure all values are JSON serializable
             output.append(
                 {
-                    "organization": result.org_name,
-                    "project": result.project_name,
-                    "repository": result.repo.name,
-                    "clone_url": result.repo.clone_url,
-                    "ssh_url": result.repo.ssh_url,
-                    "default_branch": result.repo.default_branch,
-                    "is_private": result.repo.is_private,
-                    "description": result.repo.description,
+                    "organization": (
+                        str(result.org_name) if result.org_name is not None else None
+                    ),
+                    "project": (
+                        str(result.project_name)
+                        if result.project_name is not None
+                        else None
+                    ),
+                    "repository": (
+                        str(result.repo.name) if result.repo.name is not None else None
+                    ),
+                    "clone_url": (
+                        str(result.repo.clone_url)
+                        if result.repo.clone_url is not None
+                        else None
+                    ),
+                    "ssh_url": (
+                        str(result.repo.ssh_url)
+                        if result.repo.ssh_url is not None
+                        else None
+                    ),
+                    "default_branch": (
+                        str(result.repo.default_branch)
+                        if result.repo.default_branch is not None
+                        else None
+                    ),
+                    "is_private": (
+                        bool(result.repo.is_private)
+                        if result.repo.is_private is not None
+                        else None
+                    ),
+                    "description": (
+                        str(result.repo.description)
+                        if result.repo.description is not None
+                        else None
+                    ),
                 }
             )
-        console.print(json.dumps(output, indent=2))
+        # Use print() instead of console.print() for JSON to avoid Rich formatting issues
+        print(json.dumps(output, indent=2, ensure_ascii=False))
 
     else:  # table format
         table = Table(show_header=True, header_style="bold blue")

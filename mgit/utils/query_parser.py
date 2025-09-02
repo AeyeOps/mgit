@@ -18,6 +18,7 @@ class QueryPattern:
     org_pattern: str
     project_pattern: str
     repo_pattern: str
+    provider_type: Optional[str] = None
 
     @property
     def has_org_filter(self) -> bool:
@@ -26,7 +27,9 @@ class QueryPattern:
 
     @property
     def has_project_filter(self) -> bool:
-        """Check if project is filtered (not wildcard)."""
+        """Check if project is filtered, considering provider type."""
+        if self.provider_type in ("github", "bitbucket"):
+            return False
         return self.project_pattern != "*"
 
     @property
@@ -35,36 +38,45 @@ class QueryPattern:
         return self.repo_pattern != "*"
 
 
-def parse_query(query: str) -> QueryPattern:
+def parse_query(query: str, provider_type: Optional[str] = None) -> QueryPattern:
     """Parse query string into pattern components.
 
     Args:
         query: Query pattern like "org/project/repo" with wildcards
+        provider_type: Type of provider to tailor parsing (e.g., 'github')
 
     Returns:
         QueryPattern with parsed segments
-
-    Examples:
-        >>> parse_query("myorg/*/pay*")
-        QueryPattern(org_pattern='myorg', project_pattern='*', repo_pattern='pay*')
-
-        >>> parse_query("myorg/MyProject/*")
-        QueryPattern(org_pattern='myorg', project_pattern='MyProject', repo_pattern='*')
-
-        >>> parse_query("*/*/*")
-        QueryPattern(org_pattern='*', project_pattern='*', repo_pattern='*')
     """
-    # Split by forward slash, default to wildcards for missing segments
     segments = query.split("/")
 
-    # Pad with wildcards if needed
-    while len(segments) < 3:
-        segments.append("*")
+    org_pattern = segments[0] if segments else "*"
+
+    # Provider-specific parsing
+    if provider_type in ("github", "bitbucket"):
+        # GitHub/BitBucket: org/repo (repo can have slashes)
+        project_pattern = "*"
+        repo_pattern = "/".join(segments[1:]) if len(segments) > 1 else "*"
+    else:
+        # Default (Azure DevOps): org/project/repo
+        project_pattern = segments[1] if len(segments) > 1 else "*"
+        repo_pattern = segments[2] if len(segments) > 2 else "*"
+
+    # Pad with wildcards if needed for providers that need 3 segments
+    if provider_type not in ("github", "bitbucket"):
+        while len(segments) < 3:
+            segments.append("*")
+        org_pattern, project_pattern, repo_pattern = (
+            segments[0],
+            segments[1],
+            segments[2],
+        )
 
     return QueryPattern(
-        org_pattern=segments[0] or "*",
-        project_pattern=segments[1] or "*",
-        repo_pattern=segments[2] or "*",
+        org_pattern=org_pattern or "*",
+        project_pattern=project_pattern or "*",
+        repo_pattern=repo_pattern or "*",
+        provider_type=provider_type,
     )
 
 

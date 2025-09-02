@@ -114,7 +114,9 @@ class BulkOperationProcessor:
 
                     # Determine repository folder path
                     repo_path = build_repo_path(repo_url)
-                    logger.debug(f"Using path '{repo_path}' for repository '{repo_name}'")
+                    logger.debug(
+                        f"Using path '{repo_path}' for repository '{repo_name}'"
+                    )
 
                     repo_folder = target_path / repo_path
                     # Handle existing directory
@@ -282,7 +284,9 @@ class BulkOperationProcessor:
             try:
                 # Ensure parent directories exist
                 repo_folder.parent.mkdir(parents=True, exist_ok=True)
-                await self.git_manager.git_clone(pat_url, repo_folder.parent, repo_folder.name)
+                await self.git_manager.git_clone(
+                    pat_url, repo_folder.parent, repo_folder.name
+                )
                 progress.update(
                     repo_task_id,
                     description=f"[green]Cloned: {display_name}[/green]",

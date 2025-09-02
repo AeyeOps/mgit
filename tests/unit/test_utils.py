@@ -227,7 +227,9 @@ class TestBuildRepoPath:
         """Test Azure DevOps URL with DefaultCollection segment."""
         url = "https://pdidev.visualstudio.com/DefaultCollection/Blue%20Cow/_git/Ignite%20Web%20Services"
         result = build_repo_path(url)
-        expected = Path("pdidev.visualstudio.com", "pdidev", "Blue Cow", "Ignite Web Services")
+        expected = Path(
+            "pdidev.visualstudio.com", "pdidev", "Blue Cow", "Ignite Web Services"
+        )
         assert result == expected
 
     def test_azure_devops_url_without_defaultcollection(self):
@@ -262,7 +264,9 @@ class TestBuildRepoPath:
         """Test URL percent-decoding of special characters."""
         url = "https://pdidev.visualstudio.com/My%20Project/_git/Special%20Repo%20Name"
         result = build_repo_path(url)
-        expected = Path("pdidev.visualstudio.com", "pdidev", "My Project", "Special Repo Name")
+        expected = Path(
+            "pdidev.visualstudio.com", "pdidev", "My Project", "Special Repo Name"
+        )
         assert result == expected
 
     def test_special_characters_sanitization(self):
@@ -322,7 +326,7 @@ class TestBuildRepoPath:
         assert sanitize_path_segment("normal-name") == "normal-name"
         assert sanitize_path_segment("name with spaces") == "name with spaces"
         assert sanitize_path_segment("name/with/slashes") == "name-with-slashes"
-        assert sanitize_path_segment("name<>:\"|?*chars") == "namechars"
+        assert sanitize_path_segment('name<>:"|?*chars') == "namechars"
         assert sanitize_path_segment("CON") == "CON_"
         assert sanitize_path_segment("  ..name..  ") == "name"
         assert sanitize_path_segment("name---with---dashes") == "name-with-dashes"

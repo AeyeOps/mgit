@@ -109,7 +109,6 @@ class TestStatusCommand:
         assert "Untracked" in stdout
         assert "Ahead" in stdout
 
-    @pytest.mark.skip(reason="Skipping due to JSON output issues")
     def test_status_json_output(self, cli_runner, dirty_workspace):
         """Test JSON output contains correct structured data."""
         result = cli_runner.invoke(
