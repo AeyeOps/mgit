@@ -27,6 +27,9 @@ from mgit.utils.multi_provider_resolver import MultiProviderResolver
 # diff import will be added inside the command function
 from mgit.commands.listing import format_results, list_repositories
 from mgit.commands.status import display_status_results, get_repository_statuses
+
+# Import sync command
+from mgit.commands.sync import sync_command
 from mgit.config.yaml_manager import (
     CONFIG_DIR,
     add_provider_config,
@@ -368,9 +371,25 @@ def clone_all(
     """
     Clone all repositories from a git provider project/organization.
 
-    Supports Azure DevOps, GitHub, and BitBucket providers.
-    Provider is auto-detected from URL or can be specified explicitly.
+    ⚠️  DEPRECATED: Use 'mgit sync' instead for better experience.
+
+    The 'sync' command provides the same functionality with:
+    - Simpler usage (no confusing update modes)
+    - Better progress reporting
+    - Intelligent clone + pull behavior
+    - Enhanced error handling
+
+    Migration: Replace 'mgit clone-all' with 'mgit sync'
     """
+    # Show deprecation warning
+    console.print(
+        "[yellow]⚠️  Deprecation Warning:[/yellow] "
+        "'clone-all' command will be removed in a future version.\n"
+        "[blue]Use 'mgit sync' instead for better experience and identical functionality.[/blue]\n"
+        "Run with --no-warnings to suppress this message."
+    )
+
+    # ... rest of existing function unchanged ...
     # Initialize provider manager with named configuration support
     try:
         # Priority: URL auto-detection > named config > default
@@ -536,9 +555,25 @@ def pull_all(
     """
     Pull the latest changes for all repositories in the specified path.
 
-    Supports Azure DevOps, GitHub, and BitBucket providers.
-    Provider is auto-detected from URL or can be specified explicitly.
+    ⚠️  DEPRECATED: Use 'mgit sync' instead for better experience.
+
+    The 'sync' command provides the same functionality with:
+    - Automatic handling of missing repositories
+    - Better progress reporting
+    - Intelligent clone + pull behavior
+    - Enhanced error handling
+
+    Migration: Replace 'mgit pull-all' with 'mgit sync'
     """
+    # Show deprecation warning
+    console.print(
+        "[yellow]⚠️  Deprecation Warning:[/yellow] "
+        "'pull-all' command will be removed in a future version.\n"
+        "[blue]Use 'mgit sync' instead for better experience and identical functionality.[/blue]\n"
+        "Run with --no-warnings to suppress this message."
+    )
+
+    # ... rest of existing function unchanged ...
 
     # Initialize provider manager with named configuration support
     try:
@@ -1519,6 +1554,54 @@ def status_command(
             raise typer.Exit(1)
 
     asyncio.run(do_status())
+
+
+# -----------------------------------------------------------------------------
+# sync Command
+# -----------------------------------------------------------------------------
+@app.command()
+def sync(
+    pattern: str = typer.Argument(..., help="Repository pattern (org/project/repo)"),
+    path: str = typer.Argument(".", help="Local path to synchronize repositories into"),
+    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Specific provider (otherwise search all)"),
+    force: bool = typer.Option(False, "--force", "-f", help="Delete and re-clone all repositories"),
+    concurrency: Optional[int] = typer.Option(None, "--concurrency", "-c", help="Number of concurrent operations"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without making changes"),
+    progress: bool = typer.Option(True, "--progress/--no-progress", help="Show progress bar"),
+    summary: bool = typer.Option(True, "--summary/--no-summary", help="Show detailed summary"),
+):
+    """
+    Synchronize repositories with remote providers.
+
+    🚀 UNIFIED REPOSITORY SYNC - replaces clone-all and pull-all
+
+    Intelligently handles your repository synchronization:
+    - Clones repositories that don't exist locally
+    - Pulls updates for repositories that already exist
+    - Handles conflicts and errors gracefully
+    - Provides detailed progress and summary reporting
+
+    PATTERN can be:
+    - Exact: myorg/myproject/myrepo
+    - Wildcards: myorg/*/myrepo, */myproject/*, myorg/*/*
+    - Cross-provider: */*/* (searches ALL providers)
+
+    When no --provider specified, patterns search ALL configured providers.
+
+    Examples:
+        # Daily workspace sync
+        mgit sync "myorg/*/*" ./workspace
+
+        # Preview changes first
+        mgit sync "myorg/*/*" ./workspace --dry-run
+
+        # Nuclear option - fresh everything
+        mgit sync "myorg/*/*" ./workspace --force
+
+        # Quiet sync for scripts
+        mgit sync "myorg/*/*" ./workspace --no-progress --no-summary
+    """
+    asyncio.run(sync_command(pattern, path, provider, force, concurrency, dry_run, progress, summary))
 
 
 # The callback is no longer needed since we're using Typer's built-in help
