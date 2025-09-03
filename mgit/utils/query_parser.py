@@ -50,27 +50,26 @@ def parse_query(query: str, provider_type: Optional[str] = None) -> QueryPattern
     """
     segments = query.split("/")
 
-    org_pattern = segments[0] if segments else "*"
+    # Handle short patterns by padding with wildcards to make them 3 segments
+    # This converts patterns like "*/DevTools" -> "*/*/DevTools"
+    while len(segments) < 3:
+        if len(segments) == 1:
+            # Single segment: assume it's repo name, pad with wildcards
+            segments.insert(0, "*")  # Add org wildcard
+            segments.insert(1, "*")  # Add project wildcard
+        elif len(segments) == 2:
+            # Two segments: assume org/repo, pad with project wildcard
+            segments.insert(1, "*")  # Add project wildcard
 
-    # Provider-specific parsing
+    org_pattern = segments[0] if segments else "*"
+    project_pattern = segments[1] if len(segments) > 1 else "*"
+    repo_pattern = segments[2] if len(segments) > 2 else "*"
+
+    # Provider-specific parsing (override defaults if needed)
     if provider_type in ("github", "bitbucket"):
         # GitHub/BitBucket: org/repo (repo can have slashes)
         project_pattern = "*"
         repo_pattern = "/".join(segments[1:]) if len(segments) > 1 else "*"
-    else:
-        # Default (Azure DevOps): org/project/repo
-        project_pattern = segments[1] if len(segments) > 1 else "*"
-        repo_pattern = segments[2] if len(segments) > 2 else "*"
-
-    # Pad with wildcards if needed for providers that need 3 segments
-    if provider_type not in ("github", "bitbucket"):
-        while len(segments) < 3:
-            segments.append("*")
-        org_pattern, project_pattern, repo_pattern = (
-            segments[0],
-            segments[1],
-            segments[2],
-        )
 
     return QueryPattern(
         org_pattern=org_pattern or "*",
@@ -130,8 +129,9 @@ def validate_query(query: str) -> Optional[str]:
         return "Query cannot be empty"
 
     # Check for invalid characters (basic validation)
+    # Allow spaces in project names for Azure DevOps compatibility
     invalid_chars = set(query) - set(
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*?/-_."
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*?/-_. "
     )
     if invalid_chars:
         return f"Invalid characters in query: {', '.join(sorted(invalid_chars))}"
