@@ -3,7 +3,7 @@
 # mgit list CORRECTED regression test suite with proper patterns
 # Avoids known limitations: spaces in project names, incorrect provider patterns
 
-LOG_FILE="mgit_list_corrected_test.log"
+LOG_FILE="mgit_list_test.log"
 
 # Clear previous log
 echo "=== mgit list CORRECTED regression test suite - $(date) ===" > "$LOG_FILE"
