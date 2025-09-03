@@ -19,6 +19,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, AsyncIterator, Dict, List, Optional
+import asyncio
+import time
 
 
 # Common data structures
@@ -109,6 +111,10 @@ class GitProvider(ABC):
         self._validate_config()
         self._client: Optional[Any] = None
         self._authenticated: bool = False
+
+        # Rate limiter configuration
+        self._rate_limiter_config = self._get_rate_limiter_config()
+        self._rate_limit_info: Optional[Dict[str, Any]] = None
 
     @abstractmethod
     def _validate_config(self) -> None:
@@ -432,17 +438,134 @@ class GitProvider(ABC):
         except (PermissionError, RepositoryNotFoundError):
             return False
 
-    def normalize_repository_name(self, name: str) -> str:
-        """Normalize repository name according to provider rules.
+    def _get_rate_limiter_config(self) -> Dict[str, Any]:
+        """Get rate limiter configuration with defaults.
 
-        Different providers have different rules for repository names.
-        This method should normalize names to match provider requirements.
+        Configuration options:
+        - max_wait_seconds: Maximum time to wait for rate limit reset (default: 300)
+        - exponential_rate: Base multiplier for exponential backoff (default: 2.0)
+        - backoff_max_seconds: Maximum backoff delay (default: 60.0)
+        """
+        # Import here to avoid circular imports
+        from ..config.yaml_manager import get_global_config
+
+        global_config = get_global_config()
+        rate_limiter_config = global_config.get("rate_limiter", {})
+
+        return {
+            "max_wait_seconds": rate_limiter_config.get("max_wait_seconds", 300),
+            "exponential_rate": rate_limiter_config.get("exponential_rate", 2.0),
+            "backoff_max_seconds": rate_limiter_config.get("backoff_max_seconds", 60.0),
+        }
+
+    async def _wait_for_rate_limit(self) -> None:
+        """Wait if we're close to rate limit or if rate limited.
+
+        This method implements intelligent rate limit handling:
+        - Checks remaining requests against buffer
+        - Calculates wait time based on reset timestamp
+        - Uses exponential backoff with configurable multiplier
+        - Always active (rate limiting is mandatory for API stability)
+        """
+        if not self._rate_limit_info:
+            return
+
+        remaining = self._rate_limit_info.get("remaining", 0)
+        reset_time = self._rate_limit_info.get("reset", 0)
+
+        # Check if we need to wait (when 1 or fewer requests remaining)
+        if remaining <= 1:
+            now = int(time.time())
+            if reset_time > now:
+                wait_seconds = reset_time - now + 1  # Add 1 second buffer
+
+                # Respect max wait time
+                max_wait = self._rate_limiter_config["max_wait_seconds"]
+                if wait_seconds > max_wait:
+                    raise Exception(f"Rate limit wait time ({wait_seconds}s) exceeds maximum ({max_wait}s)")
+
+                # Use exponential backoff with configurable multiplier
+                multiplier = self._rate_limiter_config["exponential_rate"]
+                max_backoff = self._rate_limiter_config["backoff_max_seconds"]
+                retry_count = self._retry_count()
+                exponential_wait = 1.0 * (multiplier ** retry_count)  # Start at 1s, multiply by rate each retry
+                wait_seconds = min(exponential_wait, max_backoff)
+
+                # Add jitter to prevent thundering herd (0.1-1.0 seconds)
+                import random
+                jitter = random.uniform(0.1, 1.0)
+                wait_seconds += jitter
+
+                print(f"Rate limit: waiting {wait_seconds:.1f}s until reset")
+                await asyncio.sleep(wait_seconds)
+
+                # Reset rate limit info after waiting
+                self._rate_limit_info = None
+
+    def _retry_count(self) -> int:
+        """Get current retry count for exponential backoff."""
+        return getattr(self, '_retry_count_attr', 0)
+
+    def _increment_retry_count(self) -> None:
+        """Increment retry count for exponential backoff."""
+        if not hasattr(self, '_retry_count_attr'):
+            self._retry_count_attr = 0
+        self._retry_count_attr += 1
+
+    def _reset_retry_count(self) -> None:
+        """Reset retry count after successful operation."""
+        self._retry_count_attr = 0
+
+    async def _check_rate_limit(self, response) -> None:
+        """Check response for rate limit headers and update info.
+
+        This is a generic implementation that can be overridden by providers
+        that use different header formats.
 
         Args:
-            name: Original repository name
+            response: HTTP response object with headers
+        """
+        # Default implementation - providers can override for their specific headers
+        headers = getattr(response, 'headers', {})
+
+        # Common rate limit headers across providers
+        rate_limit_headers = {
+            "limit": headers.get("X-RateLimit-Limit") or headers.get("X-Rate-Limit-Limit"),
+            "remaining": headers.get("X-RateLimit-Remaining") or headers.get("X-Rate-Limit-Remaining"),
+            "reset": headers.get("X-RateLimit-Reset") or headers.get("X-Rate-Limit-Reset"),
+        }
+
+        # Only update if we have at least one header
+        if any(rate_limit_headers.values()):
+            self._rate_limit_info = {
+                "limit": int(rate_limit_headers["limit"] or 0),
+                "remaining": int(rate_limit_headers["remaining"] or 0),
+                "reset": int(rate_limit_headers["reset"] or 0),
+            }
+
+    async def _make_rate_limited_request(self, request_func, *args, **kwargs):
+        """Make a request with automatic rate limit handling.
+
+        Args:
+            request_func: Async function that makes the HTTP request
+            *args, **kwargs: Arguments to pass to request_func
 
         Returns:
-            str: Normalized repository name
+            Response from the request function
         """
-        # Default implementation - providers can override
-        return name.lower().replace(" ", "-")
+        # Wait if we're approaching rate limits
+        await self._wait_for_rate_limit()
+
+        # Make the request
+        response = await request_func(*args, **kwargs)
+
+        # Check and update rate limit info
+        await self._check_rate_limit(response)
+
+        # Reset retry count on successful response
+        if hasattr(response, 'status') and 200 <= response.status < 300:
+            self._reset_retry_count()
+        else:
+            self._increment_retry_count()
+
+        return response
