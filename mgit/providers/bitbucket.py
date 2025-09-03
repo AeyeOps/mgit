@@ -220,8 +220,10 @@ class BitBucketProvider(GitProvider):
         try:
             # Handle pagination
             while url:
-                async with self._session.get(url, headers=headers) as response:
-                    await self._check_rate_limit(response)
+                response = await self._make_rate_limited_request(
+                    self._session.get, url, headers=headers
+                )
+                async with response:
                     if response.status != 200:
                         text = await response.text()
                         raise APIError(
@@ -284,8 +286,10 @@ class BitBucketProvider(GitProvider):
         try:
             # Handle pagination
             while url:
-                async with self._session.get(url, headers=headers) as response:
-                    await self._check_rate_limit(response)
+                response = await self._make_rate_limited_request(
+                    self._session.get, url, headers=headers
+                )
+                async with response:
                     if response.status != 200:
                         text = await response.text()
                         raise APIError(
@@ -368,10 +372,10 @@ class BitBucketProvider(GitProvider):
         try:
             # Handle pagination
             while url:
-                async with self._session.get(
-                    url, headers=headers, params=params
-                ) as response:
-                    await self._check_rate_limit(response)
+                response = await self._make_rate_limited_request(
+                    self._session.get, url, headers=headers, params=params
+                )
+                async with response:
                     if response.status != 200:
                         text = await response.text()
                         raise APIError(
@@ -417,8 +421,10 @@ class BitBucketProvider(GitProvider):
         url = f"{self.url}/repositories/{organization}/{repository}"
 
         try:
-            async with self._session.get(url, headers=headers) as response:
-                await self._check_rate_limit(response)
+            response = await self._make_rate_limited_request(
+                self._session.get, url, headers=headers
+            )
+            async with response:
                 if response.status == 200:
                     data = await response.json()
                     return self._convert_to_repository(data)
@@ -599,8 +605,10 @@ class BitBucketProvider(GitProvider):
         url = f"{self.url}/workspaces/{workspace}/permissions"
 
         try:
-            async with self._session.get(url, headers=headers) as response:
-                await self._check_rate_limit(response)
+            response = await self._make_rate_limited_request(
+                self._session.get, url, headers=headers
+            )
+            async with response:
                 if response.status == 200:
                     return await response.json()
                 else:
@@ -641,8 +649,10 @@ class BitBucketProvider(GitProvider):
         try:
             # Handle pagination
             while url:
-                async with self._session.get(url, headers=headers) as response:
-                    await self._check_rate_limit(response)
+                response = await self._make_rate_limited_request(
+                    self._session.get, url, headers=headers
+                )
+                async with response:
                     if response.status != 200:
                         text = await response.text()
                         raise APIError(

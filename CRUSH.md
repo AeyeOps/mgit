@@ -21,54 +21,30 @@ Security: poetry run bandit -r mgit/ -f txt; poetry run pip-audit
 
 ## Code Style Guidelines
 
-### Formatting
-- Black + Ruff, line-length 88
-- Ruff E,F,I, ignore E501 (long lines)
-- Sorted imports enforced
-
-### Imports
-- Group: stdlib/third-party/local
-- Absolute within mgit
+### Formatting & Imports
+- Black + Ruff, line-length 88, sorted imports enforced
+- Group: stdlib/third-party/local, absolute within mgit
 - No wildcard imports
 
-### Types
-- Annotate public defs
-- Disallow untyped defs
-- Prefer precise generics
-- Keep mypy quiet
-
-### Naming
-- snake_case funcs/vars
-- PascalCase classes
-- UPPER_CASE constants
-- modules snake_case
+### Types & Naming
+- Annotate public defs, disallow untyped defs, prefer precise generics
+- snake_case funcs/vars, PascalCase classes, UPPER_CASE constants
 
 ### Error Handling
-- Raise specific mgit.exceptions
-- No bare except
-- Preserve context with raise ... from e
+- Raise specific mgit.exceptions, no bare except, preserve context with raise ... from e
 
 ## Architecture Guidelines
 
-### Security & Logging
-- Never log secrets/tokens
-- Use mgit.security.logging masking
-- Use rich console for CLI output
-
-### Async Programming
-- Async-first approach
-- Avoid blocking operations
-- New aiohttp session per op
-- Don't cache provider instances across loops
+### Security & Async
+- Never log secrets/tokens, use mgit.security.logging masking, rich console for CLI
+- Async-first, new aiohttp session per op, don't cache provider instances across loops
 
 ### Architecture Patterns
-- Keep provider code in mgit/providers
-- CLI uses provider interface only
+- Keep provider code in mgit/providers, CLI uses provider interface only
 - Config via mgit/config/yaml_manager (env > config > defaults)
 
 ## Testing Patterns
-- Mock network I/O
-- Respect markers (unit/integration/e2e/slow/requires_network)
+Mock network I/O, respect markers (unit/integration/e2e/slow/requires_network)
 
 ## Commit Hygiene
 Run lint/format/types/tests before PRs
@@ -79,4 +55,5 @@ Version sync: poetry run poe version-sync
 Version bump: poetry run poe bump-patch | bump-minor | bump-major
 
 ## IDE Support
-Cursor/Copilot: none found (.cursor/.cursorrules/.github/copilot-instructions.md); if added, follow them in addition to this file
+Cursor/Copilot: none found (.cursor/.cursorrules/.github/copilot-instructions.md); if added, follow them in addition to this file</content>
+<parameter name="file_path">/opt/aeo/mgit/CRUSH.md

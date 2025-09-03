@@ -228,10 +228,11 @@ async def list_repositories(
     # Multi-provider mode when no specific provider and first segment has wildcards
     query_segments = query.split("/")
     first_segment = query_segments[0] if query_segments else ""
+    # Multi-provider mode when no specific provider OR when provider is specified with wildcards
+    # However, if a specific provider is requested, always use single-provider mode
     is_multi_provider_pattern = provider_name is None and ("*" in query or "?" in query)
 
     if is_multi_provider_pattern:
-        # Parse provider pattern from leftmost segment of query
         query_segments = query.split("/")
 
         # Check if first segment has wildcards - if so, it's a provider pattern
@@ -423,258 +424,143 @@ async def list_repositories(
         )
 
         return deduplicated_results
-
-    # Single provider mode (existing logic)
+    # Single provider mode - use multi-provider logic with just one provider
     else:
-        # Parse query pattern
-        pattern = parse_query(query)
-        logger.debug(
-            f"Parsed query '{query}' into: org={pattern.org_pattern}, project={pattern.project_pattern}, repo={pattern.repo_pattern}"
-        )
+        # When provider is specified, treat it as multi-provider with one provider
+        if provider_name:
+            matching_providers = [provider_name]
+            remaining_query = query
+        # Process the single provider using multi-provider logic
+        all_results = []
+        sem = asyncio.Semaphore(1)  # Only one provider, so limit is 1
 
-        # Get provider
-        provider_manager = ProviderManager(provider_name=provider_name)
-        try:
-            provider = provider_manager.get_provider()
-            if not provider:
-                raise MgitError(
-                    "No provider available. Use 'mgit config list' to see configured providers."
+        show_progress = format_type != "json"
+        if show_progress:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                MofNCompleteColumn(),
+                TextColumn("• {task.fields[repos_found]} repos found"),
+                console=console,
+                transient=False,
+            ) as progress:
+                # Overall discovery task
+                overall_task = progress.add_task(
+                    f"Discovering repositories...",
+                    total=len(matching_providers),
+                    repos_found=0,
                 )
 
-            # Authenticate provider
-            if not await provider.authenticate():
-                raise MgitError("Failed to authenticate with provider")
-
-            logger.debug(f"Using provider: {provider.PROVIDER_NAME}")
-
-        except Exception as e:
-            raise MgitError(f"Failed to initialize provider: {e}")
-
-        results = []
-
-        try:
-            show_progress = format_type != "json"
-            if show_progress:
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[progress.description]{task.description}"),
-                    BarColumn(),
-                    TaskProgressColumn(),
-                    MofNCompleteColumn(),
-                    TextColumn("• {task.fields[repos_found]} repos found"),
-                    console=console,
-                    transient=False,
-                ) as progress:
-                    # Step 1: List organizations
-                    discovery_task = progress.add_task(
-                        "Discovering organizations...", total=None, repos_found=0
-                    )
-                    organizations = await provider.list_organizations()
-
-                # Filter organizations by pattern
-                matching_orgs = []
-                for org in organizations:
-                    if matches_pattern(org.name, pattern.org_pattern):
-                        matching_orgs.append(org)
-
-                logger.debug(
-                    f"Found {len(matching_orgs)} matching organizations out of {len(organizations)}"
-                )
-
-                if not matching_orgs:
-                    progress.update(discovery_task, completed=True)
-                    console.print(
-                        f"[yellow]No organizations match pattern '{pattern.org_pattern}'[/yellow]"
-                    )
-                    return results
-
-                # Update overall progress with known organization count
-                progress.update(
-                    discovery_task,
-                    total=len(matching_orgs),
-                    completed=0,
-                    description="Processing organizations",
-                )
-
-                # Step 2: For each organization, list projects/repositories
-                for i, org in enumerate(matching_orgs):
-                    if limit and len(results) >= limit:
-                        break
-
-                    # Update overall progress
-                    progress.update(
-                        discovery_task,
-                        completed=i,
-                        repos_found=len(results),
-                        description=f"Processing {org.name} ({i+1}/{len(matching_orgs)})",
-                    )
-
-                    # Add organization-specific task
-                    org_task = progress.add_task(
-                        f"  └─ Scanning {org.name}",
-                        total=None,
-                        repos_found=len(results),
-                    )
-
-                    try:
-                        # Check if provider supports projects
-                        if provider.supports_projects():
-                            # List projects first
-                            projects = await provider.list_projects(org.name)
-                            matching_projects = []
-
-                            for project in projects:
-                                if matches_pattern(
-                                    project.name, pattern.project_pattern
-                                ):
-                                    matching_projects.append(project)
-
-                            # If no projects match, skip this org
-                            if not matching_projects and pattern.has_project_filter:
-                                progress.update(
-                                    org_task,
-                                    description=f"  └─ {org.name}: No matching projects",
-                                    completed=True,
-                                )
-                                continue
-
-                            # Update with project count if we have projects to process
-                            if matching_projects:
-                                progress.update(
-                                    org_task,
-                                    total=len(matching_projects),
-                                    completed=0,
-                                    description=f"  └─ {org.name}: Processing projects",
-                                )
-
-                                # List repositories for each matching project
-                                for j, project in enumerate(matching_projects):
-                                    project_name = project.name if project else None
-
-                                    # Add project-level task
-                                    project_task = progress.add_task(
-                                        f"      └─ {project.name}",
-                                        total=None,
-                                        repos_found=0,
-                                    )
-                                    project_repos = 0
-
-                                    async for repo in provider.list_repositories(
-                                        org.name, project_name
-                                    ):
-                                        if matches_pattern(
-                                            repo.name, pattern.repo_pattern
-                                        ):
-                                            results.append(
-                                                RepositoryResult(
-                                                    repo, org.name, project_name
-                                                )
-                                            )
-                                            project_repos += 1
-
-                                            # Update counters
-                                            progress.update(
-                                                project_task,
-                                                repos_found=project_repos,
-                                                description=f"      └─ {project.name}: {project_repos} repos",
-                                            )
-                                            progress.update(
-                                                org_task, repos_found=len(results)
-                                            )
-                                            progress.update(
-                                                discovery_task, repos_found=len(results)
-                                            )
-
-                                            if limit and len(results) >= limit:
-                                                break
-
-                                    progress.update(project_task, completed=True)
-                                    progress.update(org_task, completed=j + 1)
-
-                                    if limit and len(results) >= limit:
-                                        break
-                            else:
-                                # Handle case with no projects (use None)
-                                async for repo in provider.list_repositories(
-                                    org.name, None
-                                ):
-                                    if matches_pattern(repo.name, pattern.repo_pattern):
-                                        results.append(
-                                            RepositoryResult(repo, org.name, None)
-                                        )
-
-                                        # Update counters
-                                        progress.update(
-                                            org_task, repos_found=len(results)
-                                        )
-                                        progress.update(
-                                            discovery_task, repos_found=len(results)
-                                        )
-
-                                        if limit and len(results) >= limit:
-                                            break
-
-                                progress.update(org_task, completed=True)
-                        else:
-                            # Provider doesn't support projects (GitHub, BitBucket)
-                            org_repos = 0
-                            async for repo in provider.list_repositories(org.name):
-                                if matches_pattern(repo.name, pattern.repo_pattern):
-                                    results.append(RepositoryResult(repo, org.name))
-                                    org_repos += 1
-
-                                    # Update counters
-                                    progress.update(
-                                        org_task,
-                                        repos_found=org_repos,
-                                        description=f"  └─ {org.name}: {org_repos} repos",
-                                    )
-                                    progress.update(
-                                        discovery_task, repos_found=len(results)
-                                    )
-
-                                    if limit and len(results) >= limit:
-                                        break
-
-                            progress.update(org_task, completed=True)
-
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to list repositories for {org.name}: {e}"
+                async def process_provider(
+                    provider_name_item: str,
+                ) -> List[RepositoryResult]:
+                    """Process the provider and return its results."""
+                    async with sem:
+                        # Add provider-specific task
+                        provider_task = progress.add_task(
+                            f"  └─ {provider_name_item}: Initializing...",
+                            total=None,
+                            repos_found=0,
                         )
-                        progress.update(
-                            org_task,
-                            description=f"  └─ {org.name}: Error - {str(e)[:50]}",
-                            completed=True,
-                        )
-                        continue
+
+                        try:
+                            # Process this provider
+                            provider_results = await _process_single_provider(
+                                provider_name=provider_name_item,
+                                query=remaining_query,
+                                limit=limit,
+                                progress=progress,
+                                provider_task_id=provider_task,
+                            )
+
+                            # Update overall progress
+                            progress.update(
+                                overall_task,
+                                repos_found=len(all_results) + len(provider_results),
+                            )
+                            progress.advance(overall_task, 1)
+
+                            return provider_results
+
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to process provider {provider_name_item}: {e}"
+                            )
+                            progress.update(
+                                provider_task,
+                                description=f"  └─ {provider_name_item}: Error - {str(e)[:50]}",
+                                completed=True,
+                            )
+                            progress.advance(overall_task, 1)
+                            return []
+
+                # Process the provider
+                provider_results = await asyncio.gather(
+                    *(process_provider(pname) for pname in matching_providers),
+                    return_exceptions=True,
+                )
+
+                # Collect results
+                for result in provider_results:
+                    if isinstance(result, list):
+                        all_results.extend(result)
+                    elif isinstance(result, Exception):
+                        logger.warning(f"Provider processing failed: {result}")
 
                 # Final update
                 progress.update(
-                    discovery_task,
-                    completed=len(matching_orgs),
-                    repos_found=len(results),
-                    description=f"Completed - processed {len(matching_orgs)} organizations",
+                    overall_task,
+                    completed=len(matching_providers),
+                    repos_found=len(all_results),
+                    description=f"Completed - processed {len(matching_providers)} providers",
                 )
+        else:
+            # JSON mode: no progress output
+            async def process_provider(
+                provider_name_item: str,
+            ) -> List[RepositoryResult]:
+                async with sem:
+                    try:
+                        return await _process_single_provider(
+                            provider_name=provider_name_item,
+                            query=remaining_query,
+                            limit=limit,
+                            progress=None,
+                            provider_task_id=None,
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to process provider {provider_name_item}: {e}"
+                        )
+                        return []
 
-        except Exception as e:
-            raise MgitError(f"Error during repository listing: {e}")
-        finally:
-            # Clean up provider resources if cleanup method exists
-            if hasattr(provider, "cleanup"):
-                await provider.cleanup()
+            provider_results = await asyncio.gather(
+                *(process_provider(pname) for pname in matching_providers),
+                return_exceptions=True,
+            )
+            for result in provider_results:
+                if isinstance(result, list):
+                    all_results.extend(result)
+                elif isinstance(result, Exception):
+                    logger.warning(f"Provider processing failed: {result}")
 
-        logger.debug(f"Found {len(results)} total repositories matching query")
-        return results
+        logger.debug(
+            f"Found {len(all_results)} total repositories from {len(matching_providers)} providers"
+        )
 
+        # For single provider, skip deduplication since there's only one provider
+        return all_results
 
 def format_results(results: List[RepositoryResult], format_type: str = "table") -> None:
     """Format and display repository results.
 
     Args:
         results: List of repository results to display
-        format_type: Output format ('table' or 'json')
+        format_type: Output format (table or json)
     """
+
     if not results:
         if format_type == "json":
             print("[]")  # Empty JSON array
