@@ -28,20 +28,20 @@ Step-by-step guides for each supported provider:
 
 ### Azure DevOps
 ```bash
-mgit login --provider azdevops --org https://dev.azure.com/yourorg --token YOUR_PAT
-mgit clone-all --provider azdevops --project "YourProject" --destination ./repos
+mgit login --provider azuredevops --org https://dev.azure.com/yourorg --token YOUR_PAT --name work_ado
+mgit sync "yourorg/YourProject/*" ./repos --provider work_ado
 ```
 
 ### GitHub
 ```bash
-mgit login --provider github --token ghp_xxxxxxxxxxxx
-mgit clone-all --provider github --org your-org --destination ./repos
+mgit login --provider github --token ghp_xxxxxxxxxxxx --name github_personal
+mgit sync "your-org/*/*" ./repos --provider github_personal
 ```
 
 ### BitBucket
 ```bash
-mgit login --provider bitbucket --username your-user --password APP_PASSWORD
-mgit clone-all --provider bitbucket --workspace your-workspace --destination ./repos
+mgit login --provider bitbucket --name team_bb
+mgit sync "your-workspace/*/*" ./repos --provider team_bb
 ```
 
 ## Provider Selection Guide
