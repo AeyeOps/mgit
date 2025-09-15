@@ -57,14 +57,19 @@ mgit --version
 **Option 2: Build from Source (uv preferred)**
 ```bash
 git clone https://github.com/AeyeOps/mgit && cd mgit
-# Using uv
+
+# Linux (Ubuntu/WSL) with uv
 uv sync --all-extras --dev
 uv run pyinstaller mgit.spec --clean
 sudo cp dist/mgit /usr/local/bin/mgit
 
-# Or with Poetry (legacy)
-poetry install
-poetry run poe build-linux
+# Windows exe (two options)
+# 1) From Windows PowerShell in the repo
+#    uv sync --all-extras --dev
+#    uv run pyinstaller mgit.spec --clean
+#    .\dist\mgit.exe --version
+# 2) From WSL (triggers Windows build wrapper)
+#    bash scripts/build_windows_from_wsl.sh
 ```
 
 ### 2. Choose and configure one provider
@@ -449,23 +454,29 @@ chmod +x mgit-macos && sudo mv mgit-macos /usr/local/bin/mgit
 ### From Source
 
 ```bash
-# Build your own binary
+# Build your own binary (uv)
 git clone https://github.com/AeyeOps/mgit
 cd mgit
-pip install poetry
-poetry install
-poetry run poe build-linux    # Creates dist/mgit
+
+# Linux
+uv sync --all-extras --dev
+uv run pyinstaller mgit.spec --clean
 sudo cp dist/mgit /usr/local/bin/
+
+# Windows (run in Windows PowerShell)
+uv sync --all-extras --dev
+uv run pyinstaller mgit.spec --clean
+# Or from WSL: bash scripts/build_windows_from_wsl.sh
 ```
 
 ### For Contributors
 
 ```bash
-# Development installation
+# Development installation (uv)
 git clone https://github.com/AeyeOps/mgit
-cd mgit  
-poetry install
-poetry run mgit --version    # Use poetry run for development
+cd mgit
+uv sync --all-extras --dev
+uv run mgit --version
 ```
 
 **Note**: Pre-built releases coming soon. Currently requires building from source.
