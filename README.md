@@ -54,13 +54,17 @@ mgit --version
 # Should show: mgit version: 0.7.0
 ```
 
-**Option 2: Build from Source**
+**Option 2: Build from Source (uv preferred)**
 ```bash
 git clone https://github.com/AeyeOps/mgit && cd mgit
-pip install poetry
+# Using uv
+uv sync --all-extras --dev
+uv run pyinstaller mgit.spec --clean
+sudo cp dist/mgit /usr/local/bin/mgit
+
+# Or with Poetry (legacy)
 poetry install
 poetry run poe build-linux
-sudo cp dist/mgit /usr/local/bin/mgit
 ```
 
 ### 2. Choose and configure one provider
@@ -195,11 +199,17 @@ mgit list "*/project/*" --provider work_ado    # Only Azure DevOps
 mgit list "*/*/*" --provider github_personal   # Only GitHub
 
 # Output filtering with CLI tools
-mgit list "*/*/*" --format json | jq '.[] | select(.visibility == "public")'
+mgit list "*/*/*" --format json | jq '.[] | select(.is_private == false)'
 
 # Output formats and limits
 mgit list "myorg/*/*" --format json --limit 100
 mgit list "myorg/*/*" --format json | jq length  # Count repos
+```
+
+Quick checks without credentials (sanity tests):
+```
+./dist/mgit config --list              # Lists configured providers (or guidance if none)
+./dist/mgit list "*/*/*"               # Should not crash; reports no providers/repos if unconfigured
 ```
 
 #### Common Usage Examples
@@ -231,14 +241,14 @@ mgit sync "myorg/*/*" ./repos --force
 ### Update Repositories
 
 ```bash
-# Update all repositories in a directory
-mgit sync "." ./repos
+# Update all repositories for an organization
+mgit sync "myorg/*/*" ./repos
 
 # Update with specific provider
-mgit sync "myorg" ./repos --provider github_personal
+mgit sync "myorg/*/*" ./repos --provider github_personal
 
-# Update with concurrency control
-mgit sync "myproject" ./repos --concurrency 8
+# Azure DevOps: update all repositories in a specific project
+mgit sync "myorg/MyProject/*" ./repos --concurrency 8
 ```
 
 ### Check Repository Status
@@ -284,10 +294,12 @@ mgit config --remove old_config
 ### Environment Variables (Limited)
 
 ```bash
-# Legacy Azure DevOps support
-export AZURE_DEVOPS_EXT_PAT=your-azure-pat
+# Authentication (Deprecated)
+# Legacy Azure DevOps env vars are deprecated and not used by the current CLI.
+# Use `mgit login` or edit ~/.config/mgit/config.yaml instead.
+# export AZURE_DEVOPS_EXT_PAT=your-azure-pat
 
-# Security settings
+# Security settings (supported)
 export MGIT_SECURITY_MASK_CREDENTIALS_IN_LOGS=true
 
 # Proxy configuration (if needed)
@@ -361,7 +373,7 @@ mgit status ./migration-workspace --fail-on-dirty
 
 ```bash
 # Find all public repos (if supported by provider)
-mgit list "*/*/*" --format json | jq '.[] | select(.visibility == "public")'
+mgit list "*/*/*" --format json | jq '.[] | select(.is_private == false)'
 
 # Find repos by naming convention
 mgit list "*/*/prod-*"  # Production repos
@@ -400,16 +412,22 @@ mgit list "*/*/*-service" --format json
 | `mgit list <pattern>` | Find repositories | `mgit list "myorg/*/*"` |
 | `mgit sync <pattern> <path>` | Clone missing repos, update existing | `mgit sync "*/api-*" ./apis` |
 | `mgit status <path>` | Check repository status | `mgit status ./workspace` |
+| `mgit diff [path]` | Detect and export repo change data (JSONL) | `mgit diff . --output changes.jsonl` |
+| `mgit diff-remote <pattern>` | Discover remote repo changes | `mgit diff-remote "myorg/*/*" --limit 50` |
 | `mgit config` | Manage configuration | `mgit config --list` |
 
-### Global Options
+### Common Options (per command)
 
-| Option | Description | Default |
+| Option | Description | Used by |
 |--------|-------------|---------|
-| `--provider NAME` | Use specific provider configuration | Default provider |
-| `--concurrency N` | Number of parallel operations | 4 |
-| `--format FORMAT` | Output format: table/json | table |
-| `--debug` | Enable debug logging | false |
+| `--provider NAME` | Use specific provider configuration | `list`, `sync`, `diff-remote` |
+| `--concurrency N` | Number of parallel operations | `status`, `diff`, `diff-remote`, `sync` |
+| `--format FORMAT` | Output format: `table` or `json` | `list` |
+| `--output FORMAT` | Output format: `table` or `json` | `status` |
+
+Notes:
+- There is no global `--debug` flag. To increase verbosity, set `console_level: DEBUG` in `~/.config/mgit/config.yaml` or run with `CON_LEVEL=DEBUG`.
+- Default concurrency can be configured via `global.default_concurrency` in `~/.config/mgit/config.yaml`.
 
 ## Installation Options
 
@@ -501,8 +519,8 @@ echo "~/.config/mgit/" >> .gitignore
 # Reduce concurrency if hitting limits
 mgit sync "large-org/*/*" ./repos --concurrency 2
 
-# Use debug mode to see rate limit information
-mgit --debug list "large-org/*/*"
+# Increase console verbosity to see rate limit information
+CON_LEVEL=DEBUG mgit list "large-org/*/*"
 ```
 
 **Corporate proxy/SSL**
@@ -523,7 +541,7 @@ export SSL_CERT_FILE=/path/to/corporate-ca.crt
 # Verify provider is configured
 mgit config --list
 
-# Check pattern syntax (three parts required)
+# Check pattern syntax (1–3 segments supported; prefer 3: org/project/repo)
 mgit list "myorg/*/*" --limit 5
 
 # Try broader pattern

@@ -27,6 +27,7 @@ azure-devops = "^7.1.0b1"
 python-dotenv = "^1.0.0"
 rich = "^13.0.0"
 typer = "^0.9.0"
+click = "==8.1.7"
 pyyaml = "^6.0"
 "ruamel.yaml" = "^0.18.0"
 cryptography = ">=44.0.1"
@@ -143,4 +144,44 @@ addopts = [
     "--cov-report=html",
     "--cov-report=xml",
     "--cov-fail-under=0",
+]
+
+# PEP 621 metadata for uv/pip
+[project]
+name = "mgit"
+version = "0.7.0"
+description = "Multi-provider Git management tool"
+readme = "README.md"
+requires-python = ">=3.9.2,<3.13"
+license = {text = "MIT"}
+authors = [{ name = "Steve Antonakakis", email = "steve.antonakakis@gmail.com" }]
+dependencies = [
+  "aiohttp>=3.9.0",
+  "azure-devops>=7.1.0b1",
+  "python-dotenv>=1.0.0",
+  "rich>=13.0.0",
+  "typer>=0.9.0,<0.10.0",
+  "click>=8.1.7,<8.2.0",
+  "PyYAML>=6.0",
+  "ruamel.yaml>=0.18.0",
+  "cryptography>=44.0.1",
+]
+
+[project.scripts]
+mgit = "mgit.__main__:entrypoint"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0.0",
+  "pytest-cov>=4.0.0",
+  "pytest-asyncio>=0.21.0",
+  "black>=24.3.0",
+  "ruff>=0.1.0",
+  "mypy>=1.0.0",
+  "pyinstaller>=6.0",
+  "bandit[toml]>=1.8.0",
+  "safety>=3.0.0",
+  "pip-audit>=2.9.0",
+  "pytest-benchmark>=4.0.0",
+  "memory-profiler>=0.61.0",
 ]

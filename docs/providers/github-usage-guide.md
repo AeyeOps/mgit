@@ -97,52 +97,37 @@ export GITHUB_ORG="myusername"
 
 ## Common Commands
 
-### Working with repositories
-To see what repositories are available, use the GitHub web interface or API directly. mgit focuses on bulk clone and update operations.
-
-### Clone repositories
+### Discover and sync repositories
 
 ```bash
-# Clone all repos from a user/organization
-# For personal repos, use your username
-mgit clone-all your-username ./my-repos --provider github
+# List repositories (org/repo; project segment is ignored for GitHub)
+mgit list "your-username/*/*" --limit 10
+mgit list "AeyeOps/*/*" --limit 10
 
-# Clone all repos from an organization
-mgit clone-all myusername ./myusername-repos --provider github
+# Sync all repos from a user/organization
+mgit sync "your-username/*/*" ./my-repos --provider github_personal
+mgit sync "myusername/*/*" ./myusername-repos --provider github_personal
+mgit sync "AeyeOps/*/*" ./aeyeops-repos --provider github_org
 
-# Clone all repos from AeyeOps organization
-mgit clone-all AeyeOps ./aeyeops-repos --provider github
-
-# Clone with concurrency control
-mgit clone-all myusername ./repos -c 10 --provider github
-```
-
-### Update repositories
-
-```bash
-# Update all repos in a directory
-mgit pull-all myusername ./myusername-repos --provider github
+# Sync with concurrency control
+mgit sync "myusername/*/*" ./repos --concurrency 10 --provider github_personal
 ```
 
 ## Organization vs User Repositories
 
 ### Personal Repositories
 
-When working without specifying an organization, mgit accesses your personal repositories:
-
 ```bash
-# Clone all personal repos (use your GitHub username)
-mgit clone-all your-username ~/personal-repos --provider github
+# Sync all personal repos (use your GitHub username)
+mgit sync "your-username/*/*" ~/personal-repos --provider github_personal
 ```
 
 ### Organization Repositories
 
-For organization repositories, specify the org parameter:
-
 ```bash
-# Clone from multiple organizations
-mgit clone-all myusername ./myusername --provider github
-mgit clone-all AeyeOps ./aeyeops --provider github
+# Sync from multiple organizations
+mgit sync "myusername/*/*" ./myusername --provider github_personal
+mgit sync "AeyeOps/*/*" ./aeyeops --provider github_org
 ```
 
 ### Mixed Repository Management
@@ -153,13 +138,13 @@ Create a structured workspace for multiple contexts:
 #!/bin/bash
 # Organize repos by owner
 
-# Personal repos (use your username)
-mgit clone-all your-username ~/github/personal --provider github
+"# Personal repos (use your username)
+mgit sync "your-username/*/*" ~/github/personal --provider github_personal
 
 # Organization repos
 ORGS=("myusername" "AeyeOps" "MyCompany")
 for org in "${ORGS[@]}"; do
-    mgit clone-all "$org" "~/github/orgs/$org" --provider github
+  mgit sync "$org/*/*" "~/github/orgs/$org" --provider github_personal
 done
 ```
 
@@ -184,7 +169,7 @@ curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/rate_limit
 
 ```bash
 # Reduce concurrency to avoid rate limits
-mgit clone-all large-org ./repos -c 3 --provider github
+mgit sync "large-org/*/*" ./repos --concurrency 3 --provider github_work
 ```
 
 ### Rate Limit Best Practices
@@ -296,8 +281,8 @@ If you have 2FA enabled:
 
 ```bash
 # Create aliases for common operations
-alias mgit-update-all='mgit pull-all --provider github --path .'
-alias mgit-clone-org='mgit clone-all'
+alias mgit-update-all='mgit sync "${GITHUB_OWNER:-myusername}/*/*" . --provider github_personal'
+alias mgit-clone-org='mgit sync'
 ```
 
 ## Advanced Usage
@@ -306,7 +291,7 @@ alias mgit-clone-org='mgit clone-all'
 
 ```bash
 # Configure for GitHub Enterprise
-mgit login --provider github --org https://github.company.com --token YOUR_TOKEN
+mgit login --provider github --org https://github.company.com --token YOUR_TOKEN --name github_enterprise
 ```
 
 ### Filtering and Selection
@@ -326,13 +311,9 @@ ORGS=("myusername" "AeyeOps" "CompanyOrg")
 BASE_DIR="$HOME/github/orgs"
 
 for org in "${ORGS[@]}"; do
-    echo "Updating repositories for $org..."
-    if [ -d "$BASE_DIR/$org" ]; then
-        mgit pull-all "$org" "$BASE_DIR/$org" --provider github
-    else
-        echo "Directory $BASE_DIR/$org not found, cloning..."
-        mgit clone-all "$org" "$BASE_DIR/$org" --provider github
-    fi
+  echo "Syncing repositories for $org..."
+  mkdir -p "$BASE_DIR/$org"
+  mgit sync "$org/*/*" "$BASE_DIR/$org" --provider github_personal
 done
 ```
 
@@ -354,19 +335,19 @@ jobs:
         
       - name: Configure mgit
         run: |
-          mgit login --provider github --token ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Update repositories
+          mgit login --provider github --token ${{ secrets.GITHUB_TOKEN }} --name github_ci
+
+      - name: Sync repositories
         run: |
-          mgit pull-all ${{ github.repository_owner }} ./repos --provider github
+          mgit sync "${{ github.repository_owner }}/*/*" ./repos --provider github_ci
 ```
 
 ### Repository Statistics
 
 ```bash
-# Clone repositories from organizations
-mgit clone-all myusername ./repos --provider github
-mgit clone-all AeyeOps ./repos --provider github
+# Sync repositories from organizations
+mgit sync "myusername/*/*" ./repos --provider github_personal
+mgit sync "AeyeOps/*/*" ./repos --provider github_org
 ```
 
 ## Working with Specific Examples
@@ -375,35 +356,32 @@ mgit clone-all AeyeOps ./repos --provider github
 
 ```bash
 # Initial setup
-mgit login --provider github --token ghp_xxxxxxxxxxxx --org myusername
+mgit login --provider github --token ghp_xxxxxxxxxxxx --name github_personal
 
-# Clone all repositories
+# Sync all repositories
 mkdir -p ~/projects/myusername
-mgit clone-all myusername ~/projects/myusername --provider github
+mgit sync "myusername/*/*" ~/projects/myusername --provider github_personal
 
 # Regular updates
 cd ~/projects/myusername
-mgit pull-all myusername . --provider github
-
-# Clone all projects
-mgit clone-all myusername ~/projects/myusername-active --provider github
+mgit sync "myusername/*/*" . --provider github_personal
 ```
 
 ### Example 2: Working with AeyeOps organization
 
 ```bash
-# Setup for AeyeOps
-mgit login --provider github --token ghp_xxxxxxxxxxxx
+# Setup for org
+mgit login --provider github --token ghp_xxxxxxxxxxxx --name github_org
 
-# Clone all AeyeOps repos
-mgit clone-all AeyeOps ~/aeyeops/all --provider github
+# Sync all org repos
+mgit sync "AeyeOps/*/*" ~/aeyeops/all --provider github_org
 ```
 
 ### Example 3: Personal repository management
 
 ```bash
 # Backup all personal repos (use your username)
-mgit clone-all your-username ~/github-backup/personal --provider github
+mgit sync "your-username/*/*" ~/github-backup/personal --provider github_personal
 ```
 
 ## Performance Optimization
@@ -411,22 +389,22 @@ mgit clone-all your-username ~/github-backup/personal --provider github
 ### Shallow Clones
 
 ```bash
-# Clone repositories
-mgit clone-all myusername ./repos --provider github
+# Sync repositories
+mgit sync "myusername/*/*" ./repos --provider github_personal
 ```
 
 ### Parallel Operations
 
 ```bash
-# Increase concurrency for faster cloning
-mgit clone-all large-org ./repos -c 20 --provider github
+# Increase concurrency for faster sync
+mgit sync "large-org/*/*" ./repos --concurrency 20 --provider github_work
 ```
 
 ### Selective Updates
 
 ```bash
 # Update all repos
-mgit pull-all org-name ./repos --provider github
+mgit sync "org-name/*/*" ./repos --provider github_work
 ```
 
 ## Security Recommendations
