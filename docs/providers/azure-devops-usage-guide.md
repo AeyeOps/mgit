@@ -78,38 +78,21 @@ export AZURE_DEVOPS_EXT_PAT="YOUR_PAT_HERE"
 
 ## Common Commands
 
-### Clone repositories from a project
-To see what repositories are available in a project, you'll need to use the Azure DevOps web interface or API directly. mgit focuses on bulk operations rather than listing.
-
-### Clone all repositories from a project
+### Discover and clone by project
 ```bash
-# Clone all repos from a project using named configuration
-mgit clone-all "myorg/MyProject/*" ./repos --config work_ado
+# List repositories in a project (org/project/repo pattern)
+mgit list "myorg/MyProject/*" --limit 10
 
-# With concurrency control
-mgit clone-all "myorg/DataPlatform/*" ./data-platform-repos --config work_ado --concurrency 10
+# Clone or update all repositories in a project
+mgit sync "myorg/MyProject/*" ./repos --provider work_ado
 
-# Clone with pattern matching
-mgit clone-all "myorg/MyProject/*-service" ./repos --config work_ado
-```
+# Control concurrency
+mgit sync "myorg/DataPlatform/*" ./data-platform-repos --provider work_ado --concurrency 10
 
-### Update all repositories
-```bash
-# Pull latest changes for all repos
-mgit pull-all "MyProject" ./repos --config work_ado
-
-# With specific update strategy
-mgit pull-all "DataPlatform" ./data-platform-repos --config work_ado --strategy rebase
-```
-
-### Filter repositories
-```bash
-# Clone only repos matching a pattern
-mgit clone-all "myorg/MyProject/*-service" ./repos --config work_ado
-
-# Use pattern matching for multiple filters
-mgit clone-all "myorg/MyProject/api-*" ./repos --config work_ado
-mgit clone-all "myorg/MyProject/*-frontend" ./repos --config work_ado
+# Pattern-filtered selection within a project
+mgit sync "myorg/MyProject/*-service" ./repos --provider work_ado
+mgit sync "myorg/MyProject/api-*" ./repos --provider work_ado
+mgit sync "myorg/MyProject/*-frontend" ./repos --provider work_ado
 ```
 
 ## Project-Based Repository Management
@@ -124,15 +107,15 @@ Azure DevOps organizes repositories within projects. This hierarchical structure
 
 ```bash
 # Clone repos from multiple projects
-mgit clone-all --provider azdevops --project "Frontend" --destination ./frontend-repos
-mgit clone-all --provider azdevops --project "Backend" --destination ./backend-repos
-mgit clone-all --provider azdevops --project "Infrastructure" --destination ./infra-repos
+mgit sync "myorg/Frontend/*" ./frontend-repos --provider work_ado
+mgit sync "myorg/Backend/*" ./backend-repos --provider work_ado
+mgit sync "myorg/Infrastructure/*" ./infra-repos --provider work_ado
 
 # Create a workspace structure
 mkdir -p workspace/{frontend,backend,infrastructure}
-mgit clone-all --provider azdevops --project "Frontend" --destination ./workspace/frontend
-mgit clone-all --provider azdevops --project "Backend" --destination ./workspace/backend
-mgit clone-all --provider azdevops --project "Infrastructure" --destination ./workspace/infrastructure
+mgit sync "myorg/Frontend/*" ./workspace/frontend --provider work_ado
+mgit sync "myorg/Backend/*" ./workspace/backend --provider work_ado
+mgit sync "myorg/Infrastructure/*" ./workspace/infrastructure --provider work_ado
 ```
 
 ### Batch operations across projects
@@ -140,7 +123,7 @@ mgit clone-all --provider azdevops --project "Infrastructure" --destination ./wo
 ```bash
 # Update all repos in multiple project directories
 for project in Frontend Backend Infrastructure; do
-    mgit pull-all --provider azdevops --project "$project" --path "./workspace/$project"
+  mgit sync "myorg/$project/*" "./workspace/$project" --provider work_ado
 done
 ```
 
@@ -158,7 +141,7 @@ done
 
 ```bash
 # Test authentication by attempting to login
-mgit login --provider azdevops
+mgit login --provider azuredevops --name work_ado
 ```
 
 ### Organization URL Issues
@@ -177,7 +160,7 @@ Azure DevOps has rate limits for API calls:
 If you hit rate limits:
 ```bash
 # Reduce concurrency
-mgit clone-all --provider azdevops --project "LargeProject" --destination ./repos --concurrency 3
+mgit sync "myorg/LargeProject/*" ./repos --provider work_ado --concurrency 3
 ```
 
 ### SSL/TLS Errors
@@ -217,13 +200,7 @@ export HTTPS_PROXY=http://proxy.company.com:8080
 
 ### Custom clone configurations
 
-```bash
-# Clone with shallow history
-mgit clone-all --provider azdevops --project "MyProject" --destination ./repos --shallow --depth 1
-
-# Clone specific branches
-mgit clone-all --provider azdevops --project "MyProject" --destination ./repos --branch develop
-```
+Note: Shallow clones and branch selection are not exposed as sync options. Use git commands after cloning if you need specialized history or branch setups.
 
 ### Integration with CI/CD
 
@@ -232,9 +209,10 @@ mgit clone-all --provider azdevops --project "MyProject" --destination ./repos -
 steps:
 - script: |
     pip install mgit
-    mgit login --provider azdevops --org $(System.CollectionUri) --token $(System.AccessToken)
-    mgit pull-all --provider azdevops --project "$(System.TeamProject)" --path ./
-  displayName: 'Update all repositories'
+    mgit login --provider azuredevops --org $(System.CollectionUri) --token $(System.AccessToken)
+    # Match current project across the configured provider
+    mgit sync "*/$(System.TeamProject)/*" . --provider work_ado
+  displayName: 'Sync all repositories in project'
 ```
 
 ## Security Considerations
@@ -251,25 +229,21 @@ steps:
 
 ```bash
 # 1. Initial setup
-mgit login --provider azdevops --org https://dev.azure.com/myorg --token YOUR_PAT_HERE
+mgit login --provider azuredevops --org https://dev.azure.com/myorg --token YOUR_PAT_HERE --name work_ado
 
-# 2. Clone repos from a known project
-# (Use Azure DevOps web interface to explore available projects and repositories)
+# 2. Discover repositories in a project
+mgit list "myorg/DataEngineering/*" --limit 10
 
-# 3. Clone all repos from the project
+# 3. Sync all repos from the project
 mkdir -p ~/workspace/data-engineering
-mgit clone-all --provider azdevops --project "DataEngineering" \
-    --destination ~/workspace/data-engineering \
-    --concurrency 10
+mgit sync "myorg/DataEngineering/*" ~/workspace/data-engineering --provider work_ado --concurrency 10
 
 # 4. Later, update all repos
 cd ~/workspace/data-engineering
-mgit pull-all --provider azdevops --project "DataEngineering" --path .
+mgit sync "myorg/DataEngineering/*" . --provider work_ado
 
-# 5. Clone only specific repos
-mgit clone-all --provider azdevops --project "DataEngineering" \
-    --destination ~/workspace/etl-services \
-    --filter "*-etl-*"
+# 5. Sync only specific repos by pattern
+mgit sync "myorg/DataEngineering/*-etl-*" ~/workspace/etl-services --provider work_ado
 ```
 
 ### Multi-project management
@@ -283,18 +257,15 @@ BASE_DIR="$HOME/workspace/myorg"
 
 # Clone all projects
 for project in "${PROJECTS[@]}"; do
-    echo "Cloning repositories from project: $project"
-    mkdir -p "$BASE_DIR/$project"
-    mgit clone-all --provider azdevops --project "$project" \
-        --destination "$BASE_DIR/$project" \
-        --concurrency 5
+  echo "Syncing repositories from project: $project"
+  mkdir -p "$BASE_DIR/$project"
+  mgit sync "myorg/$project/*" "$BASE_DIR/$project" --provider work_ado --concurrency 5
 done
 
 # Update all projects
 for project in "${PROJECTS[@]}"; do
-    echo "Updating repositories in project: $project"
-    mgit pull-all --provider azdevops --project "$project" \
-        --path "$BASE_DIR/$project"
+  echo "Updating repositories in project: $project"
+  mgit sync "myorg/$project/*" "$BASE_DIR/$project" --provider work_ado
 done
 ```
 

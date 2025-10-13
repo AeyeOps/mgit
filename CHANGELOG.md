@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Multi-Provider Pattern Matching**: Revolutionary wildcard discovery across all configured providers
-  - Pattern matching on leftmost query segment (e.g., `*/*/*`, `*pdi/*/*`, `GITHUB*/*/*`)
+  - Pattern matching on leftmost query segment (e.g., `*/*/*`, `*abc/*/*`, `GITHUB*/*/*`)
   - Case-insensitive glob pattern matching with `*` and `?` wildcards
   - Concurrent processing of multiple providers with progress reporting
   - Extended to all bulk operations: `list`, `clone-all`, and `pull-all`
@@ -97,7 +97,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Helper script for version updates (`scripts/update_version.py`)
 
 ### Changed
-- **Git History**: Replaced all commit author emails from `santonakakis@pditechnologies.com` to `steve.antonakakis@gmail.com`
 - **Version Management**: Consolidated version source to `pyproject.toml` only (removed duplicate in `constants.py`)
 - **Workflow Simplification**: Removed unnecessary CI workflows, keeping only auto-release
 - **Release Process**: Simplified from complex multi-job workflow to single automated flow

@@ -60,3 +60,4 @@ test-binary-run/
 test-repos/
 .claude/settings.local.json
 .crush/
+.venv_build/

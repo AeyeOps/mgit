@@ -2037,41 +2037,34 @@ jobs:
     AZURE_DEVOPS_ORG: ${{ secrets.TEST_AZURE_ORG }}
   run: |
     poetry run mgit login \
-      --provider azure-devops \
+      --provider azuredevops \
       --org $AZURE_DEVOPS_ORG \
-      --token $AZURE_DEVOPS_PAT
+      --token $AZURE_DEVOPS_PAT \
+      --name work_ado
     poetry run mgit config --show
 
-# Test cloning functionality
-- name: Test multi-repo clone
+# Test sync functionality (multi-repo)
+- name: Test multi-repo sync
   run: |
-    poetry run mgit clone-all \
-      test-project \
+    poetry run mgit sync \
+      "${{ github.repository_owner }}/*/*" \
       ./test-repos \
       --concurrency 4 \
       --provider github
 
-# Test monitoring server
-- name: Test monitoring endpoints
-  run: |
-    poetry run mgit monitor start --port 8080 &
-    sleep 5
-    curl -f http://localhost:8080/health
-    curl -f http://localhost:8080/metrics
-    pkill -f "mgit monitor"
+# (No monitoring server CLI exposed by mgit)
 ```
 
 ### Performance Testing
 ```yaml
 - name: Performance benchmark
   run: |
-    # Clone 50 repos and measure time
-    time poetry run mgit clone-all \
-      large-project \
+    # Sync repositories and measure time
+    time poetry run mgit sync \
+      "${{ github.repository_owner }}/*/*" \
       ./perf-test \
       --concurrency 10 \
-      --provider github \
-      --stats
+      --provider github
       
     # Generate performance report
     poetry run python scripts/analyze-performance.py \

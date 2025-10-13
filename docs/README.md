@@ -58,8 +58,8 @@ Detailed guides for each supported Git provider.
 ## 🎯 Common Use Cases
 
 ### DevOps Teams
-- [Clone all microservices](usage/query-patterns.md#devops-team-patterns) - `mgit clone-all "*/backend/*-service" ./services`
-- [Update infrastructure repos](usage/query-patterns.md#infrastructure-management) - `mgit pull-all "*/*/terraform-*" ./infra`
+- [Clone all microservices](usage/query-patterns.md#devops-team-patterns) - `mgit sync "*/backend/*-service" ./services`
+- [Update infrastructure repos](usage/query-patterns.md#infrastructure-management) - `mgit sync "*/*/terraform-*" ./infra`
 
 ### Enterprise Organizations
 - [Multi-provider setup](configuration/mgit-configuration-examples.md#multiple-provider-configuration) - Configure Azure DevOps + GitHub
@@ -95,11 +95,11 @@ mgit login --provider github --name work
 # Find repositories
 mgit list "myorg/*/*" --limit 10
 
-# Clone repositories
-mgit clone-all "*/backend/*" ./backend-repos
+# Sync repositories
+mgit sync "*/backend/*" ./backend-repos
 
 # Update repositories
-mgit pull-all "myproject" ./repos
+mgit sync "myorg/myproject/*" ./repos
 
 # Check status
 mgit status ./repos --all

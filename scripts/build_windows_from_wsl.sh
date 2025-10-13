@@ -72,7 +72,7 @@ fi
 
 echo "✓ Source code copied"
 
-echo -e "${GREEN}Step 4: Creating Windows build script${NC}"
+echo -e "${GREEN}Step 4: Creating Windows build script (uv-based)${NC}"
 cat > "${PROJECT_DIR}/build_windows.bat" << 'EOF'
 @echo off
 echo === Building mgit for Windows ===
@@ -100,44 +100,33 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+REM Ensure uv is installed
 echo.
-echo Checking Poetry installation...
-call poetry --version >nul 2>&1
+echo Checking uv installation...
+where uv >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Installing Poetry...
-    call pip install poetry==1.8.5
-) else (
-    echo Poetry already installed
-    echo Updating Poetry...
-    call pip install --upgrade poetry==1.8.5 >nul 2>&1
-)
-
-echo.
-echo Installing project dependencies...
-call poetry install --with dev
-if %errorlevel% neq 0 (
-    echo Error: Failed to install dependencies
-    exit /b 1
-)
-
-echo.
-echo Checking PyInstaller...
-call poetry show pyinstaller >nul 2>&1
-if %errorlevel% neq 0 (
-    echo Installing PyInstaller...
-    call poetry add --group dev pyinstaller
+    echo Installing uv...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr https://astral.sh/uv/install.ps1 -UseBasicParsing | iex"
     if %errorlevel% neq 0 (
-        echo Error: Failed to install PyInstaller
+        echo Error: Failed to install uv
         exit /b 1
     )
 ) else (
-    echo PyInstaller already installed
+    echo uv is installed
+)
+
+echo.
+echo Syncing environment with uv (including dev extras)...
+uv sync --all-extras --dev
+if %errorlevel% neq 0 (
+    echo Error: uv sync failed
+    exit /b 1
 )
 
 echo.
 echo Building Windows executable with PyInstaller...
 echo Using existing mgit.spec (cross-platform compatible)...
-call poetry run pyinstaller mgit.spec --clean
+uv run pyinstaller mgit.spec --clean
 if %errorlevel% neq 0 (
     echo Error: Build failed
     exit /b 1

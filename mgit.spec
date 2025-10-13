@@ -54,7 +54,6 @@ hiddenimports = [
     # Typer and dependencies
     'typer',
     'click',
-    'click_completion',
     # Dotenv support
     'dotenv',
     'python_dotenv',
