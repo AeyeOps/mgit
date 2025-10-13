@@ -1040,7 +1040,7 @@ def diff_command(
 def diff_remote_command(
     pattern: str = typer.Argument(
         ...,
-        help="Repository search pattern (e.g., 'myorg/*/*', 'github/*/*', '*pdi/*').",
+        help="Repository search pattern (e.g., 'myorg/*/*', 'github/*/*', '*abc/*').",
     ),
     local_root: Path = typer.Option(
         None,
@@ -1108,7 +1108,7 @@ def diff_remote_command(
     Examples:
       mgit diff-remote "myorg/*/*" --local-root ./repos --save-changeset
       mgit diff-remote "github*/*/*" --provider github_work --verbose
-      mgit diff-remote "*pdi/*" --include-remote-only --output discovery.jsonl
+      mgit diff-remote "*abc/*" --include-remote-only --output discovery.jsonl
     """
     from mgit.commands.diff_remote import execute_remote_diff_command
 

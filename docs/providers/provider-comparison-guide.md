@@ -52,8 +52,8 @@ Azure DevOps Organization (myorg)
 
 **mgit Usage:**
 ```bash
-# Clone all repos from a project
-mgit clone-all DataEngineering ./data-eng --provider azuredevops
+# Sync all repos from a project (org/project/repo pattern)
+mgit sync "myorg/DataEngineering/*" ./data-eng --provider work_ado
 ```
 
 ### GitHub: Organization-Based
@@ -83,12 +83,12 @@ GitHub
 
 **mgit Usage:**
 ```bash
-# Clone personal repos (use your username)
-mgit clone-all your-username ./personal-repos --provider github
+# Sync personal repos (use your username)
+mgit sync "your-username/*/*" ./personal-repos --provider github_personal
 
-# Clone organization repos
-mgit clone-all AeyeOps ./aeyeops-repos --provider github
-mgit clone-all myusername ./myusername-repos --provider github
+# Sync organization repos
+mgit sync "AeyeOps/*/*" ./aeyeops-repos --provider github_org
+mgit sync "myusername/*/*" ./myusername-repos --provider github_personal
 ```
 
 ### BitBucket: Workspace-Based with Optional Projects
@@ -120,8 +120,8 @@ BitBucket
 
 **mgit Usage:**
 ```bash
-# Clone all repos from workspace
-mgit clone-all myworkspace ./myworkspace-repos --provider bitbucket
+# Sync all repos in a workspace (project segment ignored by BitBucket)
+mgit sync "myworkspace/*/*" ./myworkspace-repos --provider bitbucket_team
 ```
 
 ## Authentication Methods
@@ -311,11 +311,11 @@ X-RateLimit-Remaining: 4999
 **Example Scenarios:**
 ```bash
 # Enterprise .NET development
-mgit clone-all --provider azdevops --project "CoreServices" --filter "*.Api"
+mgit sync "myorg/CoreServices/*Api*" ./core-services --provider work_ado
 
 # Multi-project deployment
 for project in WebApps Services Infrastructure; do
-  mgit pull-all --provider azdevops --project "$project" --path "./$project"
+  mgit sync "myorg/$project/*" "./$project" --provider work_ado
 done
 ```
 
@@ -339,11 +339,11 @@ done
 **Example Scenarios:**
 ```bash
 # Open source project management
-mgit clone-all --provider github --org my-oss-org --public-only
+mgit sync "my-oss-org/*/*" ~/oss --provider github_oss
 
 # Personal and org repos
-mgit clone-all --provider github --destination ~/personal
-mgit clone-all --provider github --org company --destination ~/work
+mgit sync "your-username/*/*" ~/personal --provider github_personal
+mgit sync "company/*/*" ~/work --provider github_work
 ```
 
 ### Use BitBucket When:
@@ -366,10 +366,10 @@ mgit clone-all --provider github --org company --destination ~/work
 **Example Scenarios:**
 ```bash
 # Atlassian-integrated development
-mgit clone-all --provider bitbucket --workspace team --project "Jira Integration"
+mgit sync "team/*/*" ./jira-integration --provider bitbucket_team
 
 # Small team management
-mgit list-repos --provider bitbucket --workspace startup-team
+mgit list "startup-team/*/*" --provider bitbucket_team
 ```
 
 ## Migration Between Providers
@@ -380,13 +380,15 @@ mgit list-repos --provider bitbucket --workspace startup-team
 #!/bin/bash
 # migrate-repos.sh - Generic migration script
 
-SOURCE_PROVIDER="github"
+SOURCE_PROVIDER_NAME="github_personal"
 SOURCE_ORG="old-org"
-DEST_PROVIDER="azdevops"
+DEST_PROVIDER_NAME="work_ado"
+DEST_PROVIDER_TYPE="azuredevops"   # one of: azuredevops|github|bitbucket
+DEST_ORG="new-org"
 DEST_PROJECT="MigratedRepos"
 
-# Clone from source
-mgit clone-all --provider $SOURCE_PROVIDER --org $SOURCE_ORG --destination ./migration
+# Sync from source
+mgit sync "$SOURCE_ORG/*/*" ./migration --provider "$SOURCE_PROVIDER_NAME"
 
 # Add new remotes and push
 cd ./migration
@@ -395,9 +397,9 @@ for repo in */; do
     cd "$repo"
     
     # Add destination remote
-    case $DEST_PROVIDER in
-        "azdevops")
-            git remote add dest "https://dev.azure.com/org/$DEST_PROJECT/_git/$repo_name"
+    case $DEST_PROVIDER_TYPE in
+        "azuredevops")
+            git remote add dest "https://dev.azure.com/$DEST_ORG/$DEST_PROJECT/_git/$repo_name"
             ;;
         "github")
             git remote add dest "https://github.com/$DEST_ORG/$repo_name"
@@ -442,22 +444,23 @@ done
 # Multi-provider setup for gradual migration
 
 providers:
-  github:
+  github_personal:
+    url: https://github.com
+    user: old-org
     token: ${GITHUB_TOKEN}
-    default_organization: "old-org"
-    
-  azdevops:
-    organization: https://dev.azure.com/new-org
-    pat: ${AZURE_PAT}
-    default_project: "MigrationProject"
+
+  work_ado:
+    url: https://dev.azure.com/new-org
+    user: azure
+    token: ${AZURE_PAT}
 
 sync_pairs:
   - source: 
-      provider: github
+      provider: github_personal
       org: old-org
       repo: important-service
     destination:
-      provider: azdevops  
+      provider: work_ado
       project: MigrationProject
       repo: important-service
 ```
@@ -487,18 +490,17 @@ sync_pairs:
 
 ## Performance Considerations
 
-### Clone Performance
+### Sync Performance
 
 ```bash
-# Fastest clone performance by provider
 # GitHub (typically fastest)
-mgit clone-all --provider github --org my-org --concurrency 20 --shallow
+mgit sync "my-org/*/*" ./repos --provider github_personal --concurrency 20
 
 # Azure DevOps (good parallelization)
-mgit clone-all --provider azdevops --project MyProject --concurrency 15
+mgit sync "myorg/MyProject/*" ./repos --provider work_ado --concurrency 15
 
 # BitBucket (conservative due to rate limits)
-mgit clone-all --provider bitbucket --workspace my-workspace --concurrency 5
+mgit sync "my-workspace/*/*" ./repos --provider bitbucket_team --concurrency 5
 ```
 
 ### API Performance

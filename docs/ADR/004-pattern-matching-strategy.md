@@ -36,7 +36,7 @@ mgit list "*/*/*"  # Searches all configured providers
 
 # Provider prefix matching
 mgit list "GITHUB*/*/*"  # All GitHub-type providers
-mgit list "*pdi/*/*"     # Providers ending with "pdi"
+mgit list "*abc/*/*"     # Providers ending with "abc"
 ```
 
 ## Implementation

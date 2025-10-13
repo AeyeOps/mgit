@@ -188,8 +188,7 @@ poetry run mgit login --provider bitbucket --name team_bb
 
 # Repository operations
 poetry run mgit list "myorg/*/*"                           # Find repos
-poetry run mgit clone-all "myorg/*/*" ./repos              # Clone repos
-poetry run mgit pull-all "myproject" ./repos               # Update repos
+poetry run mgit sync "myorg/*/*" ./repos                   # Clone or update repos
 poetry run mgit status ./repos                              # Check status
 
 # Configuration
@@ -198,8 +197,7 @@ poetry run mgit config --show work_ado                      # Show provider conf
 poetry run mgit config --set-default personal_gh            # Set default
 
 # Monitoring
-poetry run mgit monitoring server --port 8080               # Start server
-poetry run mgit monitoring health --detailed                # Health check
+# (No monitoring CLI commands available)
 ```
 
 ## High-Level Architecture
@@ -359,7 +357,7 @@ except NetworkError as e:
 
 3. **After Async Changes**: Run concurrent operations
    ```bash
-   poetry run mgit clone-all "org/*/*" ./test --concurrency 10
+   poetry run mgit sync "org/*/*" ./test --concurrency 10
    ```
 
 4. **After Documentation Updates**: Verify all commands and examples
@@ -402,21 +400,13 @@ The query pattern uses `organization/project/repository` format:
    - Required permissions: Repositories (Read/Write), Workspaces (Read)
 
 ### Monitoring System (Optional Feature)
-The monitoring system provides production-grade observability:
-- HTTP server with Prometheus metrics at `/metrics`
-- Health endpoints: `/health`, `/health/ready`, `/health/live`
-- Performance tracking and correlation analysis
-- Commands:
-  - `mgit monitoring server --port 8080` - Start full monitoring server
-  - `mgit monitoring server --simple --port 8080` - Start simple server (no aiohttp dependency)
-  - `mgit monitoring health` - Check system health
-  - `mgit monitoring health --detailed` - Detailed health check
+Observability is integrated within mgit pipeline modules (metrics/logs); no CLI monitoring commands are exposed.
 
 ### Common Workflow Patterns
-1. **Discovery First**: Always `list` before `clone-all`
+1. **Discovery First**: Always `list` before `sync`
    ```bash
    mgit list "org/*/*" --limit 10  # Discover what's available
-   mgit clone-all "org/project/*" ./repos  # Clone specific subset
+   mgit sync "org/project/*" ./repos  # Sync a specific subset
    ```
 
 2. **Multi-Provider Management**: Use `--config` flag
@@ -427,6 +417,6 @@ The monitoring system provides production-grade observability:
 
 3. **Bulk Operations**: Use appropriate concurrency
    ```bash
-   mgit clone-all "org/*/*" ./repos --concurrency 10  # For many small repos
-   mgit clone-all "org/*/*" ./repos --concurrency 2   # For large repos
+   mgit sync "org/*/*" ./repos --concurrency 10  # For many small repos
+   mgit sync "org/*/*" ./repos --concurrency 2   # For large repos
    ```

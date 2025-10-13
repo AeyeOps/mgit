@@ -253,7 +253,7 @@ poetry run mgit list "*/*/*-api"
 ### CLI Integration Tests
 ```bash
 poetry run mgit list "org/*/*" --provider github
-poetry run mgit clone-all "org/*/*" ./test --concurrency 5
+poetry run mgit sync "org/*/*" ./test --concurrency 5
 ```
 
 ### Manual Testing

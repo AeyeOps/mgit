@@ -99,29 +99,19 @@ export BITBUCKET_WORKSPACE="myworkspace"
 ## Common Commands
 
 ### Working with workspaces and repositories
-To see available workspaces and repositories, use the BitBucket web interface. mgit focuses on bulk clone and update operations.
-
-### Clone repositories
 
 ```bash
-# Clone all repos from a workspace
-mgit clone-all myworkspace ./myworkspace-repos --provider bitbucket
+# Discover repositories in a workspace (project segment is ignored by BitBucket)
+mgit list "myworkspace/*/*" --limit 10 --provider team_bb
 
-# Clone all repos from workspace
-mgit clone-all myworkspace ./backend-repos --provider bitbucket
+# Sync all repos from a workspace
+mgit sync "myworkspace/*/*" ./myworkspace-repos --provider team_bb
 
-# Clone with concurrency control
-mgit clone-all myworkspace ./repos -c 5 --provider bitbucket
-```
+# Sync with concurrency control
+mgit sync "myworkspace/*/*" ./repos --concurrency 5 --provider team_bb
 
-### Update repositories
-
-```bash
-# Update all repos in a directory
-mgit pull-all myworkspace ./myworkspace-repos --provider bitbucket
-
-# Update only specific repos
-mgit pull-all --provider bitbucket --path ./repos --filter "*-backend"
+# Sync only backend repos by naming convention
+mgit sync "myworkspace/*/*-backend*" ./backend-repos --provider team_bb
 ```
 
 ## Workspace-Based Management
@@ -154,45 +144,26 @@ WORKSPACES=("myworkspace" "my-company" "opensource-proj")
 BASE_DIR="$HOME/bitbucket"
 
 for workspace in "${WORKSPACES[@]}"; do
-    echo "Cloning repositories from workspace: $workspace"
-    mkdir -p "$BASE_DIR/$workspace"
-    mgit clone-all --provider bitbucket --workspace "$workspace" \
-        --destination "$BASE_DIR/$workspace"
+  echo "Syncing repositories from workspace: $workspace"
+  mkdir -p "$BASE_DIR/$workspace"
+  mgit sync "$workspace/*/*" "$BASE_DIR/$workspace" --provider team_bb
 done
 ```
 
 ### Project-Based Organization
 
-BitBucket also supports projects within workspaces:
+BitBucket also supports projects within workspaces, but project filtering is not applied by mgit for BitBucket. Use repository name patterns instead:
 
 ```bash
-# List projects in a workspace
-mgit list-projects --provider bitbucket --workspace myworkspace
-
-# Clone repos from a specific project
-mgit clone-all --provider bitbucket --workspace myworkspace \
-    --project "Backend Services" \
-    --destination ./backend-services
-
-# Filter by project and name
-mgit clone-all --provider bitbucket --workspace myworkspace \
-    --project "Microservices" \
-    --filter "*-service" \
-    --destination ./microservices
+# Filter by project-naming convention
+mgit sync "myworkspace/*/*-service" ./backend-services --provider team_bb
 ```
 
 ## BitBucket-Specific Features
 
 ### 1. Mercurial Support (Legacy)
 
-While BitBucket has discontinued Mercurial support, some organizations may have archived repos:
-
-```bash
-# Skip Mercurial repos during clone
-mgit clone-all --provider bitbucket --workspace myworkspace \
-    --destination ./repos \
-    --git-only
-```
+While BitBucket has discontinued Mercurial support, some organizations may have archived repos. Handle these outside mgit.
 
 ### 2. Repository Slugs
 
@@ -203,24 +174,12 @@ BitBucket uses slugs (URL-friendly names) for repositories:
 # Slug: "my-awesome-project"
 
 # Use slugs in filters
-mgit clone-all --provider bitbucket --workspace myworkspace \
-    --filter "my-awesome-*" \
-    --destination ./awesome-projects
+mgit sync "myworkspace/*/my-awesome-*" ./awesome-projects --provider team_bb
 ```
 
 ### 3. Branch Restrictions
 
-```bash
-# Clone specific branch from all repos
-mgit clone-all --provider bitbucket --workspace myworkspace \
-    --destination ./develop-branch \
-    --branch develop
-
-# Different branches for different repos
-mgit clone-all --provider bitbucket --workspace myworkspace \
-    --destination ./repos \
-    --branch-map "frontend:main,backend:develop,infra:master"
-```
+Note: Branch selection per-repository is not handled by mgit sync; switch branches after cloning if needed.
 
 ### 4. Repository Access Levels
 
@@ -230,15 +189,8 @@ BitBucket has different access levels:
 - **Project-based**: Inherited from project settings
 
 ```bash
-# Clone only public repos
-mgit clone-all --provider bitbucket --workspace myworkspace \
-    --destination ./public-repos \
-    --public-only
-
-# Include private repos (requires authentication)
-mgit clone-all --provider bitbucket --workspace myworkspace \
-    --destination ./all-repos \
-    --include-private
+# List only public repos via JSON output filtering
+mgit list "myworkspace/*/*" --format json --provider team_bb | jq '.[] | select(.is_private == false)'
 ```
 
 ## Troubleshooting
@@ -272,8 +224,7 @@ curl -u YOUR_USERNAME:YOUR_APP_PASSWORD https://api.bitbucket.org/2.0/workspaces
 3. Ensure app password has workspace read permission
 
 ```bash
-# List accessible workspaces
-mgit list-workspaces --provider bitbucket --debug
+# List accessible workspaces via API or web; mgit operates on repository patterns.
 ```
 
 ### SSH Configuration
@@ -294,7 +245,7 @@ ssh-keygen -t ed25519 -C "your-email@example.com"
 ```bash
 # mgit uses HTTPS URLs by default
 # After cloning, you can change to SSH if needed
-mgit clone-all myworkspace ./repos --provider bitbucket
+mgit sync "myworkspace/*/*" ./repos --provider team_bb
 ```
 
 ### Rate Limiting
@@ -306,10 +257,7 @@ BitBucket API rate limits:
 Handle rate limits:
 ```bash
 # Reduce concurrency
-mgit clone-all --provider bitbucket --workspace large-workspace \
-    --destination ./repos \
-    --concurrency 3 \
-    --delay 2000  # 2 second delay between operations
+mgit sync "large-workspace/*/*" ./repos --provider team_bb --concurrency 3
 ```
 
 ### Clone Failures
@@ -319,7 +267,7 @@ mgit clone-all --provider bitbucket --workspace large-workspace \
 **Debugging steps**:
 ```bash
 # 1. Verify repository exists
-mgit list-repos --provider bitbucket --workspace myworkspace | grep repo-name
+mgit list "myworkspace/*/*" --provider team_bb | grep repo-name
 
 # 2. Check repository access
 curl -u USERNAME:APP_PASSWORD https://api.bitbucket.org/2.0/repositories/workspace/repo-slug
@@ -363,7 +311,7 @@ export MGIT_BITBUCKET_PASSWORD="$(cat ~/.bitbucket-app-password)"
 PROJECT_TYPES=("frontend" "backend" "mobile" "infrastructure")
 
 for type in "${PROJECT_TYPES[@]}"; do
-    mgit clone-all myworkspace "./repos/$type" --provider bitbucket
+  mgit sync "myworkspace/*/*$type*" "./repos/$type" --provider team_bb
 done
 ```
 
@@ -377,8 +325,8 @@ BACKUP_DIR="$HOME/bitbucket-backup/$(date +%Y%m%d)"
 WORKSPACES=("myworkspace" "personal-workspace" "company-workspace")
 
 for workspace in "${WORKSPACES[@]}"; do
-    echo "Backing up workspace: $workspace"
-    mgit clone-all "$workspace" "$BACKUP_DIR/$workspace" --provider bitbucket
+  echo "Backing up workspace: $workspace"
+  mgit sync "$workspace/*/*" "$BACKUP_DIR/$workspace" --provider team_bb
 done
 
 # Create archive
@@ -400,8 +348,8 @@ pipelines:
           name: Update all workspace repos
           script:
             - pip install mgit
-            - mgit login --provider bitbucket --org $BITBUCKET_WORKSPACE --token $BITBUCKET_APP_PASSWORD
-            - mgit pull-all $BITBUCKET_WORKSPACE ./ --provider bitbucket
+            - mgit login --provider bitbucket --name team_bb
+            - mgit sync "$BITBUCKET_WORKSPACE/*/*" ./ --provider team_bb
 ```
 
 ### Repository Migration
@@ -411,8 +359,8 @@ pipelines:
 WORKSPACE="myworkspace"
 GITHUB_ORG="my-github-org"
 
-# Clone from BitBucket
-mgit clone-all "$WORKSPACE" ./migration --provider bitbucket
+# Sync from BitBucket
+mgit sync "$WORKSPACE/*/*" ./migration --provider team_bb
 
 # Push to GitHub
 cd ./migration
@@ -429,15 +377,15 @@ done
 ### Working with Large Workspaces
 
 ```bash
-# Clone all repositories from large workspace
-mgit clone-all large-workspace ./repos --provider bitbucket
+# Sync all repositories from large workspace
+mgit sync "large-workspace/*/*" ./repos --provider team_bb
 ```
 
 ### Custom Repository Naming
 
 ```bash
-# Clone repositories
-mgit clone-all myworkspace ./repos --provider bitbucket
+# Sync repositories
+mgit sync "myworkspace/*/*" ./repos --provider team_bb
 ```
 
 ## Real-World Examples
@@ -446,18 +394,18 @@ mgit clone-all myworkspace ./repos --provider bitbucket
 
 ```bash
 # Initial setup
-mgit login --provider bitbucket --username myusername --token app-password-here
+mgit login --provider bitbucket --name team_bb
 
-# Clone all repositories
+# Sync all repositories
 mkdir -p ~/projects/myworkspace
-mgit clone-all myworkspace ~/projects/myworkspace --provider bitbucket
+mgit sync "myworkspace/*/*" ~/projects/myworkspace --provider team_bb
 
-# Clone all repositories
-mgit clone-all myworkspace ~/projects/active --provider bitbucket
+# Sync only active repositories by naming convention
+mgit sync "myworkspace/*/*-active*" ~/projects/active --provider team_bb
 
 # Regular updates
 cd ~/projects/myworkspace
-mgit pull-all myworkspace . --provider bitbucket
+mgit sync "myworkspace/*/*" . --provider team_bb
 ```
 
 ### Example 2: Project-Based Development
@@ -467,47 +415,32 @@ mgit pull-all myworkspace . --provider bitbucket
 WORKSPACE="myworkspace"
 PROJECTS=("Web Platform" "Mobile Apps" "Data Pipeline" "Infrastructure")
 
-# Clone all repositories from workspace
-mgit clone-all "$WORKSPACE" ~/bitbucket/all-repos --provider bitbucket
+# Sync all repositories from workspace
+mgit sync "$WORKSPACE/*/*" ~/bitbucket/all-repos --provider team_bb
 ```
 
 ### Example 3: CI/CD Repository Management
 
 ```bash
-# Clone all repositories
-mgit clone-all myworkspace ./ci-repos --provider bitbucket
-
-# Update and check pipeline status
-mgit pull-all --provider bitbucket --path ./ci-repos --check-pipelines
+# Sync all repositories
+mgit sync "myworkspace/*/*" ./ci-repos --provider team_bb
 ```
 
 ## Performance Optimization
 
 ### Shallow Cloning
 
-```bash
-# Clone with minimal history
-mgit clone-all --provider bitbucket --workspace myworkspace \
-    --destination ./repos \
-    --shallow --depth 1
-```
+Note: Shallow clone options are not exposed via mgit sync. Use git after cloning if needed.
 
-### Selective Cloning
+### Selective Sync
 
-```bash
-# Clone only recently updated repos
-mgit clone-all --provider bitbucket --workspace myworkspace \
-    --destination ./recent-repos \
-    --updated-after "2024-01-01"
-```
+Use patterns or post-filter JSON output from `mgit list` to select subsets, then `mgit sync` with matching patterns.
 
 ### Parallel Operations
 
 ```bash
 # Maximize concurrency for faster operations
-mgit clone-all --provider bitbucket --workspace myworkspace \
-    --destination ./repos \
-    --concurrency 20
+mgit sync "myworkspace/*/*" ./repos --provider team_bb --concurrency 20
 ```
 
 ## Security Considerations
@@ -521,20 +454,10 @@ mgit clone-all --provider bitbucket --workspace myworkspace \
 ## BitBucket Cloud vs Server
 
 ### BitBucket Cloud (bitbucket.org)
-```bash
-# Default configuration works with cloud
-mgit login --provider bitbucket --username USER --password APP_PASS
-```
+Use `mgit login --provider bitbucket --name team_bb` and enter your username and app password when prompted.
 
 ### BitBucket Server (Self-hosted)
-```bash
-# Configure for self-hosted instance
-mgit login --provider bitbucket \
-    --username USER \
-    --password APP_PASS \
-    --api-url https://bitbucket.company.com/rest/api/1.0 \
-    --base-url https://bitbucket.company.com
-```
+Self-hosted BitBucket support may require custom provider integration. Use standard BitBucket Cloud flows unless you have an adapter.
 
 ## Related Documentation
 
