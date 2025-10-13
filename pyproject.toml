@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "mgit"
-version = "0.7.0"
+version = "0.7.2"
 description = "Multi-provider Git management tool"
 authors = ["Steve Antonakakis <steve.antonakakis@gmail.com>"]
 readme = "README.md"
@@ -55,8 +55,8 @@ help = "Build Linux executable mgit"
 cmd = "pyinstaller mgit.spec --clean"
 
 [tool.poe.tasks.build-windows]
-help = "Build Windows executable mgit.exe"
-cmd = "pyinstaller mgit.spec --clean"
+help = "Build Windows executable mgit.exe from WSL2"
+cmd = "scripts/build_windows_from_wsl.sh"
 
 [tool.poe.tasks.build-all]
 sequence = ["build-linux", "build-windows"]
@@ -76,30 +76,17 @@ cmd = "black ."
 [tool.poe.tasks.format-check]
 cmd = "black --check --diff ."
 
-[tool.poe.tasks.version-sync]
-cmd = "python scripts/update_version.py"
-help = "Sync version across all project files"
-
 [tool.poe.tasks.bump-patch]
-sequence = [
-    {cmd = "poetry version patch"},
-    {cmd = "python scripts/update_version.py"}
-]
-help = "Bump patch version and sync across files"
+cmd = "poetry version patch"
+help = "Bump patch version"
 
 [tool.poe.tasks.bump-minor]
-sequence = [
-    {cmd = "poetry version minor"},
-    {cmd = "python scripts/update_version.py"}
-]
-help = "Bump minor version and sync across files"
+cmd = "poetry version minor"
+help = "Bump minor version"
 
 [tool.poe.tasks.bump-major]
-sequence = [
-    {cmd = "poetry version major"},
-    {cmd = "python scripts/update_version.py"}
-]
-help = "Bump major version and sync across files"
+cmd = "poetry version major"
+help = "Bump major version"
 
 [tool.black]
 line-length = 88

@@ -212,6 +212,25 @@ class BitBucketProvider(GitProvider):
         if not await self.authenticate():
             raise AuthenticationError("Authentication required")
 
+        # For BitBucket, we'll return only the configured workspace
+        # This avoids trying to list all workspaces which may timeout or fail
+        # and ensures we only work with the workspace we're authenticated for
+        if self.workspace:
+            # Return just the configured workspace as an organization
+            return [
+                Organization(
+                    name=self.workspace,
+                    url=f"https://bitbucket.org/{self.workspace}",
+                    provider=self.PROVIDER_NAME,
+                    metadata={
+                        "type": "workspace",
+                        "configured": True,
+                        "note": "Using configured workspace only"
+                    },
+                )
+            ]
+        
+        # If no workspace configured, try to list all (original behavior as fallback)
         await self._ensure_session()
         headers = self._get_auth_headers()
         url = f"{self.url}/workspaces"
@@ -353,7 +372,28 @@ class BitBucketProvider(GitProvider):
 
         await self._ensure_session()
         headers = self._get_auth_headers()
-        url = f"{self.url}/repositories/{organization}"
+        
+        # Use the configured workspace if organization doesn't match
+        # This handles cases where queries like "cstorepro/*/repo" are used
+        # but the provider is configured for a different workspace
+        workspace_to_use = organization
+        if organization != self.workspace:
+            self.logger.debug(
+                f"Requested workspace '{organization}' differs from configured workspace '{self.workspace}'. "
+                f"Using configured workspace '{self.workspace}' instead."
+            )
+            workspace_to_use = self.workspace
+            # If the requested org doesn't match our workspace, we shouldn't return results
+            # unless wildcards are used (handled by the calling code)
+            if organization != "*" and organization != self.workspace:
+                # Return empty iterator - no repositories match
+                self.logger.debug(
+                    f"Skipping workspace '{organization}' as it doesn't match configured '{self.workspace}'"
+                )
+                return
+                yield  # Make this an async generator (but unreachable)
+        
+        url = f"{self.url}/repositories/{workspace_to_use}"
 
         # Add query parameters for filters
         params = {}
