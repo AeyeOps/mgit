@@ -57,8 +57,10 @@ def analyze_pattern(
         validation_errors.append(f"Pattern must have exactly 3 segments separated by '/'. Got {segment_count} segments.")
 
     # Check for invalid characters in segments
+    # Allow alphanumeric, spaces, dots, underscores, hyphens, and wildcards
+    # Git and most providers support these characters
     for i, segment in enumerate(segments):
-        if segment and not re.match(r'^[a-zA-Z0-9_\-\*\?]+$', segment):
+        if segment and not re.match(r'^[a-zA-Z0-9_\-\*\?\. ]+$', segment):
             validation_errors.append(f"Segment {i+1} contains invalid characters: {segment}")
 
     # Determine if this is a multi-provider operation
