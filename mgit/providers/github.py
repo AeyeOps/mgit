@@ -84,7 +84,6 @@ class GitHubProvider(GitProvider):
 
         self.user = config.get("user", "")
         self.token = config["token"]
-        self.workspace = config.get("workspace", "")
         self.api_version = config.get("api_version", self.DEFAULT_API_VERSION)
 
         # HTTP session for API calls

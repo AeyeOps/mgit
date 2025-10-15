@@ -53,7 +53,6 @@ class AzureDevOpsProvider(GitProvider):
         self.url = config["url"]
         self.user = config.get("user", "")  # Not used for PAT auth
         self.token = config["token"]
-        self.workspace = config.get("workspace", "")
 
         # Ensure URL is properly formatted (fail-fast validation)
         if not self.url:
