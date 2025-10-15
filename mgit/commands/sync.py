@@ -25,6 +25,7 @@ from mgit.commands.bulk_operations import (
 from mgit.config.yaml_manager import get_global_setting, list_provider_names
 from mgit.exceptions import MgitError
 from mgit.git import GitManager
+from mgit.git.utils import build_repo_path
 from mgit.providers.manager import ProviderManager
 from mgit.providers.base import Repository
 from mgit.utils.pattern_matching import analyze_pattern
@@ -145,8 +146,8 @@ async def analyze_repository_states(repositories: List[Repository], target_path:
     non_git_dirs = []
 
     for repo in repositories:
-        local_path = target_path / repo.organization / (repo.project or "") / repo.name
-        local_path = Path(str(local_path).replace("//", "/"))
+        repo_path = build_repo_path(repo.clone_url)
+        local_path = target_path / repo_path
 
         if not local_path.exists():
             missing_repos.append(repo.name)
@@ -183,8 +184,9 @@ async def show_sync_preview(repositories: List[Repository], target_path: Path, f
     table.add_column("Notes", style="dim")
 
     for repo in repositories:
-        local_path = target_path / repo.organization / (repo.project or "") / repo.name
-        repo_name = f"{repo.organization}/{repo.name}"
+        repo_path = build_repo_path(repo.clone_url)
+        local_path = target_path / repo_path
+        repo_name = f"{repo_path.parts[-3]}/{repo_path.parts[-1]}"  # org/repo
 
         if repo.name in repo_analysis.missing_repos:
             table.add_row(repo_name, "Missing", "🔄 Clone", "New repository")
