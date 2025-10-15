@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2025-10-14
+
+### Fixed
+- **Sync Command**: Fixed AttributeError when using patterns with spaces (e.g., "pdidev/Cloud Engineering/*")
+  - Added missing `build_repo_path()` import to properly construct repository paths from URLs
+  - Replaced direct access to non-existent `Repository.organization` field with URL-based path construction
+
+### Changed
+- **Configuration Schema**: Cleaned up unused fields in provider configurations
+  - Removed unused `workspace` field from Azure DevOps provider code
+  - Removed unused `workspace` field from GitHub provider code
+  - BitBucket retains `workspace` field (required for functionality)
+- **Pattern Matching**: Enhanced support for repository names containing spaces and special characters
+
 ## [0.7.0] - 2025-09-02
 
 ### Added
