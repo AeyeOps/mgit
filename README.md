@@ -2,7 +2,7 @@
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.8.1-blue.svg)](#)
 
 **One CLI for all your Git repositories across Azure DevOps, GitHub, and BitBucket.**
 
@@ -51,7 +51,7 @@ sudo mv mgit /usr/local/bin/mgit
 
 # Verify installation
 mgit --version
-# Should show: mgit version: 0.8.0
+# Should show: mgit version: 0.8.1
 ```
 
 **Option 2: Build from Source (uv preferred)**
@@ -434,6 +434,7 @@ mgit list "*/*/*-service" --format json
 Notes:
 - There is no global `--debug` flag. To increase verbosity, set `console_level: DEBUG` in `~/.config/mgit/config.yaml` or run with `CON_LEVEL=DEBUG`.
 - Default concurrency can be configured via `global.default_concurrency` in `~/.config/mgit/config.yaml`.
+- Local sync (`mgit sync ./path`) uses configured provider credentials for HTTPS remotes when the origin matches a provider config, without rewriting remotes.
 
 ## Installation Options
 
@@ -475,7 +476,8 @@ uv run pyinstaller mgit.spec --clean
 make test
 make lint
 make build
-make build-install      # builds Linux binary + installs to /opt/bin/mgit
+make build-linux        # builds Linux binary + installs to /opt/bin/mgit
+make build-install      # alias of build-linux
 make build-windows      # Windows build wrapper from WSL
 make test-binary        # Exercises the standalone binary (real provider calls)
 ```
@@ -763,7 +765,8 @@ Development commands:
 make test               # Run tests
 make lint               # Check code quality
 make format             # Format code
-make build              # Build Linux binary
+make build              # Build Linux binary (no install)
+make build-linux        # Build + install Linux binary to /opt/bin/mgit
 make build-windows       # Build Windows binary (WSL wrapper)
 ```
 

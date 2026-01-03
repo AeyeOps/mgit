@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-01-03
+
+### Added
+- **Local Sync Auth Alignment**: Local `git pull` now applies matching provider credentials for HTTPS remotes without modifying repository remotes.
+- **Local Sync Logging**: Local sync scans, summaries, and failure counts are now written to `~/.config/mgit/mgit.log`.
+- **Linux Build Install**: `make build-linux` now installs the binary to `/opt/bin/mgit` by default.
+
+### Changed
+- **Progress UI**: Large concurrent batches now switch to a compact progress view to keep updates visible.
+
 ## [0.8.0] - 2026-01-03
 
 ### Added

@@ -7,8 +7,10 @@ the functionality of clone-all and pull-all into a single, intuitive command.
 
 import asyncio
 import logging
+from base64 import b64encode
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 import typer
 from rich.console import Console
@@ -29,7 +31,12 @@ from mgit.commands.bulk_operations import (
     UpdateMode,
     check_force_mode_confirmation,
 )
-from mgit.config.yaml_manager import get_global_setting, list_provider_names
+from mgit.config.yaml_manager import (
+    detect_provider_type,
+    get_global_setting,
+    get_provider_configs,
+    list_provider_names,
+)
 from mgit.git import GitManager
 from mgit.git.utils import build_repo_path, get_git_remote_url
 from mgit.providers import detect_provider_by_url
@@ -68,6 +75,16 @@ class LocalRepoResult:
     error: str | None = None
 
 
+@dataclass(frozen=True)
+class ProviderAuthConfig:
+    name: str
+    provider_type: str
+    base_url: str
+    token: str | None
+    user: str | None
+    host: str | None
+
+
 def _detect_local_provider(remote_url: str | None) -> str:
     if not remote_url:
         return "unknown"
@@ -91,6 +108,138 @@ async def _run_git_command(repo_path: Path, args: list[str]) -> tuple[int, str, 
         stdout.decode("utf-8", errors="ignore"),
         stderr.decode("utf-8", errors="ignore"),
     )
+
+
+def _normalize_http_url(url: str) -> str | None:
+    if not url:
+        return None
+    url = url.strip()
+    if not url.lower().startswith(("http://", "https://")):
+        return None
+    parsed = urlparse(url)
+    if not parsed.hostname:
+        return None
+    scheme = (parsed.scheme or "https").lower()
+    host = parsed.hostname.lower()
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    path = parsed.path or ""
+    normalized = f"{scheme}://{host}{path}".rstrip("/")
+    return normalized
+
+
+def _load_provider_auth_configs() -> list[ProviderAuthConfig]:
+    configs: list[ProviderAuthConfig] = []
+    for name, config in get_provider_configs().items():
+        base_url = config.get("url")
+        if not base_url:
+            continue
+        try:
+            provider_type = detect_provider_type(name)
+        except Exception:
+            continue
+        token = config.get("token") or config.get("pat")
+        user = config.get("user") or config.get("username")
+        normalized = _normalize_http_url(str(base_url))
+        if not normalized:
+            continue
+        host = urlparse(normalized).hostname
+        configs.append(
+            ProviderAuthConfig(
+                name=name,
+                provider_type=provider_type,
+                base_url=normalized,
+                token=token,
+                user=user,
+                host=host,
+            )
+        )
+    return configs
+
+
+def _match_provider_config(
+    remote_url: str, provider_type: str, configs: list[ProviderAuthConfig]
+) -> ProviderAuthConfig | None:
+    normalized_remote = _normalize_http_url(remote_url)
+    if not normalized_remote:
+        return None
+
+    candidates = [config for config in configs if config.provider_type == provider_type]
+    if not candidates:
+        return None
+
+    remote_lower = normalized_remote.lower()
+    best_match = None
+    for config in candidates:
+        if remote_lower.startswith(config.base_url.lower()):
+            if best_match is None or len(config.base_url) > len(best_match.base_url):
+                best_match = config
+
+    if best_match:
+        return best_match
+
+    remote_host = urlparse(normalized_remote).hostname
+    host_matches = [config for config in candidates if config.host == remote_host]
+    if host_matches:
+        return sorted(host_matches, key=lambda cfg: len(cfg.base_url), reverse=True)[0]
+
+    token_configs = [config for config in candidates if config.token]
+    if len(token_configs) == 1:
+        logger.debug(
+            "Local sync using sole %s provider config '%s' for %s",
+            provider_type,
+            token_configs[0].name,
+            normalized_remote,
+        )
+        return token_configs[0]
+
+    return None
+
+
+def _build_basic_auth_header(user: str, token: str) -> str:
+    payload = f"{user}:{token}".encode("utf-8")
+    encoded = b64encode(payload).decode("ascii")
+    return f"Authorization: Basic {encoded}"
+
+
+def _build_auth_header(config: ProviderAuthConfig) -> str | None:
+    token = config.token
+    if not token:
+        return None
+
+    if config.provider_type == "azuredevops":
+        return _build_basic_auth_header("", token)
+    if config.provider_type == "github":
+        return _build_basic_auth_header(config.user or "x-access-token", token)
+    if config.provider_type == "bitbucket":
+        if not config.user:
+            return None
+        return _build_basic_auth_header(config.user, token)
+
+    return None
+
+
+def _build_git_pull_args(
+    state: LocalRepoState, configs: list[ProviderAuthConfig]
+) -> list[str]:
+    if not state.remote_url or state.provider == "unknown":
+        return ["pull"]
+
+    config = _match_provider_config(state.remote_url, state.provider, configs)
+    if not config:
+        return ["pull"]
+
+    header = _build_auth_header(config)
+    if not header:
+        return ["pull"]
+
+    logger.debug(
+        "Local sync using %s credentials from '%s' for %s",
+        config.provider_type,
+        config.name,
+        state.path,
+    )
+    return ["-c", f"http.extraheader={header}", "pull"]
 
 
 async def _inspect_local_repository(repo_path: Path) -> LocalRepoState:
@@ -481,7 +630,9 @@ async def show_sync_preview(
         console.print(summary_table)
 
 
-async def _sync_local_repository(state: LocalRepoState, force: bool) -> LocalRepoResult:
+async def _sync_local_repository(
+    state: LocalRepoState, force: bool, auth_configs: list[ProviderAuthConfig]
+) -> LocalRepoResult:
     action = _determine_local_action(state, force)
     if action != LOCAL_ACTION_PULL:
         return LocalRepoResult(state=state, action=action, error=state.error)
@@ -504,7 +655,8 @@ async def _sync_local_repository(state: LocalRepoState, force: bool) -> LocalRep
                 state=state, action=LOCAL_ACTION_FAILED, error=error_msg
             )
 
-    returncode, stdout, stderr = await _run_git_command(state.path, ["pull"])
+    pull_args = _build_git_pull_args(state, auth_configs)
+    returncode, stdout, stderr = await _run_git_command(state.path, pull_args)
     if returncode != 0:
         error_msg = stderr.strip() or stdout.strip() or "git pull failed"
         return LocalRepoResult(state=state, action=LOCAL_ACTION_FAILED, error=error_msg)
@@ -534,13 +686,17 @@ async def sync_local_command(
         )
         raise typer.Exit(code=1)
 
+    logger.info("Local sync scan: %s", root_path)
     repo_paths = sorted(find_repositories_in_directory(root_path, recursive=True))
     if not repo_paths:
+        logger.info("Local sync found no git repositories under %s", root_path)
         console.print(f"[yellow]No git repositories found under {root_path}[/yellow]")
         return
 
+    logger.info("Local sync repositories found: %d", len(repo_paths))
     console.print(f"[blue]Local sync scan:[/blue] {root_path}")
 
+    provider_auth_configs = _load_provider_auth_configs()
     executor = AsyncExecutor(concurrency=concurrency, rich_console=console)
 
     async def inspect_repo(repo_path: Path) -> LocalRepoState:
@@ -554,7 +710,11 @@ async def sync_local_command(
     )
     repo_states = [state for state in repo_states if state]
 
+    if errors:
+        logger.warning("Local sync scan encountered %d errors", len(errors))
+
     for repo_path, error in errors:
+        logger.debug("Local sync scan failed for %s: %s", repo_path, error)
         repo_states.append(
             LocalRepoState(
                 path=repo_path,
@@ -595,7 +755,7 @@ async def sync_local_command(
                 return
 
     async def process_repo(state: LocalRepoState) -> LocalRepoResult:
-        return await _sync_local_repository(state, force)
+        return await _sync_local_repository(state, force, provider_auth_configs)
 
     results, errors = await executor.run_batch(
         items=repo_states,
@@ -626,6 +786,22 @@ async def sync_local_command(
         _render_local_summary(results, dry_run=False)
 
     _render_local_failures(results, root_path)
+
+    counts = _summarize_local_results(results)
+    logger.info(
+        "Local sync summary: total=%s pulled=%s skipped_dirty=%s skipped_no_remote=%s failed=%s",
+        counts["total"],
+        counts["pulled"],
+        counts["skipped_dirty"],
+        counts["skipped_no_remote"],
+        counts["failed"],
+    )
+    failures = [result for result in results if result.action == LOCAL_ACTION_FAILED]
+    if failures:
+        logger.warning("Local sync failed for %d repositories", len(failures))
+        for result in failures:
+            error_msg = result.error or result.state.error or "Unknown error"
+            logger.debug("Local sync failed for %s: %s", result.state.path, error_msg)
 
     if any(result.action == LOCAL_ACTION_FAILED for result in results):
         raise typer.Exit(code=1)
