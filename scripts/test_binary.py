@@ -500,10 +500,16 @@ class StandaloneTestSuite:
         """Extract JSON array from output that may contain log lines."""
         import json
 
-        # Find the JSON array in the output
-        start = output.find("[")
+        # Find the JSON array - look for [{ or [\n{ to avoid false matches like [authentication_success]
+        for marker in ["[\n  {", "[{", "[\n{"]:
+            start = output.find(marker)
+            if start != -1:
+                break
+        else:
+            return None
+
         end = output.rfind("]")
-        if start == -1 or end == -1:
+        if end == -1 or end <= start:
             return None
 
         json_str = output[start : end + 1]
@@ -536,10 +542,10 @@ class StandaloneTestSuite:
 
             self.log(f"Testing sync for {ptype} via {provider}")
 
-            # Get a repo to clone
+            # Get repos to clone - use higher limit to find repos without spaces
             list_result = self.run_cmd(
-                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "10"],
-                timeout=60,
+                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "50"],
+                timeout=90,
             )
 
             if list_result.returncode != 0:
