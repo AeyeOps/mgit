@@ -29,7 +29,7 @@ from mgit.commands.listing import format_results, list_repositories
 from mgit.commands.status import display_status_results, get_repository_statuses
 
 # Import sync command
-from mgit.commands.sync import sync_command
+from mgit.commands.sync import sync_command, sync_local_command
 from mgit.config.yaml_manager import (
     CONFIG_DIR,
     add_provider_config,
@@ -224,7 +224,8 @@ app = typer.Typer(
     help=f"Multi-Git CLI Tool v{__version__} - A utility for managing repositories across "
     "multiple git platforms (Azure DevOps, GitHub, BitBucket) with bulk operations.",
     add_completion=False,
-    no_args_is_help=True,
+    no_args_is_help=False,  # We handle this ourselves with animated help
+    add_help_option=False,  # We add our own --help handler
 )
 
 
@@ -295,20 +296,39 @@ def version_callback(value: bool):
         raise typer.Exit()
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main_options(
+    ctx: typer.Context,
     version: Optional[bool] = typer.Option(
         None,
         "--version",
         callback=version_callback,
         is_eager=True,
         help="Show the application's version and exit.",
-    )
+    ),
+    help_flag: Optional[bool] = typer.Option(
+        None,
+        "--help",
+        "-h",
+        is_eager=True,
+        help="Show this message and exit.",
+    ),
 ):
     """
     Multi-Git CLI Tool - Manage repos across multiple git platforms easily.
     """
-    pass
+    # Handle --help flag or no subcommand (show animated help)
+    if help_flag or ctx.invoked_subcommand is None:
+        from mgit.ui.help_animation import show_animated_help
+
+        # Get the help text from Typer/Click
+        help_text = ctx.get_help()
+        try:
+            show_animated_help(help_text)
+        except KeyboardInterrupt:
+            # User interrupted, exit cleanly
+            raise typer.Exit(code=130)
+        raise typer.Exit()
 
 
 # -----------------------------------------------------------------------------
@@ -1190,8 +1210,15 @@ def status_command(
 # -----------------------------------------------------------------------------
 @app.command()
 def sync(
-    pattern: str = typer.Argument(..., help="Repository pattern (org/project/repo)"),
-    path: str = typer.Argument(".", help="Local path to synchronize repositories into"),
+    pattern: Optional[str] = typer.Argument(
+        None, help="Repository pattern (remote) or local path (local mode)"
+    ),
+    path: Optional[str] = typer.Argument(
+        None, help="Target path for remote sync (default: .)"
+    ),
+    filter_pattern: Optional[str] = typer.Option(
+        None, "--filter", help="Explicit remote pattern (forces remote mode)"
+    ),
     provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Specific provider (otherwise search all)"),
     force: bool = typer.Option(False, "--force", "-f", help="Delete and re-clone all repositories"),
     concurrency: Optional[int] = typer.Option(None, "--concurrency", "-c", help="Number of concurrent operations"),
@@ -1200,7 +1227,7 @@ def sync(
     summary: bool = typer.Option(True, "--summary/--no-summary", help="Show detailed summary"),
 ):
     """
-    Synchronize repositories with remote providers.
+    Synchronize repositories locally or with remote providers.
 
     🚀 UNIFIED REPOSITORY SYNC - replaces clone-all and pull-all
 
@@ -1210,7 +1237,7 @@ def sync(
     - Handles conflicts and errors gracefully
     - Provides detailed progress and summary reporting
 
-    PATTERN can be:
+    Remote PATTERN can be:
     - Exact: myorg/myproject/myrepo
     - Wildcards: myorg/*/myrepo, */myproject/*, myorg/*/*
     - Cross-provider: */*/* (searches ALL providers)
@@ -1218,8 +1245,17 @@ def sync(
     When no --provider specified, patterns search ALL configured providers.
 
     Examples:
+        # Local walk mode (current directory)
+        mgit sync
+
+        # Local walk mode (specific path)
+        mgit sync ./workspace
+
         # Daily workspace sync
         mgit sync "myorg/*/*" ./workspace
+
+        # Force remote sync even if pattern matches a path
+        mgit sync --filter "myorg/*/*" ./workspace
 
         # Preview changes first
         mgit sync "myorg/*/*" ./workspace --dry-run
@@ -1230,7 +1266,49 @@ def sync(
         # Quiet sync for scripts
         mgit sync "myorg/*/*" ./workspace --no-progress --no-summary
     """
-    asyncio.run(sync_command(pattern, path, provider, force, concurrency, dry_run, progress, summary))
+    if filter_pattern:
+        target_path = path or pattern or "."
+        asyncio.run(
+            sync_command(
+                filter_pattern,
+                target_path,
+                provider,
+                force,
+                concurrency,
+                dry_run,
+                progress,
+                summary,
+            )
+        )
+        return
+
+    if path is not None:
+        if pattern is None:
+            console.print("[red]Error:[/red] Pattern is required when a path is provided.")
+            raise typer.Exit(code=1)
+        asyncio.run(
+            sync_command(
+                pattern, path, provider, force, concurrency, dry_run, progress, summary
+            )
+        )
+        return
+
+    if pattern is None:
+        asyncio.run(sync_local_command(".", force, concurrency, dry_run, progress, summary))
+        return
+
+    candidate_path = Path(pattern).expanduser()
+    if candidate_path.exists():
+        asyncio.run(
+            sync_local_command(
+                str(candidate_path), force, concurrency, dry_run, progress, summary
+            )
+        )
+        return
+
+    asyncio.run(
+        sync_command(pattern, ".", provider, force, concurrency, dry_run, progress, summary)
+    )
 
 
 # The callback is no longer needed since we're using Typer's built-in help

@@ -7,8 +7,9 @@ the functionality of clone-all and pull-all into a single, intuitive command.
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import typer
 from rich.console import Console
@@ -25,14 +26,207 @@ from mgit.commands.bulk_operations import (
 from mgit.config.yaml_manager import get_global_setting, list_provider_names
 from mgit.exceptions import MgitError
 from mgit.git import GitManager
-from mgit.git.utils import build_repo_path
+from mgit.git.utils import build_repo_path, get_git_remote_url
+from mgit.providers import detect_provider_by_url
 from mgit.providers.manager import ProviderManager
 from mgit.providers.base import Repository
+from mgit.utils.async_executor import AsyncExecutor
+from mgit.utils.directory_scanner import find_repositories_in_directory
 from mgit.utils.pattern_matching import analyze_pattern
 from mgit.utils.multi_provider_resolver import MultiProviderResolver
 
 logger = logging.getLogger(__name__)
 console = Console()
+
+LOCAL_ACTION_PULL = "pull"
+LOCAL_ACTION_PULLED = "pulled"
+LOCAL_ACTION_SKIP_DIRTY = "skipped_dirty"
+LOCAL_ACTION_SKIP_NO_REMOTE = "skipped_no_remote"
+LOCAL_ACTION_FAILED = "failed"
+
+
+@dataclass
+class LocalRepoState:
+    path: Path
+    name: str
+    remote_url: Optional[str]
+    provider: str
+    is_dirty: bool
+    error: Optional[str] = None
+
+
+@dataclass
+class LocalRepoResult:
+    state: LocalRepoState
+    action: str
+    error: Optional[str] = None
+
+
+def _detect_local_provider(remote_url: Optional[str]) -> str:
+    if not remote_url:
+        return "unknown"
+    try:
+        return detect_provider_by_url(remote_url)
+    except Exception:
+        return "unknown"
+
+
+async def _run_git_command(repo_path: Path, args: List[str]) -> Tuple[int, str, str]:
+    process = await asyncio.create_subprocess_exec(
+        "git",
+        *args,
+        cwd=str(repo_path),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await process.communicate()
+    return (
+        process.returncode or 0,
+        stdout.decode("utf-8", errors="ignore"),
+        stderr.decode("utf-8", errors="ignore"),
+    )
+
+
+async def _inspect_local_repository(repo_path: Path) -> LocalRepoState:
+    remote_url = get_git_remote_url(repo_path)
+    provider = _detect_local_provider(remote_url)
+
+    try:
+        returncode, stdout, stderr = await _run_git_command(
+            repo_path, ["status", "--porcelain"]
+        )
+        if returncode != 0:
+            error_msg = stderr.strip() or stdout.strip() or "git status failed"
+            return LocalRepoState(
+                path=repo_path,
+                name=repo_path.name,
+                remote_url=remote_url,
+                provider=provider,
+                is_dirty=True,
+                error=error_msg,
+            )
+        return LocalRepoState(
+            path=repo_path,
+            name=repo_path.name,
+            remote_url=remote_url,
+            provider=provider,
+            is_dirty=bool(stdout.strip()),
+        )
+    except Exception as exc:
+        return LocalRepoState(
+            path=repo_path,
+            name=repo_path.name,
+            remote_url=remote_url,
+            provider=provider,
+            is_dirty=True,
+            error=str(exc),
+        )
+
+
+def _determine_local_action(state: LocalRepoState, force: bool) -> str:
+    if state.error:
+        return LOCAL_ACTION_FAILED
+    if not state.remote_url:
+        return LOCAL_ACTION_SKIP_NO_REMOTE
+    if state.is_dirty and not force:
+        return LOCAL_ACTION_SKIP_DIRTY
+    return LOCAL_ACTION_PULL
+
+
+def _summarize_local_results(results: List[LocalRepoResult]) -> Dict[str, int]:
+    counts = {
+        "total": len(results),
+        "pulled": 0,
+        "skipped_dirty": 0,
+        "skipped_no_remote": 0,
+        "failed": 0,
+    }
+    for result in results:
+        if result.action in {LOCAL_ACTION_PULL, LOCAL_ACTION_PULLED}:
+            counts["pulled"] += 1
+        elif result.action == LOCAL_ACTION_SKIP_DIRTY:
+            counts["skipped_dirty"] += 1
+        elif result.action == LOCAL_ACTION_SKIP_NO_REMOTE:
+            counts["skipped_no_remote"] += 1
+        else:
+            counts["failed"] += 1
+    return counts
+
+
+def _format_repo_display(root_path: Path, repo_path: Path) -> str:
+    try:
+        return str(repo_path.relative_to(root_path))
+    except ValueError:
+        return str(repo_path)
+
+
+def _render_local_plan(
+    root_path: Path, results: List[LocalRepoResult], force: bool
+) -> None:
+    table = Table(title="Local Sync Plan")
+    table.add_column("Repository", style="cyan", overflow="fold")
+    table.add_column("Provider", style="magenta")
+    table.add_column("Action", style="green")
+    table.add_column("Notes", style="dim")
+
+    for result in results:
+        state = result.state
+        action_label = "Pull"
+        notes = ""
+        if result.action == LOCAL_ACTION_SKIP_DIRTY:
+            action_label = "Skip"
+            notes = "Dirty"
+        elif result.action == LOCAL_ACTION_SKIP_NO_REMOTE:
+            action_label = "Skip"
+            notes = "No remote"
+        elif result.action == LOCAL_ACTION_FAILED:
+            action_label = "Error"
+            notes = result.error or state.error or "Unknown error"
+        elif force:
+            notes = "Force clean"
+
+        table.add_row(
+            _format_repo_display(root_path, state.path),
+            state.provider,
+            action_label,
+            notes,
+        )
+
+    console.print(table)
+
+
+def _render_local_summary(results: List[LocalRepoResult], dry_run: bool) -> None:
+    counts = _summarize_local_results(results)
+    table = Table(title="Local Sync Summary")
+    table.add_column("Result", style="bold")
+    table.add_column("Count", justify="right", style="green")
+
+    table.add_row("Total", str(counts["total"]))
+    table.add_row("Pull" if dry_run else "Pulled", str(counts["pulled"]))
+    table.add_row("Skipped (dirty)", str(counts["skipped_dirty"]))
+    table.add_row("Skipped (no remote)", str(counts["skipped_no_remote"]))
+    table.add_row("Failed", str(counts["failed"]))
+
+    console.print(table)
+
+
+def _render_local_failures(results: List[LocalRepoResult], root_path: Path) -> None:
+    failures = [result for result in results if result.action == LOCAL_ACTION_FAILED]
+    if not failures:
+        return
+
+    table = Table(title="Local Sync Failures")
+    table.add_column("Repository", style="red", overflow="fold")
+    table.add_column("Error", style="yellow", overflow="fold")
+
+    for result in failures:
+        error_msg = result.error or result.state.error or "Unknown error"
+        table.add_row(
+            _format_repo_display(root_path, result.state.path),
+            error_msg,
+        )
+
+    console.print(table)
 
 async def resolve_repositories_for_sync(
     pattern: str,
@@ -222,6 +416,157 @@ async def show_sync_preview(repositories: List[Repository], target_path: Path, f
         summary_table.add_row("Skip", str(skip_count))
 
         console.print(summary_table)
+
+
+async def _sync_local_repository(
+    state: LocalRepoState, force: bool
+) -> LocalRepoResult:
+    action = _determine_local_action(state, force)
+    if action != LOCAL_ACTION_PULL:
+        return LocalRepoResult(state=state, action=action, error=state.error)
+
+    if force:
+        returncode, stdout, stderr = await _run_git_command(
+            state.path, ["reset", "--hard"]
+        )
+        if returncode != 0:
+            error_msg = stderr.strip() or stdout.strip() or "git reset --hard failed"
+            return LocalRepoResult(
+                state=state, action=LOCAL_ACTION_FAILED, error=error_msg
+            )
+        returncode, stdout, stderr = await _run_git_command(
+            state.path, ["clean", "-fd"]
+        )
+        if returncode != 0:
+            error_msg = stderr.strip() or stdout.strip() or "git clean -fd failed"
+            return LocalRepoResult(
+                state=state, action=LOCAL_ACTION_FAILED, error=error_msg
+            )
+
+    returncode, stdout, stderr = await _run_git_command(state.path, ["pull"])
+    if returncode != 0:
+        error_msg = stderr.strip() or stdout.strip() or "git pull failed"
+        return LocalRepoResult(state=state, action=LOCAL_ACTION_FAILED, error=error_msg)
+
+    return LocalRepoResult(state=state, action=LOCAL_ACTION_PULLED)
+
+
+async def sync_local_command(
+    root: str = ".",
+    force: bool = False,
+    concurrency: Optional[int] = None,
+    dry_run: bool = False,
+    progress: bool = True,
+    summary: bool = True,
+) -> None:
+    """
+    Synchronize repositories in a local directory tree by running git pull.
+    """
+    default_concurrency = int(get_global_setting("default_concurrency") or 4)
+    if concurrency is None:
+        concurrency = default_concurrency
+
+    root_path = Path(root).expanduser().resolve()
+    if not root_path.exists() or not root_path.is_dir():
+        console.print(
+            f"[red]Error:[/red] Local path '{root_path}' does not exist or is not a directory."
+        )
+        raise typer.Exit(code=1)
+
+    repo_paths = sorted(find_repositories_in_directory(root_path, recursive=True))
+    if not repo_paths:
+        console.print(
+            f"[yellow]No git repositories found under {root_path}[/yellow]"
+        )
+        return
+
+    console.print(f"[blue]Local sync scan:[/blue] {root_path}")
+
+    executor = AsyncExecutor(concurrency=concurrency, rich_console=console)
+
+    async def inspect_repo(repo_path: Path) -> LocalRepoState:
+        return await _inspect_local_repository(repo_path)
+
+    repo_states, errors = await executor.run_batch(
+        items=repo_paths,
+        process_func=inspect_repo,
+        task_description="Scanning local repositories...",
+        show_progress=False,
+    )
+
+    for repo_path, error in errors:
+        repo_states.append(
+            LocalRepoState(
+                path=repo_path,
+                name=repo_path.name,
+                remote_url=None,
+                provider="unknown",
+                is_dirty=True,
+                error=str(error),
+            )
+        )
+
+    planned_results = [
+        LocalRepoResult(
+            state=state,
+            action=_determine_local_action(state, force),
+            error=state.error,
+        )
+        for state in repo_states
+    ]
+
+    if dry_run:
+        _render_local_plan(root_path, planned_results, force)
+        _render_local_summary(planned_results, dry_run=True)
+        return
+
+    if force:
+        force_targets = [
+            result for result in planned_results if result.action == LOCAL_ACTION_PULL
+        ]
+        if force_targets:
+            confirmed = Confirm.ask(
+                "[red]WARNING:[/red] Force mode will reset and clean "
+                f"{len(force_targets)} repositories before pulling. Continue?"
+            )
+            if not confirmed:
+                console.print("Sync cancelled.")
+                return
+
+    async def process_repo(state: LocalRepoState) -> LocalRepoResult:
+        return await _sync_local_repository(state, force)
+
+    results, errors = await executor.run_batch(
+        items=repo_states,
+        process_func=process_repo,
+        task_description="Pulling local repositories...",
+        item_description=lambda state: _format_repo_display(root_path, state.path),
+        show_progress=progress,
+    )
+
+    for repo_path, error in errors:
+        results.append(
+            LocalRepoResult(
+                state=LocalRepoState(
+                    path=repo_path,
+                    name=repo_path.name,
+                    remote_url=None,
+                    provider="unknown",
+                    is_dirty=True,
+                    error=str(error),
+                ),
+                action=LOCAL_ACTION_FAILED,
+                error=str(error),
+            )
+        )
+
+    if summary:
+        _render_local_summary(results, dry_run=False)
+
+    _render_local_failures(results, root_path)
+
+    if any(result.action == LOCAL_ACTION_FAILED for result in results):
+        raise typer.Exit(code=1)
 
 async def sync_command(
     pattern: str = typer.Argument(..., help="Repository pattern (org/project/repo)"),

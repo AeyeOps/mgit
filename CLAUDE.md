@@ -13,6 +13,13 @@ uv sync
 uv run mgit --help
 uv run mgit --version
 
+# Local sync (walk current directory or a path)
+mgit sync
+mgit sync ./workspace
+
+# Remote sync (explicit pattern)
+mgit sync --filter "myorg/*/*" ./repos
+
 # Run tests
 uv run python scripts/make_test.py                    # All tests
 uv run python scripts/make_test.py tests/unit/ -v     # Unit tests only
@@ -41,6 +48,11 @@ uv run python scripts/make_build.py --target all
 
 # Clean build artifacts
 uv run python scripts/make_clean.py
+
+# Test standalone binary (uses /opt/bin/mgit)
+uv run python scripts/test_binary.py
+uv run python scripts/test_binary.py --verbose
+uv run python scripts/test_binary.py --binary /path/to/mgit
 ```
 
 ### Version Management
