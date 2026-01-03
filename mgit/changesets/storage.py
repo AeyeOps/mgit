@@ -6,19 +6,20 @@ proper error handling, atomic operations, and data integrity validation.
 """
 
 import logging
-import yaml
 import shutil
-from pathlib import Path
-from typing import Dict, List, Optional, Any
-from datetime import datetime
-from dataclasses import asdict, fields
 from contextlib import contextmanager
+from dataclasses import asdict
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import yaml
 
 from mgit.changesets.models import (
     ChangesetCollection,
-    RepositoryChangeset,
-    FileChange,
     CommitInfo,
+    FileChange,
+    RepositoryChangeset,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,7 @@ class ChangesetStorage:
         logger.debug(f"Changeset storage initialized at: {self.storage_dir}")
 
     def save_changeset_collection(
-        self, collection: ChangesetCollection, collection_name: Optional[str] = None
+        self, collection: ChangesetCollection, collection_name: str | None = None
     ) -> Path:
         """
         Save a changeset collection to YAML file with atomic operation.
@@ -133,7 +134,7 @@ class ChangesetStorage:
 
     def load_changeset_collection(
         self, collection_name: str
-    ) -> Optional[ChangesetCollection]:
+    ) -> ChangesetCollection | None:
         """
         Load a changeset collection from YAML file.
 
@@ -174,7 +175,7 @@ class ChangesetStorage:
             logger.error(f"Failed to load changeset collection {collection_name}: {e}")
             raise ChangesetStorageError(f"Load operation failed: {e}") from e
 
-    def list_changeset_collections(self) -> List[str]:
+    def list_changeset_collections(self) -> list[str]:
         """
         List available changeset collection names.
 
@@ -226,7 +227,7 @@ class ChangesetStorage:
             )
             raise ChangesetStorageError(f"Delete operation failed: {e}") from e
 
-    def get_collection_metadata(self, collection_name: str) -> Optional[Dict[str, Any]]:
+    def get_collection_metadata(self, collection_name: str) -> dict[str, Any] | None:
         """
         Get metadata for a collection without loading full data.
 
@@ -294,7 +295,7 @@ class ChangesetStorage:
             logger.error(f"Atomic update failed for {collection_name}: {e}")
             raise
 
-    def _collection_to_dict(self, collection: ChangesetCollection) -> Dict[str, Any]:
+    def _collection_to_dict(self, collection: ChangesetCollection) -> dict[str, Any]:
         """Convert ChangesetCollection to dictionary for YAML serialization."""
         collection_dict = asdict(collection)
 
@@ -306,7 +307,7 @@ class ChangesetStorage:
         collection_dict["repositories"] = repositories_dict
         return collection_dict
 
-    def _dict_to_collection(self, data: Dict[str, Any]) -> ChangesetCollection:
+    def _dict_to_collection(self, data: dict[str, Any]) -> ChangesetCollection:
         """Convert dictionary from YAML to ChangesetCollection."""
         repositories = {}
 
@@ -397,7 +398,7 @@ class ChangesetStorage:
 def save_repository_changeset(
     changeset: RepositoryChangeset,
     collection_name: str = "default",
-    storage_dir: Optional[Path] = None,
+    storage_dir: Path | None = None,
 ) -> None:
     """
     Convenience function to save a single repository changeset.
@@ -416,8 +417,8 @@ def save_repository_changeset(
 def load_repository_changeset(
     repository_path: str,
     collection_name: str = "default",
-    storage_dir: Optional[Path] = None,
-) -> Optional[RepositoryChangeset]:
+    storage_dir: Path | None = None,
+) -> RepositoryChangeset | None:
     """
     Convenience function to load a single repository changeset.
 

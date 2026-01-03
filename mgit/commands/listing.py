@@ -5,7 +5,6 @@ Provides repository discovery across providers using query patterns.
 
 import asyncio
 import logging
-from typing import List, Optional
 
 from rich.console import Console
 from rich.progress import (
@@ -33,7 +32,7 @@ class RepositoryResult:
     """Container for repository search results."""
 
     def __init__(
-        self, repo: Repository, org_name: str, project_name: Optional[str] = None
+        self, repo: Repository, org_name: str, project_name: str | None = None
     ):
         self.repo = repo
         self.org_name = org_name
@@ -51,10 +50,10 @@ class RepositoryResult:
 async def _process_single_provider(
     provider_name: str,
     query: str,
-    limit: Optional[int] = None,
-    progress: Optional[Progress] = None,
-    provider_task_id: Optional[int] = None,
-) -> List[RepositoryResult]:
+    limit: int | None = None,
+    progress: Progress | None = None,
+    provider_task_id: int | None = None,
+) -> list[RepositoryResult]:
     """Process a single provider for repository discovery.
 
     Args:
@@ -202,10 +201,10 @@ async def _process_single_provider(
 
 async def list_repositories(
     query: str,
-    provider_name: Optional[str] = None,
+    provider_name: str | None = None,
     format_type: str = "table",
-    limit: Optional[int] = None,
-) -> List[RepositoryResult]:
+    limit: int | None = None,
+) -> list[RepositoryResult]:
     """List repositories matching query pattern.
 
     Args:
@@ -298,7 +297,7 @@ async def list_repositories(
 
                 async def process_provider(
                     provider_name_item: str,
-                ) -> List[RepositoryResult]:
+                ) -> list[RepositoryResult]:
                     """Process a single provider and return its results."""
                     async with sem:
                         # Add provider-specific task
@@ -363,7 +362,7 @@ async def list_repositories(
             # JSON mode: no progress output
             async def process_provider(
                 provider_name_item: str,
-            ) -> List[RepositoryResult]:
+            ) -> list[RepositoryResult]:
                 async with sem:
                     try:
                         return await _process_single_provider(
@@ -449,14 +448,14 @@ async def list_repositories(
             ) as progress:
                 # Overall discovery task
                 overall_task = progress.add_task(
-                    f"Discovering repositories...",
+                    "Discovering repositories...",
                     total=len(matching_providers),
                     repos_found=0,
                 )
 
                 async def process_provider(
                     provider_name_item: str,
-                ) -> List[RepositoryResult]:
+                ) -> list[RepositoryResult]:
                     """Process the provider and return its results."""
                     async with sem:
                         # Add provider-specific task
@@ -526,7 +525,7 @@ async def list_repositories(
             # JSON mode: no progress output
             async def process_provider(
                 provider_name_item: str,
-            ) -> List[RepositoryResult]:
+            ) -> list[RepositoryResult]:
                 async with sem:
                     try:
                         return await _process_single_provider(
@@ -565,7 +564,8 @@ async def list_repositories(
         # For single provider, skip deduplication since there's only one provider
         return all_results
 
-def format_results(results: List[RepositoryResult], format_type: str = "table") -> None:
+
+def format_results(results: list[RepositoryResult], format_type: str = "table") -> None:
     """Format and display repository results.
 
     Args:

@@ -7,7 +7,7 @@ security event tracking.
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from .credentials import CredentialMasker, mask_sensitive_data
 
@@ -98,8 +98,8 @@ class SecurityLogger:
         self,
         method: str,
         url: str,
-        status_code: Optional[int] = None,
-        response_time: Optional[float] = None,
+        status_code: int | None = None,
+        response_time: float | None = None,
     ):
         """Log API call with masked URL.
 
@@ -176,7 +176,7 @@ def get_security_logger(name: str) -> SecurityLogger:
 
 
 def setup_secure_logging(
-    log_file: Optional[Union[str, Path]] = None,
+    log_file: str | Path | None = None,
     log_level: str = "INFO",
     console_level: str = "INFO",
 ) -> None:
@@ -293,7 +293,7 @@ def log_validation_failure(
 
 
 def log_suspicious_activity(
-    logger: logging.Logger, activity: str, details: Dict[str, Any]
+    logger: logging.Logger, activity: str, details: dict[str, Any]
 ):
     """Log suspicious activity.
 

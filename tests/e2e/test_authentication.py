@@ -4,8 +4,10 @@ These tests run actual CLI commands using real APIs and credentials.
 They are marked with @pytest.mark.e2e and skipped by default.
 """
 
-import pytest
 import subprocess
+
+import pytest
+
 from mgit.config.yaml_manager import list_provider_names
 
 
@@ -38,15 +40,15 @@ def test_cli_authentication():
             )
 
             if result.returncode == 0:
-                print(f"  ✅ CLI Authentication successful")
+                print("  ✅ CLI Authentication successful")
                 results[provider_name] = True
             else:
-                print(f"  ❌ CLI Authentication failed")
+                print("  ❌ CLI Authentication failed")
                 print(f"  Error output: {result.stderr}")
                 results[provider_name] = False
 
         except subprocess.TimeoutExpired:
-            print(f"  ❌ CLI Authentication timed out")
+            print("  ❌ CLI Authentication timed out")
             results[provider_name] = False
         except Exception as e:
             print(f"  ❌ Error: {type(e).__name__}: {e}")
@@ -56,7 +58,7 @@ def test_cli_authentication():
     passed = sum(1 for result in results.values() if result)
     total = len(results)
 
-    print(f"\n=== CLI Authentication Test Summary ===")
+    print("\n=== CLI Authentication Test Summary ===")
     print(f"Total providers tested: {total}")
     print(f"Authentication successful: {passed}")
     print(f"Authentication failed: {total - passed}")

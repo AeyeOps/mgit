@@ -8,7 +8,7 @@ and malformed input handling.
 import logging
 import re
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ class SecurityValidator:
             re.compile(pattern) for pattern in self.DANGEROUS_PATH_PATTERNS
         ]
 
-    def validate_url(self, url: str, schemes: Optional[List[str]] = None) -> bool:
+    def validate_url(self, url: str, schemes: list[str] | None = None) -> bool:
         """Validate URL format and scheme.
 
         Args:
@@ -103,7 +103,7 @@ class SecurityValidator:
             logger.warning(f"URL validation error: {e}")
             return False
 
-    def validate_path(self, path: Union[str, Path], must_exist: bool = False) -> bool:
+    def validate_path(self, path: str | Path, must_exist: bool = False) -> bool:
         """Validate file system path.
 
         Args:
@@ -404,7 +404,7 @@ def validate_input(value: Any, input_type: str = "string", **kwargs) -> bool:
         return value is not None and isinstance(value, str) and len(str(value)) > 0
 
 
-def sanitize_path(path: Union[str, Path]) -> str:
+def sanitize_path(path: str | Path) -> str:
     """Sanitize file system path."""
     return _validator.sanitize_path(str(path))
 
@@ -419,9 +419,7 @@ def sanitize_repository_name(name: str) -> str:
     return _validator.sanitize_repository_name(name)
 
 
-def is_safe_path(
-    path: Union[str, Path], base_path: Optional[Union[str, Path]] = None
-) -> bool:
+def is_safe_path(path: str | Path, base_path: str | Path | None = None) -> bool:
     """Check if path is safe and within allowed boundaries.
 
     Args:

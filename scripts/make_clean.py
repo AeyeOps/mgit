@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """Remove build artifacts."""
+
 import shutil
 from pathlib import Path
 
-DIRS_TO_REMOVE = ["build", "dist", ".pytest_cache", ".ruff_cache", "htmlcov", ".coverage"]
+DIRS_TO_REMOVE = [
+    "build",
+    "dist",
+    ".pytest_cache",
+    ".ruff_cache",
+    "htmlcov",
+    ".coverage",
+]
 PATTERNS_TO_REMOVE = ["*.egg-info"]
 
 if __name__ == "__main__":

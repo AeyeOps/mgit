@@ -5,11 +5,10 @@ Provides structured data models for storing repository change information
 with proper serialization support and data integrity validation.
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Any
-from datetime import datetime
-from pathlib import Path
 import hashlib
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 # Forward reference for EmbeddedContent (imported at end to avoid circular imports)
 EmbeddedContent = Any
@@ -23,9 +22,9 @@ class FileChange:
     change_type: str  # added, modified, deleted, renamed, untracked
     index_status: str
     worktree_status: str
-    size_bytes: Optional[int] = None
-    content_hash: Optional[str] = None  # SHA-256 of file content
-    embedded_content: Optional[EmbeddedContent] = None  # Smart content embedding
+    size_bytes: int | None = None
+    content_hash: str | None = None  # SHA-256 of file content
+    embedded_content: EmbeddedContent | None = None  # Smart content embedding
 
     def __post_init__(self):
         """Validate change type after initialization."""
@@ -50,7 +49,7 @@ class FileChange:
         )
 
     @property
-    def content_strategy(self) -> Optional[str]:
+    def content_strategy(self) -> str | None:
         """Get the content embedding strategy used."""
         return self.embedded_content.strategy.value if self.embedded_content else None
 
@@ -79,13 +78,13 @@ class RepositoryChangeset:
     repository_name: str
     timestamp: str
     has_uncommitted_changes: bool
-    current_branch: Optional[str]
+    current_branch: str | None
     git_status: str  # clean, dirty, error
-    uncommitted_files: List[FileChange] = field(default_factory=list)
-    recent_commits: List[CommitInfo] = field(default_factory=list)
-    error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    content_embedding_stats: Optional[Dict[str, Any]] = (
+    uncommitted_files: list[FileChange] = field(default_factory=list)
+    recent_commits: list[CommitInfo] = field(default_factory=list)
+    error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    content_embedding_stats: dict[str, Any] | None = (
         None  # Content embedding statistics
     )
 
@@ -100,7 +99,7 @@ class RepositoryChangeset:
         return self.git_status == "clean" and not self.has_uncommitted_changes
 
     @property
-    def change_summary(self) -> Dict[str, int]:
+    def change_summary(self) -> dict[str, int]:
         """Generate summary of changes by type."""
         summary = {}
         for file_change in self.uncommitted_files:
@@ -114,7 +113,7 @@ class RepositoryChangeset:
         return sum(1 for f in self.uncommitted_files if f.has_content)
 
     @property
-    def content_strategies_used(self) -> Dict[str, int]:
+    def content_strategies_used(self) -> dict[str, int]:
         """Get count of content strategies used."""
         strategies = {}
         for file_change in self.uncommitted_files:
@@ -144,15 +143,15 @@ class ChangesetCollection:
     name: str
     created_at: str
     updated_at: str
-    repositories: Dict[str, RepositoryChangeset] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    repositories: dict[str, RepositoryChangeset] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def add_repository(self, changeset: RepositoryChangeset) -> None:
         """Add or update a repository changeset."""
         self.repositories[changeset.repository_key] = changeset
         self.updated_at = datetime.now().isoformat()
 
-    def get_repository(self, repo_path: str) -> Optional[RepositoryChangeset]:
+    def get_repository(self, repo_path: str) -> RepositoryChangeset | None:
         """Get changeset for a specific repository path."""
         repo_key = hashlib.sha256(repo_path.encode("utf-8")).hexdigest()[:16]
         return self.repositories.get(repo_key)

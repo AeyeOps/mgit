@@ -5,7 +5,6 @@ the main mgit exception hierarchy.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from mgit.exceptions import (
     AuthenticationError as BaseAuthenticationError,
@@ -33,9 +32,7 @@ from mgit.exceptions import (
 class RateLimitError(BaseProviderError):
     """Rate limit exceeded."""
 
-    def __init__(
-        self, message: str, provider: str, reset_time: Optional[datetime] = None
-    ):
+    def __init__(self, message: str, provider: str, reset_time: datetime | None = None):
         """Initialize rate limit error.
 
         Args:
@@ -80,7 +77,7 @@ class RepositoryNotFoundError(BaseProviderError):
 class PermissionError(BaseProviderError):
     """Insufficient permissions."""
 
-    def __init__(self, message: str, provider: str, resource: Optional[str] = None):
+    def __init__(self, message: str, provider: str, resource: str | None = None):
         """Initialize permission error.
 
         Args:
@@ -96,7 +93,7 @@ class PermissionError(BaseProviderError):
 class APIError(BaseProviderError):
     """Generic API error from provider."""
 
-    def __init__(self, message: str, provider: str, status_code: Optional[int] = None):
+    def __init__(self, message: str, provider: str, status_code: int | None = None):
         """Initialize API error.
 
         Args:

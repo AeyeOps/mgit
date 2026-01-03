@@ -4,13 +4,13 @@ These tests run actual CLI commands to test configuration management.
 They are marked with @pytest.mark.e2e and skipped by default.
 """
 
-import pytest
-import subprocess
 import re
-from typing import Dict, List, Optional
+import subprocess
+
+import pytest
 
 
-def run_mgit_command(args: List[str]) -> tuple[int, str, str]:
+def run_mgit_command(args: list[str]) -> tuple[int, str, str]:
     """Run mgit CLI command and return exit code, stdout, stderr."""
     result = subprocess.run(
         ["poetry", "run", "mgit"] + args, capture_output=True, text=True, timeout=30
@@ -18,7 +18,7 @@ def run_mgit_command(args: List[str]) -> tuple[int, str, str]:
     return result.returncode, result.stdout, result.stderr
 
 
-def get_provider_list() -> Dict[str, str]:
+def get_provider_list() -> dict[str, str]:
     """Get all providers and their types from CLI."""
     code, stdout, stderr = run_mgit_command(["config", "--list"])
     if code != 0:
@@ -35,7 +35,7 @@ def get_provider_list() -> Dict[str, str]:
     return providers
 
 
-def get_current_default() -> Optional[str]:
+def get_current_default() -> str | None:
     """Get current default provider from CLI."""
     code, stdout, stderr = run_mgit_command(["config", "--global"])
     if code != 0:
@@ -49,7 +49,7 @@ def get_current_default() -> Optional[str]:
     return None
 
 
-def get_provider_with_default_marker() -> Optional[str]:
+def get_provider_with_default_marker() -> str | None:
     """Get which provider shows (default) marker in list."""
     code, stdout, stderr = run_mgit_command(["config", "--list"])
     if code != 0:
@@ -96,7 +96,7 @@ def test_cli_config_default_provider():
     # Select one representative from each type
     test_providers = [providers[0] for providers in providers_by_type.values()]
 
-    print(f"\nTesting default provider functionality")
+    print("\nTesting default provider functionality")
     print(f"Available types: {list(providers_by_type.keys())}")
     print(f"Testing with representatives: {test_providers}")
 
@@ -118,16 +118,16 @@ def test_cli_config_default_provider():
 
             # Verify in --global
             current_default = get_current_default()
-            assert (
-                current_default == provider_name
-            ), f"Global config shows {current_default}, expected {provider_name}"
+            assert current_default == provider_name, (
+                f"Global config shows {current_default}, expected {provider_name}"
+            )
             print(f"✅ Global config shows correct default: {current_default}")
 
             # Verify in --list (correct provider has marker)
             marked_provider = get_provider_with_default_marker()
-            assert (
-                marked_provider == provider_name
-            ), f"List shows {marked_provider} with (default), expected {provider_name}"
+            assert marked_provider == provider_name, (
+                f"List shows {marked_provider} with (default), expected {provider_name}"
+            )
             print(
                 f"✅ List shows (default) marker on correct provider: {marked_provider}"
             )
@@ -137,10 +137,10 @@ def test_cli_config_default_provider():
             assert code == 0, f"Failed to get provider list: {stderr}"
 
             default_count = stdout.count("(default)")
-            assert (
-                default_count == 1
-            ), f"Found {default_count} (default) markers, expected exactly 1"
-            print(f"✅ Exactly one provider shows (default) marker")
+            assert default_count == 1, (
+                f"Found {default_count} (default) markers, expected exactly 1"
+            )
+            print("✅ Exactly one provider shows (default) marker")
 
         print(
             f"\n=== All {len(test_providers)} provider types passed default tests ==="
@@ -167,4 +167,4 @@ def test_cli_config_default_provider():
                         f"⚠️  Restoration mismatch: got {restored_default}, expected {original_default}"
                     )
         else:
-            print(f"\nNo original default to restore")
+            print("\nNo original default to restore")

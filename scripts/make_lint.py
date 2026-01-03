@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run ruff linter with optional arguments."""
+
 import subprocess
 import sys
 

@@ -4,7 +4,7 @@ This module implements the factory pattern for creating provider instances
 based on provider type and configuration.
 """
 
-from typing import Any, Dict, List, Type
+from typing import Any
 
 from .base import GitProvider
 
@@ -12,10 +12,10 @@ from .base import GitProvider
 class ProviderFactory:
     """Factory for creating provider instances."""
 
-    _providers: Dict[str, Type[GitProvider]] = {}
+    _providers: dict[str, type[GitProvider]] = {}
 
     @classmethod
-    def register_provider(cls, name: str, provider_class: Type[GitProvider]) -> None:
+    def register_provider(cls, name: str, provider_class: type[GitProvider]) -> None:
         """Register a new provider type.
 
         Args:
@@ -25,7 +25,7 @@ class ProviderFactory:
         cls._providers[name.lower()] = provider_class
 
     @classmethod
-    def create_provider(cls, provider_type: str, config: Dict[str, Any]) -> GitProvider:
+    def create_provider(cls, provider_type: str, config: dict[str, Any]) -> GitProvider:
         """Create a provider instance.
 
         Args:
@@ -48,7 +48,7 @@ class ProviderFactory:
         return provider_class(config)
 
     @classmethod
-    def list_providers(cls) -> List[str]:
+    def list_providers(cls) -> list[str]:
         """List available provider types.
 
         Returns:

@@ -5,7 +5,8 @@ GitProvider base class to support Azure DevOps repositories.
 """
 
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional
+from collections.abc import AsyncIterator
+from typing import Any
 from urllib.parse import urlparse
 
 from azure.devops.connection import Connection
@@ -33,7 +34,7 @@ class AzureDevOpsProvider(GitProvider):
     SUPPORTED_AUTH_METHODS = [AuthMethod.PAT]
     DEFAULT_API_VERSION = "7.1"
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """Initialize Azure DevOps provider.
 
         Args:
@@ -61,9 +62,9 @@ class AzureDevOpsProvider(GitProvider):
             self.url = f"https://{self.url}"
 
         # Azure DevOps SDK clients
-        self.connection: Optional[Connection] = None
-        self.core_client: Optional[CoreClient] = None
-        self.git_client: Optional[GitClient] = None
+        self.connection: Connection | None = None
+        self.core_client: CoreClient | None = None
+        self.git_client: GitClient | None = None
 
         # Now call super() which will validate the config
         super().__init__(config)
@@ -139,7 +140,7 @@ class AzureDevOpsProvider(GitProvider):
             self._authenticated = False
             return False
 
-    async def list_organizations(self) -> List[Organization]:
+    async def list_organizations(self) -> list[Organization]:
         """List all accessible organizations.
 
         For Azure DevOps, this returns the current organization only,
@@ -166,7 +167,7 @@ class AzureDevOpsProvider(GitProvider):
             )
         ]
 
-    async def list_projects(self, organization: str) -> List[Project]:
+    async def list_projects(self, organization: str) -> list[Project]:
         """List all projects in the organization.
 
         Args:
@@ -217,8 +218,8 @@ class AzureDevOpsProvider(GitProvider):
     async def list_repositories(
         self,
         organization: str,
-        project: Optional[str] = None,
-        filters: Optional[Dict[str, Any]] = None,
+        project: str | None = None,
+        filters: dict[str, Any] | None = None,
     ) -> AsyncIterator[Repository]:
         """List repositories with optional filtering.
 
@@ -249,7 +250,7 @@ class AzureDevOpsProvider(GitProvider):
                 return
 
             # List repositories in the project
-            repos: List[GitRepository] = self.git_client.get_repositories(
+            repos: list[GitRepository] = self.git_client.get_repositories(
                 project=project_details.id
             )
 
@@ -258,6 +259,8 @@ class AzureDevOpsProvider(GitProvider):
                 repository = Repository(
                     name=repo.name,
                     clone_url=repo.remote_url,
+                    organization=organization,
+                    project=project,
                     ssh_url=repo.ssh_url,
                     is_disabled=repo.is_disabled,
                     is_private=True,  # Azure DevOps repos are typically private
@@ -280,8 +283,8 @@ class AzureDevOpsProvider(GitProvider):
             logger.error("Error listing repositories: %s", e)
 
     async def get_repository(
-        self, organization: str, repository: str, project: Optional[str] = None
-    ) -> Optional[Repository]:
+        self, organization: str, repository: str, project: str | None = None
+    ) -> Repository | None:
         """Get a specific repository.
 
         Args:
@@ -319,6 +322,8 @@ class AzureDevOpsProvider(GitProvider):
                 return Repository(
                     name=repo.name,
                     clone_url=repo.remote_url,
+                    organization=organization,
+                    project=project,
                     ssh_url=repo.ssh_url,
                     is_disabled=repo.is_disabled,
                     is_private=True,
@@ -354,7 +359,7 @@ class AzureDevOpsProvider(GitProvider):
 
     async def _get_project(
         self, project_name_or_id: str
-    ) -> Optional[TeamProjectReference]:
+    ) -> TeamProjectReference | None:
         """Get project details by name or ID.
 
         Args:

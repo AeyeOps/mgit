@@ -9,32 +9,37 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import typer
 from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from rich.prompt import Confirm
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
 from rich.table import Table
-from rich.panel import Panel
 
 from mgit.commands.bulk_operations import (
     BulkOperationProcessor,
     OperationType,
+    UpdateMode,
     check_force_mode_confirmation,
 )
 from mgit.config.yaml_manager import get_global_setting, list_provider_names
-from mgit.exceptions import MgitError
 from mgit.git import GitManager
 from mgit.git.utils import build_repo_path, get_git_remote_url
 from mgit.providers import detect_provider_by_url
-from mgit.providers.manager import ProviderManager
-from mgit.providers.exceptions import RepositoryNotFoundError
 from mgit.providers.base import Repository
+from mgit.providers.exceptions import RepositoryNotFoundError
+from mgit.providers.manager import ProviderManager
 from mgit.utils.async_executor import AsyncExecutor
 from mgit.utils.directory_scanner import find_repositories_in_directory
-from mgit.utils.pattern_matching import analyze_pattern
 from mgit.utils.multi_provider_resolver import MultiProviderResolver
+from mgit.utils.pattern_matching import analyze_pattern
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -50,20 +55,20 @@ LOCAL_ACTION_FAILED = "failed"
 class LocalRepoState:
     path: Path
     name: str
-    remote_url: Optional[str]
+    remote_url: str | None
     provider: str
     is_dirty: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
 class LocalRepoResult:
     state: LocalRepoState
     action: str
-    error: Optional[str] = None
+    error: str | None = None
 
 
-def _detect_local_provider(remote_url: Optional[str]) -> str:
+def _detect_local_provider(remote_url: str | None) -> str:
     if not remote_url:
         return "unknown"
     try:
@@ -72,7 +77,7 @@ def _detect_local_provider(remote_url: Optional[str]) -> str:
         return "unknown"
 
 
-async def _run_git_command(repo_path: Path, args: List[str]) -> Tuple[int, str, str]:
+async def _run_git_command(repo_path: Path, args: list[str]) -> tuple[int, str, str]:
     process = await asyncio.create_subprocess_exec(
         "git",
         *args,
@@ -134,7 +139,7 @@ def _determine_local_action(state: LocalRepoState, force: bool) -> str:
     return LOCAL_ACTION_PULL
 
 
-def _summarize_local_results(results: List[LocalRepoResult]) -> Dict[str, int]:
+def _summarize_local_results(results: list[LocalRepoResult]) -> dict[str, int]:
     counts = {
         "total": len(results),
         "pulled": 0,
@@ -162,7 +167,7 @@ def _format_repo_display(root_path: Path, repo_path: Path) -> str:
 
 
 def _render_local_plan(
-    root_path: Path, results: List[LocalRepoResult], force: bool
+    root_path: Path, results: list[LocalRepoResult], force: bool
 ) -> None:
     table = Table(title="Local Sync Plan")
     table.add_column("Repository", style="cyan", overflow="fold")
@@ -196,7 +201,7 @@ def _render_local_plan(
     console.print(table)
 
 
-def _render_local_summary(results: List[LocalRepoResult], dry_run: bool) -> None:
+def _render_local_summary(results: list[LocalRepoResult], dry_run: bool) -> None:
     counts = _summarize_local_results(results)
     table = Table(title="Local Sync Summary")
     table.add_column("Result", style="bold")
@@ -211,7 +216,7 @@ def _render_local_summary(results: List[LocalRepoResult], dry_run: bool) -> None
     console.print(table)
 
 
-def _render_local_failures(results: List[LocalRepoResult], root_path: Path) -> None:
+def _render_local_failures(results: list[LocalRepoResult], root_path: Path) -> None:
     failures = [result for result in results if result.action == LOCAL_ACTION_FAILED]
     if not failures:
         return
@@ -229,20 +234,20 @@ def _render_local_failures(results: List[LocalRepoResult], root_path: Path) -> N
 
     console.print(table)
 
+
 async def resolve_repositories_for_sync(
     pattern: str,
     provider_manager,
-    explicit_provider: Optional[str] = None,
-    explicit_url: Optional[str] = None
-) -> tuple[List[Repository], bool]:
+    explicit_provider: str | None = None,
+    explicit_url: str | None = None,
+) -> tuple[list[Repository], bool]:
     """
     Resolve repositories for sync operation with clear logging.
 
     Returns:
         Tuple of (repositories, is_multi_provider_operation)
     """
-    from mgit.utils.pattern_matching import analyze_pattern
-    
+
     pattern_analysis = analyze_pattern(pattern, explicit_provider, explicit_url)
 
     # Validate pattern
@@ -257,10 +262,14 @@ async def resolve_repositories_for_sync(
         if pattern_analysis.is_multi_provider:
             # Multi-provider search
             available_providers = list_provider_names()
-            console.print(f"[blue]Synchronizing across {len(available_providers)} providers:[/blue] {', '.join(available_providers)}")
+            console.print(
+                f"[blue]Synchronizing across {len(available_providers)} providers:[/blue] {', '.join(available_providers)}"
+            )
 
             if not available_providers:
-                console.print("[red]Error:[/red] No providers configured. Run 'mgit login' to add providers.")
+                console.print(
+                    "[red]Error:[/red] No providers configured. Run 'mgit login' to add providers."
+                )
                 raise typer.Exit(code=1)
 
             resolver = MultiProviderResolver()
@@ -285,7 +294,9 @@ async def resolve_repositories_for_sync(
                 )
 
             if result.duplicates_removed > 0:
-                console.print(f"[blue]Info:[/blue] Removed {result.duplicates_removed} duplicate repositories")
+                console.print(
+                    f"[blue]Info:[/blue] Removed {result.duplicates_removed} duplicate repositories"
+                )
 
             return repositories, True
 
@@ -303,7 +314,9 @@ async def resolve_repositories_for_sync(
             )
             repositories = result.repositories
 
-            console.print(f"[green]Found {len(repositories)} repositories[/green] in provider '{provider_name}'")
+            console.print(
+                f"[green]Found {len(repositories)} repositories[/green] in provider '{provider_name}'"
+            )
 
             return repositories, False
 
@@ -313,7 +326,7 @@ async def resolve_repositories_for_sync(
             if len(segments) == 3:
                 org_name, project_name, repo_name = segments
                 provider = provider_manager.get_provider()
-                repo_list: List[Repository] = []
+                repo_list: list[Repository] = []
 
                 try:
                     repo = await provider.get_repository(
@@ -362,16 +375,17 @@ async def resolve_repositories_for_sync(
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1)
 
-async def analyze_repository_states(repositories: List[Repository], target_path: Path):
+
+async def analyze_repository_states(repositories: list[Repository], target_path: Path):
     """Analyze current state of repositories in target path."""
     from dataclasses import dataclass
 
     @dataclass
     class RepoAnalysis:
-        clean_repos: List[str]
-        dirty_repos: List[str]
-        missing_repos: List[str]
-        non_git_dirs: List[str]
+        clean_repos: list[str]
+        dirty_repos: list[str]
+        missing_repos: list[str]
+        non_git_dirs: list[str]
 
     clean_repos = []
     dirty_repos = []
@@ -389,13 +403,10 @@ async def analyze_repository_states(repositories: List[Repository], target_path:
         else:
             # Check if repo has uncommitted changes
             try:
-                result = await asyncio.subprocess.run(
-                    ["git", "status", "--porcelain"],
-                    cwd=local_path,
-                    capture_output=True,
-                    text=True
+                returncode, stdout, stderr = await _run_git_command(
+                    local_path, ["status", "--porcelain"]
                 )
-                if result.stdout.strip():
+                if returncode != 0 or stdout.strip():
                     dirty_repos.append(repo.name)
                 else:
                     clean_repos.append(repo.name)
@@ -405,7 +416,10 @@ async def analyze_repository_states(repositories: List[Repository], target_path:
 
     return RepoAnalysis(clean_repos, dirty_repos, missing_repos, non_git_dirs)
 
-async def show_sync_preview(repositories: List[Repository], target_path: Path, force: bool, detailed: bool):
+
+async def show_sync_preview(
+    repositories: list[Repository], target_path: Path, force: bool, detailed: bool
+):
     """Show detailed preview of sync operations."""
     repo_analysis = await analyze_repository_states(repositories, target_path)
 
@@ -418,21 +432,27 @@ async def show_sync_preview(repositories: List[Repository], target_path: Path, f
 
     for repo in repositories:
         repo_path = build_repo_path(repo.clone_url)
-        local_path = target_path / repo_path
+        target_path / repo_path
         repo_name = f"{repo_path.parts[-3]}/{repo_path.parts[-1]}"  # org/repo
 
         if repo.name in repo_analysis.missing_repos:
             table.add_row(repo_name, "Missing", "🔄 Clone", "New repository")
         elif repo.name in repo_analysis.non_git_dirs:
-            table.add_row(repo_name, "Non-Git", "⚠️ Skip", "Directory exists but not git repo")
+            table.add_row(
+                repo_name, "Non-Git", "⚠️ Skip", "Directory exists but not git repo"
+            )
         elif repo.name in repo_analysis.dirty_repos:
             if force:
-                table.add_row(repo_name, "Dirty", "🗑️ Force Clone", "Will delete local changes")
+                table.add_row(
+                    repo_name, "Dirty", "🗑️ Force Clone", "Will delete local changes"
+                )
             else:
                 table.add_row(repo_name, "Dirty", "⏭️ Skip", "Has uncommitted changes")
         else:  # clean repo
             if force:
-                table.add_row(repo_name, "Clean", "🗑️ Force Clone", "Will re-clone fresh")
+                table.add_row(
+                    repo_name, "Clean", "🗑️ Force Clone", "Will re-clone fresh"
+                )
             else:
                 table.add_row(repo_name, "Clean", "⬇️ Pull", "Update to latest")
 
@@ -444,11 +464,15 @@ async def show_sync_preview(repositories: List[Repository], target_path: Path, f
         summary_table.add_column("Action", style="bold")
         summary_table.add_column("Count", justify="right", style="green")
 
-        clone_count = len(repo_analysis.missing_repos) + (len(repositories) if force else 0)
+        clone_count = len(repo_analysis.missing_repos) + (
+            len(repositories) if force else 0
+        )
         pull_count = len(repo_analysis.clean_repos) if not force else 0
         skip_count = len(repo_analysis.dirty_repos) + len(repo_analysis.non_git_dirs)
         if force:
-            skip_count = len(repo_analysis.non_git_dirs)  # Only non-git dirs skipped in force mode
+            skip_count = len(
+                repo_analysis.non_git_dirs
+            )  # Only non-git dirs skipped in force mode
 
         summary_table.add_row("Clone", str(clone_count))
         summary_table.add_row("Pull", str(pull_count))
@@ -457,9 +481,7 @@ async def show_sync_preview(repositories: List[Repository], target_path: Path, f
         console.print(summary_table)
 
 
-async def _sync_local_repository(
-    state: LocalRepoState, force: bool
-) -> LocalRepoResult:
+async def _sync_local_repository(state: LocalRepoState, force: bool) -> LocalRepoResult:
     action = _determine_local_action(state, force)
     if action != LOCAL_ACTION_PULL:
         return LocalRepoResult(state=state, action=action, error=state.error)
@@ -493,7 +515,7 @@ async def _sync_local_repository(
 async def sync_local_command(
     root: str = ".",
     force: bool = False,
-    concurrency: Optional[int] = None,
+    concurrency: int | None = None,
     dry_run: bool = False,
     progress: bool = True,
     summary: bool = True,
@@ -514,9 +536,7 @@ async def sync_local_command(
 
     repo_paths = sorted(find_repositories_in_directory(root_path, recursive=True))
     if not repo_paths:
-        console.print(
-            f"[yellow]No git repositories found under {root_path}[/yellow]"
-        )
+        console.print(f"[yellow]No git repositories found under {root_path}[/yellow]")
         return
 
     console.print(f"[blue]Local sync scan:[/blue] {root_path}")
@@ -610,15 +630,28 @@ async def sync_local_command(
     if any(result.action == LOCAL_ACTION_FAILED for result in results):
         raise typer.Exit(code=1)
 
+
 async def sync_command(
     pattern: str = typer.Argument(..., help="Repository pattern (org/project/repo)"),
     path: str = typer.Argument(".", help="Local path to synchronize repositories into"),
-    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Specific provider (otherwise search all)"),
-    force: bool = typer.Option(False, "--force", "-f", help="Delete and re-clone all repositories"),
-    concurrency: Optional[int] = typer.Option(None, "--concurrency", "-c", help="Number of concurrent operations"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without making changes"),
-    progress: bool = typer.Option(True, "--progress/--no-progress", help="Show progress bar"),
-    summary: bool = typer.Option(True, "--summary/--no-summary", help="Show detailed summary"),
+    provider: str | None = typer.Option(
+        None, "--provider", "-p", help="Specific provider (otherwise search all)"
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Delete and re-clone all repositories"
+    ),
+    concurrency: int | None = typer.Option(
+        None, "--concurrency", "-c", help="Number of concurrent operations"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be done without making changes"
+    ),
+    progress: bool = typer.Option(
+        True, "--progress/--no-progress", help="Show progress bar"
+    ),
+    summary: bool = typer.Option(
+        True, "--summary/--no-summary", help="Show detailed summary"
+    ),
 ) -> None:
     """
     Synchronize repositories with remote providers.
@@ -664,7 +697,9 @@ async def sync_command(
     if provider:
         provider_manager = ProviderManager(provider_name=provider)
     else:
-        provider_manager = ProviderManager()  # Will be used for non-pattern queries only
+        provider_manager = (
+            ProviderManager()
+        )  # Will be used for non-pattern queries only
 
     # Setup target path
     target_path = Path(path).resolve()
@@ -673,7 +708,9 @@ async def sync_command(
     console.print(f"[blue]Synchronizing to:[/blue] {target_path}")
 
     # Resolve repositories
-    repositories, is_multi_provider = await resolve_repositories_for_sync(pattern, provider_manager, provider, None)
+    repositories, is_multi_provider = await resolve_repositories_for_sync(
+        pattern, provider_manager, provider, None
+    )
 
     if not repositories:
         console.print(f"[yellow]No repositories found for pattern '{pattern}'[/yellow]")
@@ -684,10 +721,14 @@ async def sync_command(
         repo_analysis = await analyze_repository_states(repositories, target_path)
 
         if repo_analysis.dirty_repos and not force:
-            console.print("\n[yellow]⚠️  Repositories with uncommitted changes:[/yellow]")
+            console.print(
+                "\n[yellow]⚠️  Repositories with uncommitted changes:[/yellow]"
+            )
             for repo_name in repo_analysis.dirty_repos:
                 console.print(f"  • {repo_name}")
-            console.print("\n[blue]These will be skipped. Use --force to override (will lose changes)[/blue]")
+            console.print(
+                "\n[blue]These will be skipped. Use --force to override (will lose changes)[/blue]"
+            )
 
     # Enhanced dry run with repository analysis
     if dry_run:
@@ -695,20 +736,17 @@ async def sync_command(
         return
 
     # Determine update mode based on force flag
-    update_mode = "force" if force else "pull"
+    update_mode = UpdateMode.force if force else UpdateMode.pull
 
-    # Handle force confirmation
+    confirmed_force_remove = False
+    dirs_to_remove = []
     if force:
-        force_confirmed = Confirm.ask(
-            f"[red]WARNING:[/red] Force mode will DELETE and re-clone {len(repositories)} repositories. "
-            f"All local changes will be lost. Continue?"
+        confirmed_force_remove, dirs_to_remove = check_force_mode_confirmation(
+            repositories, target_path, update_mode
         )
-        if not force_confirmed:
+        if dirs_to_remove and not confirmed_force_remove:
             console.print("Sync cancelled.")
             return
-
-    confirmed_force_remove = force
-    dirs_to_remove = []  # Will be calculated by processor if needed
 
     # Create processor - use appropriate provider manager
     if is_multi_provider:
@@ -728,16 +766,35 @@ async def sync_command(
     # Run sync with progress tracking
     if progress:
         await run_sync_with_progress(
-            repositories, target_path, processor, concurrency, update_mode,
-            confirmed_force_remove, dirs_to_remove
+            repositories,
+            target_path,
+            processor,
+            concurrency,
+            update_mode,
+            confirmed_force_remove,
+            dirs_to_remove,
         )
     else:
         await run_sync_quiet(
-            repositories, target_path, processor, concurrency, update_mode,
-            confirmed_force_remove, dirs_to_remove
+            repositories,
+            target_path,
+            processor,
+            concurrency,
+            update_mode,
+            confirmed_force_remove,
+            dirs_to_remove,
         )
 
-async def run_sync_with_progress(repositories, target_path, processor, concurrency, update_mode, confirmed_force_remove, dirs_to_remove):
+
+async def run_sync_with_progress(
+    repositories,
+    target_path,
+    processor,
+    concurrency,
+    update_mode,
+    confirmed_force_remove,
+    dirs_to_remove,
+):
     """Run sync operation with rich progress reporting."""
 
     with Progress(
@@ -746,18 +803,17 @@ async def run_sync_with_progress(repositories, target_path, processor, concurren
         BarColumn(),
         TaskProgressColumn(),
         TimeElapsedColumn(),
-        console=console
+        console=console,
     ) as progress:
-
         # Add main progress task
-        sync_task = progress.add_task("Synchronizing repositories...", total=len(repositories))
+        sync_task = progress.add_task(
+            "Synchronizing repositories...", total=len(repositories)
+        )
 
         # Custom callback to update progress
         async def progress_callback(completed: int, total: int, current_repo: str):
             progress.update(
-                sync_task,
-                completed=completed,
-                description=f"Syncing: {current_repo}"
+                sync_task, completed=completed, description=f"Syncing: {current_repo}"
             )
 
         # Run sync with progress callback
@@ -768,13 +824,14 @@ async def run_sync_with_progress(repositories, target_path, processor, concurren
             update_mode=update_mode,
             confirmed_force_remove=confirmed_force_remove,
             dirs_to_remove=dirs_to_remove,
+            show_progress=False,
         )
 
     # Show final results
     success_count = len(repositories) - len(failures)
 
     if failures:
-        console.print(f"\n[yellow]Sync completed with issues:[/yellow]")
+        console.print("\n[yellow]Sync completed with issues:[/yellow]")
         console.print(f"  [green]✅ Successful:[/green] {success_count}")
         console.print(f"  [red]❌ Failed:[/red] {len(failures)}")
 
@@ -793,9 +850,20 @@ async def run_sync_with_progress(repositories, target_path, processor, concurren
         console.print(failure_table)
         raise typer.Exit(code=1)
     else:
-        console.print(f"\n[green]✅ Successfully synchronized {success_count} repositories![/green]")
+        console.print(
+            f"\n[green]✅ Successfully synchronized {success_count} repositories![/green]"
+        )
 
-async def run_sync_quiet(repositories, target_path, processor, concurrency, update_mode, confirmed_force_remove, dirs_to_remove):
+
+async def run_sync_quiet(
+    repositories,
+    target_path,
+    processor,
+    concurrency,
+    update_mode,
+    confirmed_force_remove,
+    dirs_to_remove,
+):
     """Run sync operation without progress reporting."""
     failures = await processor.process_repositories(
         repositories=repositories,
@@ -804,12 +872,15 @@ async def run_sync_quiet(repositories, target_path, processor, concurrency, upda
         update_mode=update_mode,
         confirmed_force_remove=confirmed_force_remove,
         dirs_to_remove=dirs_to_remove,
+        show_progress=False,
     )
 
     success_count = len(repositories) - len(failures)
 
     if failures:
-        logger.error(f"Sync completed with {len(failures)} failures out of {len(repositories)} repositories")
+        logger.error(
+            f"Sync completed with {len(failures)} failures out of {len(repositories)} repositories"
+        )
         for failure in failures:
             logger.error(f"Failed: {failure}")
         raise typer.Exit(code=1)

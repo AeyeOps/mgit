@@ -5,17 +5,17 @@ Implements summary, sample, and full content strategies based on file
 characteristics and safety requirements.
 """
 
-import logging
-import hashlib
 import base64
+import hashlib
+import logging
 import os
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
-from .mime_detector import MimeDetector, MimeInfo, ContentSafety
+from .mime_detector import MimeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -34,15 +34,15 @@ class EmbeddedContent:
     """Container for embedded file content with metadata."""
 
     strategy: ContentStrategy
-    content: Optional[str]
+    content: str | None
     content_hash: str
     size_bytes: int
     mime_type: str
-    charset: Optional[str]
+    charset: str | None
     is_truncated: bool = False
-    line_count: Optional[int] = None
-    error: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = field(default_factory=dict)
+    line_count: int | None = None
+    error: str | None = None
+    metadata: dict[str, Any] | None = field(default_factory=dict)
 
 
 class ContentEmbedder(ABC):
@@ -145,7 +145,7 @@ class SummaryContentEmbedder(ContentEmbedder):
 
     def _generate_text_summary(
         self, file_path: Path, mime_info: MimeInfo
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate summary information for text files."""
         try:
             encoding = mime_info.charset or "utf-8"
@@ -285,7 +285,7 @@ class SampleContentEmbedder(ContentEmbedder):
 
     def _generate_text_sample(
         self, file_path: Path, mime_info: MimeInfo
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate sample content for text files."""
         try:
             encoding = mime_info.charset or "utf-8"
@@ -468,7 +468,7 @@ class FullContentEmbedder(ContentEmbedder):
                 error=str(e),
             )
 
-    def _read_full_text(self, file_path: Path, mime_info: MimeInfo) -> Dict[str, Any]:
+    def _read_full_text(self, file_path: Path, mime_info: MimeInfo) -> dict[str, Any]:
         """Read complete text file content."""
         try:
             encoding = mime_info.charset or "utf-8"

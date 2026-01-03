@@ -2,7 +2,7 @@
 
 This package provides enterprise-grade features for the change pipeline including:
 - Data compression for storage efficiency
-- Data validation for integrity checking  
+- Data validation for integrity checking
 - Error recovery for fault tolerance
 - Performance optimization and monitoring
 """

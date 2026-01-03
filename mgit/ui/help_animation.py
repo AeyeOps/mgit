@@ -85,7 +85,9 @@ def _restore_terminal(old_settings: Any) -> None:
             pass
 
 
-def run_tree_animation(duration: float = ANIMATION_DURATION, fps: float = ANIMATION_FPS) -> None:
+def run_tree_animation(
+    duration: float = ANIMATION_DURATION, fps: float = ANIMATION_FPS
+) -> None:
     """
     Run the spinning tree animation.
 
@@ -171,6 +173,7 @@ def _is_animation_enabled() -> bool:
     """Check if help animation is enabled in config."""
     try:
         from mgit.config.yaml_manager import get_global_setting
+
         return get_global_setting("help_animation", True)
     except Exception:
         return True  # Default to enabled if config unavailable

@@ -7,7 +7,7 @@ to prevent credential exposure in logs, error messages, and API responses.
 import logging
 import re
 from functools import wraps
-from typing import Any, Dict
+from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ class CredentialMasker:
         masked_text = text
 
         # Apply each credential pattern
-        for pattern_name, pattern in self.CREDENTIAL_PATTERNS.items():
+        for _pattern_name, pattern in self.CREDENTIAL_PATTERNS.items():
             masked_text = pattern.sub(self._mask_match, masked_text)
 
         return masked_text
@@ -138,7 +138,7 @@ class CredentialMasker:
             # Fallback to string masking
             return self.mask_string(url)
 
-    def mask_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def mask_dict(self, data: dict[str, Any]) -> dict[str, Any]:
         """Mask credentials in dictionary values.
 
         Args:
@@ -165,7 +165,9 @@ class CredentialMasker:
                     (
                         self.mask_dict(item)
                         if isinstance(item, dict)
-                        else self.mask_string(item) if isinstance(item, str) else item
+                        else self.mask_string(item)
+                        if isinstance(item, str)
+                        else item
                     )
                     for item in value
                 ]
@@ -174,7 +176,7 @@ class CredentialMasker:
 
         return masked_data
 
-    def mask_headers(self, headers: Dict[str, str]) -> Dict[str, str]:
+    def mask_headers(self, headers: dict[str, str]) -> dict[str, str]:
         """Mask credentials in HTTP headers.
 
         Args:
@@ -367,11 +369,7 @@ def is_credential_exposed(text: str) -> bool:
     masker = CredentialMasker()
 
     # Check against all credential patterns
-    for pattern in masker.CREDENTIAL_PATTERNS.values():
-        if pattern.search(text):
-            return True
-
-    return False
+    return any(pattern.search(text) for pattern in masker.CREDENTIAL_PATTERNS.values())
 
 
 def sanitize_for_logging(data: Any) -> Any:

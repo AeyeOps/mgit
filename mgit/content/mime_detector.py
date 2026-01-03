@@ -9,10 +9,9 @@ import logging
 import mimetypes
 import os
 import subprocess
-from pathlib import Path
-from typing import Optional, Dict, Set, Tuple, List
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ class MimeInfo:
     """Complete MIME type and safety information for a file."""
 
     mime_type: str
-    charset: Optional[str]
+    charset: str | None
     safety: ContentSafety
     size_bytes: int
     is_text: bool
@@ -171,7 +170,7 @@ class MimeDetector:
     }
 
     def __init__(
-        self, max_safe_size: Optional[int] = None, max_sample_size: Optional[int] = None
+        self, max_safe_size: int | None = None, max_sample_size: int | None = None
     ):
         """Initialize MIME detector with configurable limits."""
         # Configuration over convention - allow size limits to be configured
@@ -304,7 +303,7 @@ class MimeDetector:
             ContentSafety.SAFE_CODE,
         }
 
-    def _detect_mime_type(self, file_path: Path) -> Tuple[str, Optional[str], float]:
+    def _detect_mime_type(self, file_path: Path) -> tuple[str, str | None, float]:
         """
         Detect MIME type using multiple methods for best accuracy.
 
@@ -352,7 +351,7 @@ class MimeDetector:
 
     def _detect_with_file_command(
         self, file_path: Path
-    ) -> Optional[Tuple[str, Optional[str]]]:
+    ) -> tuple[str, str | None] | None:
         """Use system 'file' command for MIME detection with proper charset handling."""
         try:
             result = subprocess.run(
@@ -392,9 +391,7 @@ class MimeDetector:
 
         return None
 
-    def _detect_from_content(
-        self, file_path: Path
-    ) -> Optional[Tuple[str, Optional[str]]]:
+    def _detect_from_content(self, file_path: Path) -> tuple[str, str | None] | None:
         """Basic content-based MIME type detection with charset detection."""
         try:
             with file_path.open("rb") as f:
@@ -420,7 +417,7 @@ class MimeDetector:
 
             for encoding, charset in encoding_attempts:
                 try:
-                    text_content = header.decode(encoding, errors="strict")
+                    header.decode(encoding, errors="strict")
                     # If we can decode without errors, return as text with detected charset
                     return "text/plain", charset
                 except UnicodeDecodeError:
@@ -488,11 +485,7 @@ class MimeDetector:
                 b"\x50\x4b",  # ZIP archive (generic)
             ]
 
-            for sig in binary_signatures:
-                if sample.startswith(sig):
-                    return True
-
-            return False
+            return any(sample.startswith(sig) for sig in binary_signatures)
 
         except Exception as e:
             logger.debug(f"Binary detection failed for {file_path}: {e}")

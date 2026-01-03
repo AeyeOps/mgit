@@ -10,7 +10,7 @@ import inspect
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 from .base import GitProvider
@@ -35,7 +35,7 @@ class ProviderRegistry:
 
     # URL patterns for each provider type
     # Order matters - more specific patterns should come first
-    URL_PATTERNS: List[Tuple[re.Pattern, str]] = [
+    URL_PATTERNS: list[tuple[re.Pattern, str]] = [
         # Azure DevOps patterns
         (re.compile(r"https?://dev\.azure\.com/[^/]+", re.IGNORECASE), "azuredevops"),
         (
@@ -74,14 +74,14 @@ class ProviderRegistry:
     def __init__(self):
         """Initialize the registry (only once due to singleton)."""
         if not self._initialized:
-            self._providers: Dict[str, Type[GitProvider]] = {}
-            self._provider_instances: Dict[str, GitProvider] = {}
+            self._providers: dict[str, type[GitProvider]] = {}
+            self._provider_instances: dict[str, GitProvider] = {}
             self._auto_discovered = False
             ProviderRegistry._initialized = True
             logger.debug("ProviderRegistry initialized")
 
     def register_provider(
-        self, name: str, provider_class: Type[GitProvider], validate: bool = True
+        self, name: str, provider_class: type[GitProvider], validate: bool = True
     ) -> None:
         """Register a provider class.
 
@@ -113,7 +113,7 @@ class ProviderRegistry:
             del self._provider_instances[name]
 
     def _validate_provider_class(
-        self, name: str, provider_class: Type[GitProvider]
+        self, name: str, provider_class: type[GitProvider]
     ) -> None:
         """Validate that a provider class properly implements GitProvider.
 
@@ -148,7 +148,7 @@ class ProviderRegistry:
         if provider_class.PROVIDER_NAME.lower() != name:
             # Only warn for the primary name, not aliases
             if provider_class.PROVIDER_NAME.lower() not in [
-                n.lower() for n in self._providers.keys()
+                n.lower() for n in self._providers
             ]:
                 logger.warning(
                     "Provider name mismatch: registered as '%s' but PROVIDER_NAME is '%s'",
@@ -183,7 +183,7 @@ class ProviderRegistry:
                     field="provider_class",
                 )
 
-    def get_provider(self, provider_type: str, config: Dict[str, Any]) -> GitProvider:
+    def get_provider(self, provider_type: str, config: dict[str, Any]) -> GitProvider:
         """Get a provider instance by type.
 
         This method creates a new instance or returns a cached one based on
@@ -214,7 +214,7 @@ class ProviderRegistry:
         return provider_class(config)
 
     def get_provider_by_url(
-        self, url: str, config: Optional[Dict[str, Any]] = None
+        self, url: str, config: dict[str, Any] | None = None
     ) -> GitProvider:
         """Get a provider instance based on URL pattern matching.
 
@@ -282,7 +282,7 @@ class ProviderRegistry:
             f"Unable to determine provider type from URL: {url}"
         )
 
-    def list_providers(self) -> List[str]:
+    def list_providers(self) -> list[str]:
         """List all registered provider types.
 
         Returns:
@@ -320,7 +320,7 @@ class ProviderRegistry:
         if name in self._provider_instances:
             del self._provider_instances[name]
 
-    def auto_discover(self, package_path: Optional[Path] = None) -> None:
+    def auto_discover(self, package_path: Path | None = None) -> None:
         """Auto-discover provider implementations in the providers package.
 
         This method scans the providers package for classes that inherit from
@@ -356,7 +356,7 @@ class ProviderRegistry:
                 module = importlib.import_module(module_name)
 
                 # Scan for GitProvider subclasses
-                for name, obj in inspect.getmembers(module, inspect.isclass):
+                for _name, obj in inspect.getmembers(module, inspect.isclass):
                     if (
                         issubclass(obj, GitProvider)
                         and obj is not GitProvider
@@ -392,7 +392,7 @@ class ProviderRegistry:
         self._auto_discovered = False
         logger.debug("Cleared provider registry")
 
-    def get_provider_info(self, provider_type: str) -> Dict[str, Any]:
+    def get_provider_info(self, provider_type: str) -> dict[str, Any]:
         """Get information about a registered provider.
 
         Args:

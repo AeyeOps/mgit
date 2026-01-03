@@ -7,7 +7,6 @@ for use by various mgit commands and discovery modules.
 
 import logging
 from pathlib import Path
-from typing import List
 
 from mgit.git.utils import is_git_repository
 
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def find_repositories_in_directory(
     root_path: Path, recursive: bool = True, max_depth: int = None
-) -> List[Path]:
+) -> list[Path]:
     """
     Find all Git repositories in a directory structure.
 
@@ -77,7 +76,7 @@ def find_repositories_by_pattern(
     name_pattern: str = None,
     organization_pattern: str = None,
     recursive: bool = True,
-) -> List[Path]:
+) -> list[Path]:
     """
     Find repositories matching specific patterns.
 

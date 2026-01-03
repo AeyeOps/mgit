@@ -8,7 +8,8 @@ import functools
 import inspect
 import logging
 import time
-from typing import Any, Callable, Dict, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from .credentials import CredentialMasker
 from .logging import SecurityLogger
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def secure_provider_method(func: F) -> F:
+def secure_provider_method[F: Callable[..., Any]](func: F) -> F:
     """Decorator to add security controls to provider methods.
 
     This decorator:
@@ -233,7 +234,7 @@ class SecureProviderMixin:
         log_method = getattr(security_logger, level.lower(), security_logger.info)
         log_method(message, **kwargs)
 
-    def _mask_credentials_in_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _mask_credentials_in_config(self, config: dict[str, Any]) -> dict[str, Any]:
         """Mask credentials in configuration dictionary."""
         masker = CredentialMasker()
         return masker.mask_dict(config)

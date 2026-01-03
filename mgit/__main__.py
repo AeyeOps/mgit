@@ -6,7 +6,7 @@ import os
 import warnings
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -15,14 +15,8 @@ from rich.prompt import Confirm
 
 from mgit import __version__
 from mgit.commands.bulk_operations import (
-    BulkOperationProcessor,
-    OperationType,
-    check_force_mode_confirmation,
-)
-from mgit.commands.bulk_operations import (
     UpdateMode as BulkUpdateMode,
 )
-from mgit.utils.multi_provider_resolver import MultiProviderResolver
 
 # diff import will be added inside the command function
 from mgit.commands.listing import format_results, list_repositories
@@ -44,7 +38,6 @@ from mgit.config.yaml_manager import (
     set_default_provider,
 )
 from mgit.exceptions import MgitError
-from mgit.git import GitManager
 from mgit.providers.manager import ProviderManager
 
 # Suppress the specific UserWarning from PyInstaller's bootloader
@@ -68,7 +61,7 @@ CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # Configuration loading with YAML system
-def get_config_value(key: str, default_value: Optional[str] = None) -> str:
+def get_config_value(key: str, default_value: str | None = None) -> str:
     """
     Get a configuration value with the following priority:
     1. Environment variable (highest priority)
@@ -229,7 +222,7 @@ app = typer.Typer(
 )
 
 
-def _infer_provider_from_query(query: str) -> Optional[str]:
+def _infer_provider_from_query(query: str) -> str | None:
     try:
         from mgit.config.yaml_manager import get_provider_configs
 
@@ -299,14 +292,14 @@ def version_callback(value: bool):
 @app.callback(invoke_without_command=True)
 def main_options(
     ctx: typer.Context,
-    version: Optional[bool] = typer.Option(
+    version: bool | None = typer.Option(
         None,
         "--version",
         callback=version_callback,
         is_eager=True,
         help="Show the application's version and exit.",
     ),
-    help_flag: Optional[bool] = typer.Option(
+    help_flag: bool | None = typer.Option(
         None,
         "--help",
         "-h",
@@ -362,13 +355,12 @@ def main_options(
 UpdateMode = BulkUpdateMode
 
 
-
 # -----------------------------------------------------------------------------
 # Login Command Helper Functions
 # -----------------------------------------------------------------------------
 
 
-def _find_existing_azdevops_config(organization: str) -> Optional[str]:
+def _find_existing_azdevops_config(organization: str) -> str | None:
     """Find existing Azure DevOps configuration for the same organization."""
     try:
         providers = get_provider_configs()
@@ -395,12 +387,12 @@ def _find_existing_azdevops_config(organization: str) -> Optional[str]:
     return None
 
 
-def _find_existing_github_config() -> Optional[str]:
+def _find_existing_github_config() -> str | None:
     """Find existing GitHub configuration."""
     try:
         providers = get_provider_configs()
 
-        for name, config in providers.items():
+        for name, _config in providers.items():
             try:
                 # Check if it's a GitHub provider
                 provider_type = detect_provider_type(name)
@@ -417,7 +409,7 @@ def _find_existing_github_config() -> Optional[str]:
     return None
 
 
-def _find_existing_bitbucket_config(username: str) -> Optional[str]:
+def _find_existing_bitbucket_config(username: str) -> str | None:
     """Find existing BitBucket configuration for the same username."""
     try:
         providers = get_provider_configs()
@@ -443,7 +435,7 @@ def _find_existing_bitbucket_config(username: str) -> Optional[str]:
 
 
 def _test_provider_connection(
-    provider_type: str, provider_config: Dict[str, Any]
+    provider_type: str, provider_config: dict[str, Any]
 ) -> bool:
     """Test provider connection with the given configuration."""
     try:
@@ -479,31 +471,31 @@ def _test_provider_connection(
     help="Login to git provider and validate credentials. Supports Azure DevOps, GitHub, and BitBucket."
 )
 def login(
-    config: Optional[str] = typer.Option(
+    config: str | None = typer.Option(
         None,
         "--config",
         "-cfg",
         help="Named provider configuration to test (e.g., 'work_ado', 'github_personal').",
     ),
-    provider_type: Optional[str] = typer.Option(
+    provider_type: str | None = typer.Option(
         None,
         "--provider",
         "-p",
         help="Provider type for new configuration (azuredevops, github, bitbucket).",
     ),
-    name: Optional[str] = typer.Option(
+    name: str | None = typer.Option(
         None,
         "--name",
         "-n",
         help="Name for new provider configuration (e.g., 'my_github').",
     ),
-    organization: Optional[str] = typer.Option(
+    organization: str | None = typer.Option(
         None,
         "--org",
         "-o",
         help="Provider organization/workspace URL for new configuration.",
     ),
-    token: Optional[str] = typer.Option(
+    token: str | None = typer.Option(
         None,
         "--token",
         "-t",
@@ -778,13 +770,13 @@ def config(
     list_providers: bool = typer.Option(
         False, "--list", "-l", help="List all configured providers."
     ),
-    show_provider: Optional[str] = typer.Option(
+    show_provider: str | None = typer.Option(
         None, "--show", "-s", help="Show details for a specific provider."
     ),
-    set_default: Optional[str] = typer.Option(
+    set_default: str | None = typer.Option(
         None, "--set-default", "-d", help="Set the default provider."
     ),
-    remove_provider: Optional[str] = typer.Option(
+    remove_provider: str | None = typer.Option(
         None, "--remove", "-r", help="Remove a provider configuration."
     ),
     global_settings: bool = typer.Option(
@@ -910,13 +902,13 @@ def config(
 @app.command(name="list")
 def list_command(
     query: str = typer.Argument(..., help="Query pattern (org/project/repo)"),
-    provider: Optional[str] = typer.Option(
+    provider: str | None = typer.Option(
         None, "--provider", "-p", help="Provider configuration name"
     ),
     format_type: str = typer.Option(
         "table", "--format", "-f", help="Output format (table, json)"
     ),
-    limit: Optional[int] = typer.Option(
+    limit: int | None = typer.Option(
         None, "--limit", "-l", help="Maximum results to return"
     ),
 ):
@@ -1195,6 +1187,7 @@ def status_command(
     """
 
     async def do_status():
+        results = []
         try:
             results = await get_repository_statuses(
                 path, concurrency, fetch, json_mode=(output == "json")
@@ -1205,9 +1198,6 @@ def status_command(
                 )
             display_status_results(results, output, show_clean)
             if fail_on_dirty and any(not r.is_clean for r in results):
-                raise typer.Exit(code=1)
-        except MgitError:
-            if any(not r.is_clean for r in results):
                 raise typer.Exit(code=1)
         except MgitError as e:
             console.print(f"[red]Error: {e}[/red]")
@@ -1221,21 +1211,33 @@ def status_command(
 # -----------------------------------------------------------------------------
 @app.command()
 def sync(
-    pattern: Optional[str] = typer.Argument(
+    pattern: str | None = typer.Argument(
         None, help="Repository pattern (remote) or local path (local mode)"
     ),
-    path: Optional[str] = typer.Argument(
+    path: str | None = typer.Argument(
         None, help="Target path for remote sync (default: .)"
     ),
-    filter_pattern: Optional[str] = typer.Option(
+    filter_pattern: str | None = typer.Option(
         None, "--filter", help="Explicit remote pattern (forces remote mode)"
     ),
-    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Specific provider (otherwise search all)"),
-    force: bool = typer.Option(False, "--force", "-f", help="Delete and re-clone all repositories"),
-    concurrency: Optional[int] = typer.Option(None, "--concurrency", "-c", help="Number of concurrent operations"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without making changes"),
-    progress: bool = typer.Option(True, "--progress/--no-progress", help="Show progress bar"),
-    summary: bool = typer.Option(True, "--summary/--no-summary", help="Show detailed summary"),
+    provider: str | None = typer.Option(
+        None, "--provider", "-p", help="Specific provider (otherwise search all)"
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Delete and re-clone all repositories"
+    ),
+    concurrency: int | None = typer.Option(
+        None, "--concurrency", "-c", help="Number of concurrent operations"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be done without making changes"
+    ),
+    progress: bool = typer.Option(
+        True, "--progress/--no-progress", help="Show progress bar"
+    ),
+    summary: bool = typer.Option(
+        True, "--summary/--no-summary", help="Show detailed summary"
+    ),
 ):
     """
     Synchronize repositories locally or with remote providers.
@@ -1295,7 +1297,9 @@ def sync(
 
     if path is not None:
         if pattern is None:
-            console.print("[red]Error:[/red] Pattern is required when a path is provided.")
+            console.print(
+                "[red]Error:[/red] Pattern is required when a path is provided."
+            )
             raise typer.Exit(code=1)
         asyncio.run(
             sync_command(
@@ -1305,7 +1309,9 @@ def sync(
         return
 
     if pattern is None:
-        asyncio.run(sync_local_command(".", force, concurrency, dry_run, progress, summary))
+        asyncio.run(
+            sync_local_command(".", force, concurrency, dry_run, progress, summary)
+        )
         return
 
     candidate_path = Path(pattern).expanduser()
@@ -1318,7 +1324,9 @@ def sync(
         return
 
     asyncio.run(
-        sync_command(pattern, ".", provider, force, concurrency, dry_run, progress, summary)
+        sync_command(
+            pattern, ".", provider, force, concurrency, dry_run, progress, summary
+        )
     )
 
 

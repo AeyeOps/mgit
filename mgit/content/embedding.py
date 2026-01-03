@@ -6,20 +6,19 @@ safety requirements, and resource constraints.
 """
 
 import logging
-from pathlib import Path
-from typing import Dict, List, Optional, Set
 from dataclasses import dataclass
+from pathlib import Path
 
-from mgit.content.mime_detector import MimeDetector, MimeInfo, ContentSafety
 from mgit.content.content_strategies import (
+    ContentEmbedder,
     ContentStrategy,
     EmbeddedContent,
-    ContentEmbedder,
-    NoneContentEmbedder,
-    SummaryContentEmbedder,
-    SampleContentEmbedder,
     FullContentEmbedder,
+    NoneContentEmbedder,
+    SampleContentEmbedder,
+    SummaryContentEmbedder,
 )
+from mgit.content.mime_detector import ContentSafety, MimeDetector, MimeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +29,9 @@ class EmbeddingConfig:
 
     default_strategy: ContentStrategy = ContentStrategy.SAMPLE
     max_total_memory_mb: int = 100  # Total memory budget for all embeddings
-    prefer_full_for_extensions: Set[str] = None
-    prefer_summary_for_extensions: Set[str] = None
-    force_none_for_extensions: Set[str] = None
+    prefer_full_for_extensions: set[str] = None
+    prefer_summary_for_extensions: set[str] = None
+    force_none_for_extensions: set[str] = None
 
     def __post_init__(self):
         """Set default extension preferences if not provided."""
@@ -78,13 +77,13 @@ class ContentEmbeddingEngine:
     safety requirements, and resource constraints.
     """
 
-    def __init__(self, config: Optional[EmbeddingConfig] = None):
+    def __init__(self, config: EmbeddingConfig | None = None):
         """Initialize content embedding engine."""
         self.config = config or EmbeddingConfig()
         self.mime_detector = MimeDetector()
 
         # Initialize strategy implementations
-        self.embedders: Dict[ContentStrategy, ContentEmbedder] = {
+        self.embedders: dict[ContentStrategy, ContentEmbedder] = {
             ContentStrategy.NONE: NoneContentEmbedder(),
             ContentStrategy.SUMMARY: SummaryContentEmbedder(),
             ContentStrategy.SAMPLE: SampleContentEmbedder(),
@@ -100,7 +99,7 @@ class ContentEmbeddingEngine:
         )
 
     def embed_file_content(
-        self, file_path: Path, strategy_override: Optional[ContentStrategy] = None
+        self, file_path: Path, strategy_override: ContentStrategy | None = None
     ) -> EmbeddedContent:
         """
         Embed content from a single file using intelligent strategy selection.
@@ -156,8 +155,8 @@ class ContentEmbeddingEngine:
             )
 
     def embed_multiple_files(
-        self, file_paths: List[Path], batch_strategy: Optional[ContentStrategy] = None
-    ) -> List[EmbeddedContent]:
+        self, file_paths: list[Path], batch_strategy: ContentStrategy | None = None
+    ) -> list[EmbeddedContent]:
         """
         Embed content from multiple files with intelligent batching.
 
@@ -183,7 +182,7 @@ class ContentEmbeddingEngine:
 
                 if (i + 1) % 10 == 0:
                     logger.debug(
-                        f"Processed {i + 1}/{total_files} files, memory usage: {self.current_memory_usage / (1024*1024):.1f}MB"
+                        f"Processed {i + 1}/{total_files} files, memory usage: {self.current_memory_usage / (1024 * 1024):.1f}MB"
                     )
 
             except Exception as e:
@@ -208,7 +207,7 @@ class ContentEmbeddingEngine:
 
         return results
 
-    def get_memory_usage_stats(self) -> Dict[str, float]:
+    def get_memory_usage_stats(self) -> dict[str, float]:
         """Get current memory usage statistics."""
         return {
             "current_usage_mb": self.current_memory_usage / (1024 * 1024),

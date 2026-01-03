@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run pytest with optional arguments."""
+
 import subprocess
 import sys
 

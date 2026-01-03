@@ -9,7 +9,6 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
 
 from rich.console import Console
 from rich.table import Table
@@ -34,7 +33,7 @@ class RepositoryStatus:
     modified_files: int = 0
     untracked_files: int = 0
     staged_files: int = 0
-    error: Optional[str] = None
+    error: str | None = None
 
 
 async def _get_single_repo_status(repo_path: Path, fetch: bool) -> RepositoryStatus:
@@ -118,7 +117,7 @@ def _parse_status_output(repo_path: Path, output: str) -> RepositoryStatus:
 
 async def get_repository_statuses(
     path: Path, concurrency: int, fetch: bool, json_mode: bool = False
-) -> List[RepositoryStatus]:
+) -> list[RepositoryStatus]:
     """Finds all git repos in a path and gets their status concurrently."""
     logger.info(f"Getting statuses for repos in: {path}")
     repos_to_check = []
@@ -137,8 +136,9 @@ async def get_repository_statuses(
         return []
 
     # For JSON mode, disable progress output to avoid mixing with JSON output
-    from rich.console import Console
     import io
+
+    from rich.console import Console
 
     if json_mode:
         # Create a null console that discards all output
@@ -170,7 +170,7 @@ async def get_repository_statuses(
 
 
 def display_status_results(
-    results: List[RepositoryStatus], output_format: str, show_clean: bool
+    results: list[RepositoryStatus], output_format: str, show_clean: bool
 ):
     """Displays the status results in the specified format."""
     logger.info(f"Entering display_status_results with {len(results)} results.")

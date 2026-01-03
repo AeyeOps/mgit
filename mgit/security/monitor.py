@@ -12,7 +12,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .logging import SecurityLogger
 
@@ -27,9 +27,9 @@ class SecurityEvent:
     event_type: str
     severity: str
     source: str
-    details: Dict[str, Any]
-    user_context: Optional[Dict[str, Any]] = None
-    remediation: Optional[str] = None
+    details: dict[str, Any]
+    user_context: dict[str, Any] | None = None
+    remediation: str | None = None
 
 
 @dataclass
@@ -72,7 +72,7 @@ class SecurityMonitor:
         self.lock = threading.Lock()
 
         # Rate limiting tracking
-        self.rate_limits: Dict[str, List[float]] = defaultdict(list)
+        self.rate_limits: dict[str, list[float]] = defaultdict(list)
         self.rate_limit_windows = {
             "api_calls": (60, 100),  # 100 calls per minute
             "auth_attempts": (300, 10),  # 10 attempts per 5 minutes
@@ -100,9 +100,9 @@ class SecurityMonitor:
         event_type: str,
         severity: str,
         source: str,
-        details: Dict[str, Any],
-        user_context: Optional[Dict[str, Any]] = None,
-        remediation: Optional[str] = None,
+        details: dict[str, Any],
+        user_context: dict[str, Any] | None = None,
+        remediation: str | None = None,
     ) -> None:
         """Log a security event.
 
@@ -141,7 +141,7 @@ class SecurityMonitor:
         provider: str,
         organization: str,
         success: bool,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> None:
         """Log authentication attempt.
 
@@ -172,7 +172,7 @@ class SecurityMonitor:
         url: str,
         status_code: int,
         response_time: float,
-        user_agent: Optional[str] = None,
+        user_agent: str | None = None,
     ) -> None:
         """Log API call.
 
@@ -258,7 +258,7 @@ class SecurityMonitor:
         )
 
     def log_suspicious_activity(
-        self, activity_type: str, details: Dict[str, Any], severity: str = "WARNING"
+        self, activity_type: str, details: dict[str, Any], severity: str = "WARNING"
     ) -> None:
         """Log suspicious activity.
 
@@ -274,7 +274,7 @@ class SecurityMonitor:
             {"activity_type": activity_type, **details},
         )
 
-    def get_security_summary(self, hours: int = 24) -> Dict[str, Any]:
+    def get_security_summary(self, hours: int = 24) -> dict[str, Any]:
         """Get security summary for the specified time period.
 
         Args:
@@ -322,9 +322,9 @@ class SecurityMonitor:
     def get_recent_events(
         self,
         count: int = 100,
-        event_type: Optional[str] = None,
-        severity: Optional[str] = None,
-    ) -> List[SecurityEvent]:
+        event_type: str | None = None,
+        severity: str | None = None,
+    ) -> list[SecurityEvent]:
         """Get recent security events.
 
         Args:
@@ -501,7 +501,7 @@ class SecurityMonitor:
         return False
 
     def _is_suspicious_api_call(
-        self, method: str, url: str, user_agent: Optional[str]
+        self, method: str, url: str, user_agent: str | None
     ) -> bool:
         """Check if API call is suspicious."""
         if user_agent:
@@ -516,7 +516,7 @@ class SecurityMonitor:
 
         return False
 
-    def _calculate_security_score(self, events: List[SecurityEvent]) -> int:
+    def _calculate_security_score(self, events: list[SecurityEvent]) -> int:
         """Calculate security score (0-100) based on recent events."""
         if not events:
             return 100
@@ -542,7 +542,7 @@ class SecurityMonitor:
 
         return max(0, score)
 
-    def _get_security_recommendations(self, events: List[SecurityEvent]) -> List[str]:
+    def _get_security_recommendations(self, events: list[SecurityEvent]) -> list[str]:
         """Get security recommendations based on recent events."""
         recommendations = []
 
@@ -581,7 +581,7 @@ class SecurityMonitor:
 
 
 # Global security monitor instance
-_security_monitor: Optional[SecurityMonitor] = None
+_security_monitor: SecurityMonitor | None = None
 
 
 def get_security_monitor() -> SecurityMonitor:
@@ -593,7 +593,7 @@ def get_security_monitor() -> SecurityMonitor:
 
 
 def log_security_event(
-    event_type: str, severity: str, source: str, details: Dict[str, Any], **kwargs
+    event_type: str, severity: str, source: str, details: dict[str, Any], **kwargs
 ) -> None:
     """Log security event using global monitor."""
     monitor = get_security_monitor()

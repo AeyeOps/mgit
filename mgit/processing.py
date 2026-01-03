@@ -2,18 +2,17 @@
 
 import asyncio
 import logging
-from pathlib import Path
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from mgit.git.manager import GitManager
-from mgit.changesets.models import RepositoryChangeset, FileChange, CommitInfo
 from mgit.content.embedding import (
     ContentEmbeddingEngine,
-    EmbeddingConfig,
     ContentStrategy,
+    EmbeddingConfig,
 )
+from mgit.git.manager import GitManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +25,11 @@ class RepositoryChange:
     repository_name: str
     timestamp: str
     has_uncommitted_changes: bool
-    uncommitted_files: List[Dict[str, Any]]
-    recent_commits: List[Dict[str, Any]]
-    current_branch: Optional[str]
+    uncommitted_files: list[dict[str, Any]]
+    recent_commits: list[dict[str, Any]]
+    current_branch: str | None
     git_status: str
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class DiffProcessor:
@@ -59,10 +58,10 @@ class DiffProcessor:
 
     async def process_repositories(
         self,
-        repositories: List[Path],
-        progress: Optional[Any] = None,
-        task_id: Optional[Any] = None,
-    ) -> List[RepositoryChange]:
+        repositories: list[Path],
+        progress: Any | None = None,
+        task_id: Any | None = None,
+    ) -> list[RepositoryChange]:
         """
         Process multiple repositories concurrently to detect changes.
         """
@@ -140,7 +139,7 @@ class DiffProcessor:
 
     def _parse_git_status(
         self, status_output: str, repo_path: Path
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Parse git status output into structured file change information.
         """
@@ -201,7 +200,7 @@ class DiffProcessor:
 
     async def _get_recent_commits(
         self, repo_path: Path, limit: int = 5
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get recent commit information from the repository.
         """

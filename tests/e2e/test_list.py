@@ -4,15 +4,15 @@ These tests run actual CLI commands to test repository listing functionality.
 They are marked with @pytest.mark.e2e and skipped by default.
 """
 
-import pytest
-import subprocess
 import json
-import re
 import random
-from typing import Dict, List, Optional, Tuple
+import re
+import subprocess
+
+import pytest
 
 
-def run_mgit_command(args: List[str], timeout: int = 60) -> tuple[int, str, str]:
+def run_mgit_command(args: list[str], timeout: int = 60) -> tuple[int, str, str]:
     """Run mgit CLI command and return exit code, stdout, stderr."""
     result = subprocess.run(
         ["uv", "run", "mgit"] + args,
@@ -23,7 +23,7 @@ def run_mgit_command(args: List[str], timeout: int = 60) -> tuple[int, str, str]
     return result.returncode, result.stdout, result.stderr
 
 
-def get_provider_list() -> Dict[str, str]:
+def get_provider_list() -> dict[str, str]:
     """Get all providers and their types from CLI."""
     code, stdout, stderr = run_mgit_command(["config", "--list"])
     if code != 0:
@@ -40,7 +40,7 @@ def get_provider_list() -> Dict[str, str]:
     return providers
 
 
-def get_provider_workspace(provider_name: str) -> Optional[str]:
+def get_provider_workspace(provider_name: str) -> str | None:
     """Get workspace/organization from provider config."""
     code, stdout, stderr = run_mgit_command(["config", "--show", provider_name])
     if code != 0:
@@ -91,7 +91,7 @@ def test_cli_list_basic_functionality():
         random.choice(providers) for providers in providers_by_type.values()
     ]
 
-    print(f"\nTesting mgit list functionality")
+    print("\nTesting mgit list functionality")
     print(f"Available types: {list(providers_by_type.keys())}")
     print(
         f"Providers per type: {[(ptype, len(providers)) for ptype, providers in providers_by_type.items()]}"
@@ -125,7 +125,7 @@ def test_cli_list_basic_functionality():
             # Verify we got repository results
             if "No repositories found" in stdout:
                 repo_count = 0
-                print(f"✅ Table format: No repositories found (valid)")
+                print("✅ Table format: No repositories found (valid)")
             else:
                 # Look for repository count or table content
                 lines = stdout.split("\n")
@@ -157,7 +157,7 @@ def test_cli_list_basic_functionality():
     total_tests = len(results)
     passed_tests = sum(1 for success in results.values() if success)
 
-    print(f"\n=== List Command Test Summary ===")
+    print("\n=== List Command Test Summary ===")
     print(f"Provider types tested: {total_tests}")
     print(f"Successful: {passed_tests}")
     print(f"Failed: {total_tests - passed_tests}")
@@ -169,9 +169,9 @@ def test_cli_list_basic_functionality():
 
     # Test passes if at least one provider type works
     # This ensures the core list functionality is working
-    assert (
-        passed_tests > 0
-    ), f"No provider types could execute list command. Results: {results}"
+    assert passed_tests > 0, (
+        f"No provider types could execute list command. Results: {results}"
+    )
 
     # Warn if some providers failed but don't fail the test
     if passed_tests < total_tests:
@@ -214,9 +214,9 @@ def test_cli_list_error_handling():
 
     assert code != 0, "Expected failure for invalid query pattern"
     error_output = stderr + stdout  # Error might be in either stream
-    assert (
-        "Invalid query" in error_output or "Error" in error_output
-    ), f"Expected error message, got stderr: {stderr}, stdout: {stdout}"
+    assert "Invalid query" in error_output or "Error" in error_output, (
+        f"Expected error message, got stderr: {stderr}, stdout: {stdout}"
+    )
     print("✅ Invalid pattern properly rejected")
 
     # Test 2: Non-existent provider
@@ -254,7 +254,7 @@ def test_cli_list_error_handling():
     print("=== Error handling tests completed ===")
 
 
-def _extract_json(output: str) -> Optional[list]:
+def _extract_json(output: str) -> list | None:
     """Extract JSON array from output that may contain log lines."""
     # Find the JSON array - look for [{ or [\n{ to avoid false matches
     for marker in ["[\n  {", "[{", "[\n{"]:
@@ -282,8 +282,8 @@ def test_cli_sync_each_provider_no_spaces():
     Clones one repo from each provider type (GitHub, Azure DevOps, BitBucket)
     where org/project/repo names do not contain spaces.
     """
-    import tempfile
     import shutil
+    import tempfile
     from pathlib import Path
 
     try:
@@ -294,12 +294,12 @@ def test_cli_sync_each_provider_no_spaces():
     if not all_providers:
         pytest.skip("No providers configured")
 
-    providers_by_type: Dict[str, List[str]] = {}
+    providers_by_type: dict[str, list[str]] = {}
     for name, ptype in all_providers.items():
         providers_by_type.setdefault(ptype, []).append(name)
 
     test_dir = Path(tempfile.mkdtemp(prefix="mgit_e2e_sync_"))
-    results: Dict[str, Tuple[bool, str]] = {}
+    results: dict[str, tuple[bool, str]] = {}
 
     try:
         for ptype, providers in providers_by_type.items():
@@ -311,7 +311,16 @@ def test_cli_sync_each_provider_no_spaces():
 
             # Get repos
             code, stdout, stderr = run_mgit_command(
-                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "30"],
+                [
+                    "list",
+                    "*/*/*",
+                    "--provider",
+                    provider,
+                    "--format",
+                    "json",
+                    "--limit",
+                    "30",
+                ],
                 timeout=90,
             )
             if code != 0:
@@ -347,7 +356,7 @@ def test_cli_sync_each_provider_no_spaces():
                         cloned = True
                         break
                 except subprocess.TimeoutExpired:
-                    print(f"  Timeout (repo too large), trying next...")
+                    print("  Timeout (repo too large), trying next...")
                     continue
 
             if not cloned and ptype not in results:
@@ -360,7 +369,7 @@ def test_cli_sync_each_provider_no_spaces():
     ok = [t for t, (passed, _) in results.items() if passed]
     failed = [(t, msg) for t, (passed, msg) in results.items() if not passed]
 
-    print(f"\n=== Sync (no spaces) Results ===")
+    print("\n=== Sync (no spaces) Results ===")
     for ptype, (passed, msg) in results.items():
         status = "✅" if passed else "❌"
         print(f"  {ptype}: {status} {msg}")
@@ -377,8 +386,8 @@ def test_cli_sync_each_provider_with_spaces():
     Tests repos where org/project/repo contains spaces (e.g., "Blue Cow").
     This validates the space handling fix in manager.py.
     """
-    import tempfile
     import shutil
+    import tempfile
     from pathlib import Path
 
     try:
@@ -389,12 +398,12 @@ def test_cli_sync_each_provider_with_spaces():
     if not all_providers:
         pytest.skip("No providers configured")
 
-    providers_by_type: Dict[str, List[str]] = {}
+    providers_by_type: dict[str, list[str]] = {}
     for name, ptype in all_providers.items():
         providers_by_type.setdefault(ptype, []).append(name)
 
     test_dir = Path(tempfile.mkdtemp(prefix="mgit_e2e_sync_spaces_"))
-    results: Dict[str, Tuple[bool, str]] = {}
+    results: dict[str, tuple[bool, str]] = {}
 
     try:
         for ptype, providers in providers_by_type.items():
@@ -406,7 +415,16 @@ def test_cli_sync_each_provider_with_spaces():
 
             # Get repos with higher limit to find spaces
             code, stdout, stderr = run_mgit_command(
-                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "100"],
+                [
+                    "list",
+                    "*/*/*",
+                    "--provider",
+                    provider,
+                    "--format",
+                    "json",
+                    "--limit",
+                    "100",
+                ],
                 timeout=120,  # Higher limit = more time
             )
             if code != 0:
@@ -445,20 +463,23 @@ def test_cli_sync_each_provider_with_spaces():
                     else:
                         print(f"  Failed: exit {code}")
                 except subprocess.TimeoutExpired:
-                    print(f"  Timeout (repo too large), trying next...")
+                    print("  Timeout (repo too large), trying next...")
                     continue
 
             if not cloned and ptype not in results:
-                results[ptype] = (True, "skipped - no repos with spaces or all too large")
+                results[ptype] = (
+                    True,
+                    "skipped - no repos with spaces or all too large",
+                )
 
     finally:
         shutil.rmtree(test_dir, ignore_errors=True)
 
     # Report
-    ok = [t for t, (passed, _) in results.items() if passed]
+    [t for t, (passed, _) in results.items() if passed]
     failed = [(t, msg) for t, (passed, msg) in results.items() if not passed]
 
-    print(f"\n=== Sync (with spaces) Results ===")
+    print("\n=== Sync (with spaces) Results ===")
     for ptype, (passed, msg) in results.items():
         status = "✅" if passed else "❌"
         print(f"  {ptype}: {status} {msg}")

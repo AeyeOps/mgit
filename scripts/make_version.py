@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Bump version. Use --bump patch|minor|major."""
+
 import argparse
 import re
 import subprocess
 from pathlib import Path
+
 
 def main():
     parser = argparse.ArgumentParser(description="Bump project version")
@@ -27,9 +29,12 @@ def main():
         patch += 1
 
     new_version = f"{major}.{minor}.{patch}"
-    new_content = re.sub(r'version = "\d+\.\d+\.\d+"', f'version = "{new_version}"', content)
+    new_content = re.sub(
+        r'version = "\d+\.\d+\.\d+"', f'version = "{new_version}"', content
+    )
     pyproject.write_text(new_content)
     print(f"Version bumped to {new_version}")
+
 
 if __name__ == "__main__":
     main()
