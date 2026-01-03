@@ -119,7 +119,8 @@ async def get_repository_statuses(
     path: Path, concurrency: int, fetch: bool, json_mode: bool = False
 ) -> list[RepositoryStatus]:
     """Finds all git repos in a path and gets their status concurrently."""
-    logger.info(f"Getting statuses for repos in: {path}")
+    if not json_mode:
+        logger.info(f"Getting statuses for repos in: {path}")
     repos_to_check = []
     # First, check if the root path itself is a repository
     if is_git_repository(path):
@@ -173,8 +174,11 @@ def display_status_results(
     results: list[RepositoryStatus], output_format: str, show_clean: bool
 ):
     """Displays the status results in the specified format."""
-    logger.info(f"Entering display_status_results with {len(results)} results.")
-    logger.debug(f"Displaying {len(results)} status results in {output_format} format.")
+    if output_format != "json":
+        logger.info(f"Entering display_status_results with {len(results)} results.")
+        logger.debug(
+            f"Displaying {len(results)} status results in {output_format} format."
+        )
     if not show_clean:
         results = [r for r in results if not r.is_clean]
 
