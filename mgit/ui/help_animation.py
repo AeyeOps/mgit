@@ -16,7 +16,7 @@ from mgit.ui.terminal import (
 )
 
 # Animation settings
-ANIMATION_DURATION = 3.5  # seconds
+ANIMATION_DURATION = 7.0  # seconds
 ANIMATION_FPS = 12  # frames per second
 ROTATION_SPEED = 0.15  # radians per frame
 
@@ -116,31 +116,29 @@ def run_tree_animation(duration: float = ANIMATION_DURATION, fps: float = ANIMAT
         _restore_signal_handler(previous_handler)
 
 
-def print_static_tree() -> None:
+def print_static_tree(use_color: bool = True) -> None:
     """Print the static ASCII tree (for non-animated contexts)."""
-    print(get_static_tree())
+    print(get_static_tree(use_color=use_color))
 
 
 def show_animated_help(help_text: str) -> None:
     """
     Show help with optional animation based on terminal capabilities.
 
-    In capable terminals: shows spinning tree animation, then static tree + help text.
-    In limited terminals: shows static tree, then help text.
-    In pipes: shows help text, then static tree.
+    In capable terminals: shows spinning tree animation, then static tree on top of help text.
+    In limited terminals: shows static tree on top of help text.
+    In pipes: shows static tree on top of help text (no color).
     """
     caps = get_terminal_capabilities()
+    use_color = caps in (TerminalCaps.ANSI, TerminalCaps.BASIC)
 
     try:
         if caps == TerminalCaps.ANSI:
             run_tree_animation()
-            # After animation, show help text first, then static tree as decoration
-            print(help_text)
-            print_static_tree()
-        else:
-            # For pipes and dumb terminals, show help first for usability
-            print(help_text)
-            print_static_tree()
+        # Tree always appears on top, then help text below
+        print_static_tree(use_color=use_color)
+        sys.stdout.flush()  # Ensure tree prints before Rich help text
+        print(help_text)
 
     except KeyboardInterrupt:
         # User interrupted - just show help without tree
