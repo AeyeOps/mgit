@@ -141,7 +141,7 @@ class TestGitHelpers:
         ]
 
         # These will be actual tests once sanitize_repo_name is available
-        for input_name, expected in test_cases:
+        for _input_name, _expected in test_cases:
             # result = sanitize_repo_name(input_name)
             # assert result == expected
             pass
@@ -179,7 +179,7 @@ class TestGitURLHandling:
         ]
 
         # These will be actual tests once embed_pat_in_url is available
-        for url, pat, expected in test_cases:
+        for _url, _pat, _expected in test_cases:
             # result = embed_pat_in_url(url, pat)
             # assert result == expected
             pass
@@ -194,7 +194,7 @@ class TestGitURLHandling:
     )
     def test_detect_git_provider(self, provider, urls):
         """Test detecting git provider from URL."""
-        for url in urls:
+        for _url in urls:
             # In real implementation:
             # detected = detect_provider(url)
             # assert detected == provider

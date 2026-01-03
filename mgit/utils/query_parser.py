@@ -8,7 +8,6 @@ Handles query patterns like:
 
 import fnmatch
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -18,7 +17,7 @@ class QueryPattern:
     org_pattern: str
     project_pattern: str
     repo_pattern: str
-    provider_type: Optional[str] = None
+    provider_type: str | None = None
 
     @property
     def has_org_filter(self) -> bool:
@@ -38,7 +37,7 @@ class QueryPattern:
         return self.repo_pattern != "*"
 
 
-def parse_query(query: str, provider_type: Optional[str] = None) -> QueryPattern:
+def parse_query(query: str, provider_type: str | None = None) -> QueryPattern:
     """Parse query string into pattern components.
 
     Args:
@@ -116,7 +115,7 @@ def matches_pattern(text: str, pattern: str, case_sensitive: bool = False) -> bo
     return False
 
 
-def validate_query(query: str) -> Optional[str]:
+def validate_query(query: str) -> str | None:
     """Validate query syntax and return error message if invalid.
 
     Args:

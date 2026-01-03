@@ -9,33 +9,62 @@ import asyncio
 import json
 import logging
 import sys
-from pathlib import Path
-from typing import Optional, List, Dict, Any
 from dataclasses import asdict
+from pathlib import Path
 
 import typer
 from rich.console import Console
 from rich.progress import Progress
 from rich.table import Table
 
-from mgit.discovery.change_discovery import ChangeDiscoveryEngine, ChangeDiscoveryResult
 from mgit.changesets.storage import ChangesetStorage
-from mgit.commands.diff import _convert_to_repository_changeset
+from mgit.discovery.change_discovery import ChangeDiscoveryEngine, ChangeDiscoveryResult
+from mgit.git.utils import get_repo_components
 
 logger = logging.getLogger(__name__)
 console = Console()
 
 
+def _resolve_repo_identity(repo) -> dict[str, str | None]:
+    """Resolve repository identity fields with clone URL fallback."""
+    organization = repo.organization
+    project = repo.project
+    name = repo.name
+
+    if repo.clone_url:
+        components = get_repo_components(repo.clone_url)
+        if components:
+            _, url_org, url_project, url_name = components
+            if not organization:
+                organization = url_org
+            if not project and url_project != "repos":
+                project = url_project
+            if not name:
+                name = url_name
+
+    return {"name": name, "organization": organization, "project": project}
+
+
+def _format_repo_label(repo) -> str:
+    identity = _resolve_repo_identity(repo)
+    parts = [
+        identity["organization"],
+        identity["project"],
+        identity["name"],
+    ]
+    return "/".join([part for part in parts if part]) or repo.name
+
+
 def execute_remote_diff_command(
     pattern: str,
-    local_root: Optional[Path],
-    provider: Optional[str],
-    output: Optional[Path],
+    local_root: Path | None,
+    provider: str | None,
+    output: Path | None,
     save_changeset: bool,
     changeset_name: str,
     include_remote_only: bool,
     concurrency: int,
-    limit: Optional[int],
+    limit: int | None,
     verbose: bool,
 ) -> None:
     """
@@ -93,7 +122,7 @@ def execute_remote_diff_command(
 
         if verbose:
             console.print(
-                f"[green]Remote change discovery completed successfully[/green]"
+                "[green]Remote change discovery completed successfully[/green]"
             )
 
     except KeyboardInterrupt:
@@ -172,7 +201,7 @@ def _display_discovery_summary(result: ChangeDiscoveryResult, verbose: bool) -> 
                 changes_info = " ([red]error[/red])"
 
             console.print(
-                f"  {status_emoji} {repo_change.repository.organization}/{repo_change.repository.name}{changes_info}"
+                f"  {status_emoji} {_format_repo_label(repo_change.repository)}{changes_info}"
             )
 
             if verbose and repo_change.error:
@@ -219,11 +248,9 @@ def _save_discovery_to_changesets(
 
 
 def _output_discovery_results(
-    result: ChangeDiscoveryResult, output: Optional[Path], verbose: bool
+    result: ChangeDiscoveryResult, output: Path | None, verbose: bool
 ) -> None:
     """Output detailed discovery results in JSONL format."""
-    import json
-
     output_stream = sys.stdout
     if output:
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -235,11 +262,12 @@ def _output_discovery_results(
         for repo_change in result.discovered_repositories:
             try:
                 # Convert to serializable format
+                repo_identity = _resolve_repo_identity(repo_change.repository)
                 result_data = {
                     "repository": {
-                        "name": repo_change.repository.name,
-                        "organization": repo_change.repository.organization,
-                        "project": repo_change.repository.project,
+                        "name": repo_identity["name"],
+                        "organization": repo_identity["organization"],
+                        "project": repo_identity["project"],
                         "clone_url": repo_change.repository.clone_url,
                         "description": repo_change.repository.description,
                         "default_branch": repo_change.repository.default_branch,

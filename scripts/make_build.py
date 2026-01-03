@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Build mgit executable. Wraps existing shell scripts."""
+
 import argparse
 import subprocess
 import sys

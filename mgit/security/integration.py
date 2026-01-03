@@ -5,7 +5,7 @@ to existing mgit components.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .config import get_security_settings, init_security_config
 from .logging import SecurityLogger, setup_secure_logging
@@ -24,7 +24,7 @@ class SecurityIntegration:
         self.monitor = get_security_monitor()
         self.is_initialized = False
 
-    def initialize(self, config_file: Optional[Path] = None) -> None:
+    def initialize(self, config_file: Path | None = None) -> None:
         """Initialize security subsystem.
 
         Args:
@@ -85,7 +85,7 @@ class SecurityIntegration:
         logger.info("Security configuration validated for production")
         return True
 
-    def get_security_summary(self) -> Dict[str, Any]:
+    def get_security_summary(self) -> dict[str, Any]:
         """Get comprehensive security status summary.
 
         Returns:
@@ -115,7 +115,7 @@ class SecurityIntegration:
             },
         }
 
-    def _get_production_issues(self) -> List[str]:
+    def _get_production_issues(self) -> list[str]:
         """Get list of production security issues.
 
         Returns:
@@ -144,7 +144,7 @@ class SecurityIntegration:
 
 
 # Global security integration instance
-_security_integration: Optional[SecurityIntegration] = None
+_security_integration: SecurityIntegration | None = None
 
 
 def get_security_integration() -> SecurityIntegration:
@@ -159,7 +159,7 @@ def get_security_integration() -> SecurityIntegration:
     return _security_integration
 
 
-def initialize_security(config_file: Optional[Path] = None) -> None:
+def initialize_security(config_file: Path | None = None) -> None:
     """Initialize mgit security subsystem.
 
     Args:
@@ -179,7 +179,7 @@ def validate_production_security() -> bool:
     return integration.validate_production_readiness()
 
 
-def get_security_status() -> Dict[str, Any]:
+def get_security_status() -> dict[str, Any]:
     """Get current security status.
 
     Returns:
@@ -264,8 +264,8 @@ def create_security_cli_commands():
     @security_app.command("events")
     def show_security_events(
         count: int = typer.Option(10, help="Number of events to show"),
-        event_type: Optional[str] = typer.Option(None, help="Filter by event type"),
-        severity: Optional[str] = typer.Option(None, help="Filter by severity"),
+        event_type: str | None = typer.Option(None, help="Filter by event type"),
+        severity: str | None = typer.Option(None, help="Filter by severity"),
     ):
         """Show recent security events."""
         monitor = get_security_monitor()
@@ -302,9 +302,9 @@ def create_security_cli_commands():
 
     @security_app.command("init")
     def init_security_config(
-        config_file: Optional[str] = typer.Option(
+        config_file: str | None = typer.Option(
             None, help="Security configuration file"
-        )
+        ),
     ):
         """Initialize security configuration."""
         config_path = Path(config_file) if config_file else None

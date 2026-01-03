@@ -4,7 +4,6 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import List, Optional
 from urllib.parse import unquote, urlparse
 
 logger = logging.getLogger(__name__)
@@ -30,7 +29,7 @@ def embed_pat_in_url(url: str, pat: str) -> str:
     return url  # Return original URL if not HTTPS
 
 
-def get_git_remote_url(repo_path: Path) -> Optional[str]:
+def get_git_remote_url(repo_path: Path) -> str | None:
     """
     Get the origin remote URL of a git repository.
 
@@ -49,13 +48,13 @@ def get_git_remote_url(repo_path: Path) -> Optional[str]:
         return None
 
     current_remote = None
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         for line in f:
             stripped = line.strip()
             if stripped.startswith("[") and stripped.endswith("]"):
                 current_remote = None
                 if stripped.lower().startswith('[remote "'):
-                    remote_name = stripped[len('[remote "'): -2]
+                    remote_name = stripped[len('[remote "') : -2]
                     current_remote = remote_name
                 continue
 
@@ -238,6 +237,21 @@ def build_repo_path(clone_url: str) -> Path:
     return Path(safe_host, safe_org, safe_project, safe_repo)
 
 
+def get_repo_components(
+    clone_url: str,
+) -> tuple[str, str, str, str] | None:
+    """Extract host/org/project/repo components from a clone URL."""
+    try:
+        repo_path = build_repo_path(clone_url)
+    except Exception:
+        return None
+
+    parts = repo_path.parts
+    if len(parts) != 4:
+        return None
+    return parts[0], parts[1], parts[2], parts[3]
+
+
 def _parse_ssh_url(clone_url: str) -> tuple[str, str, str, str]:
     """Parse SSH format Git URL (git@host:path)."""
     # Extract host and path from SSH format
@@ -316,7 +330,7 @@ def _parse_repository_path(
 
 
 def _parse_azure_devops_path(
-    host: str, segments: List[str], original_url: str
+    host: str, segments: list[str], original_url: str
 ) -> tuple[str, str, str, str]:
     """Parse Azure DevOps repository path patterns."""
     # Remove common Azure DevOps path elements
@@ -353,7 +367,7 @@ def _parse_azure_devops_path(
 
 
 def _parse_github_path(
-    host: str, segments: List[str], original_url: str
+    host: str, segments: list[str], original_url: str
 ) -> tuple[str, str, str, str]:
     """Parse GitHub repository path patterns."""
     if len(segments) < 2:
@@ -374,7 +388,7 @@ def _parse_github_path(
 
 
 def _parse_bitbucket_path(
-    host: str, segments: List[str], original_url: str
+    host: str, segments: list[str], original_url: str
 ) -> tuple[str, str, str, str]:
     """Parse BitBucket repository path patterns."""
     if len(segments) < 2:
@@ -403,7 +417,7 @@ def _parse_bitbucket_path(
 
 
 def _parse_generic_path(
-    host: str, segments: List[str], original_url: str
+    host: str, segments: list[str], original_url: str
 ) -> tuple[str, str, str, str]:
     """Parse generic Git provider path (assumes owner/repo pattern)."""
     if len(segments) == 1:

@@ -6,8 +6,9 @@ operations through the GitHub API.
 
 import asyncio
 import re
+from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any
 
 import aiohttp
 
@@ -55,7 +56,7 @@ class GitHubProvider(GitProvider):
         r"ssh://git@github\.com",
     ]
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """Initialize GitHub provider.
 
         Args:
@@ -87,9 +88,9 @@ class GitHubProvider(GitProvider):
         self.api_version = config.get("api_version", self.DEFAULT_API_VERSION)
 
         # HTTP session for API calls
-        self._session: Optional[aiohttp.ClientSession] = None
-        self._headers: Dict[str, str] = {}
-        self._rate_limit_info: Optional[Dict[str, Any]] = None
+        self._session: aiohttp.ClientSession | None = None
+        self._headers: dict[str, str] = {}
+        self._rate_limit_info: dict[str, Any] | None = None
 
         super().__init__(config)
 
@@ -307,7 +308,7 @@ class GitHubProvider(GitProvider):
             self._session = None
             self._authenticated = False
 
-    async def list_organizations(self) -> List[Organization]:
+    async def list_organizations(self) -> list[Organization]:
         """List accessible GitHub organizations.
 
         Returns:
@@ -377,7 +378,7 @@ class GitHubProvider(GitProvider):
             logger.error("Error listing GitHub organizations: %s", e)
             raise APIError(f"Failed to list organizations: {e}", self.PROVIDER_NAME)
 
-    async def list_projects(self, organization: str) -> List[Project]:
+    async def list_projects(self, organization: str) -> list[Project]:
         """List projects in organization.
 
         Note: GitHub doesn't have projects in the same sense as Azure DevOps.
@@ -395,8 +396,8 @@ class GitHubProvider(GitProvider):
     async def list_repositories(
         self,
         organization: str,
-        project: Optional[str] = None,
-        filters: Optional[Dict[str, Any]] = None,
+        project: str | None = None,
+        filters: dict[str, Any] | None = None,
     ) -> AsyncIterator[Repository]:
         """List GitHub repositories.
 
@@ -454,12 +455,11 @@ class GitHubProvider(GitProvider):
                                 ):
                                     continue
                                 if "archived" in filters:
-                                    if filters["archived"] is False and repo.get(
-                                        "archived", False
-                                    ):
-                                        continue
-                                    elif filters["archived"] is True and not repo.get(
-                                        "archived", False
+                                    if (
+                                        filters["archived"] is False
+                                        and repo.get("archived", False)
+                                        or filters["archived"] is True
+                                        and not repo.get("archived", False)
                                     ):
                                         continue
 
@@ -515,8 +515,8 @@ class GitHubProvider(GitProvider):
             raise APIError(f"Failed to list repositories: {e}", self.PROVIDER_NAME)
 
     async def get_repository(
-        self, organization: str, repository: str, project: Optional[str] = None
-    ) -> Optional[Repository]:
+        self, organization: str, repository: str, project: str | None = None
+    ) -> Repository | None:
         """Get specific GitHub repository.
 
         Args:
@@ -613,7 +613,7 @@ class GitHubProvider(GitProvider):
         """
         return False
 
-    def get_rate_limit_info(self) -> Optional[Dict[str, Any]]:
+    def get_rate_limit_info(self) -> dict[str, Any] | None:
         """Get GitHub API rate limit information.
 
         Returns:
@@ -676,7 +676,7 @@ class GitHubProvider(GitProvider):
                     "GitHub API rate limit exceeded", self.PROVIDER_NAME, reset_time
                 )
 
-    def _convert_repo_data(self, repo_data: Dict[str, Any]) -> Repository:
+    def _convert_repo_data(self, repo_data: dict[str, Any]) -> Repository:
         """Convert GitHub repository data to Repository object.
 
         Args:
@@ -688,6 +688,7 @@ class GitHubProvider(GitProvider):
         return Repository(
             name=repo_data["name"],
             clone_url=repo_data["clone_url"],
+            organization=repo_data.get("owner", {}).get("login"),
             ssh_url=repo_data.get("ssh_url"),
             is_disabled=repo_data.get("disabled", False),
             is_private=repo_data.get("private", False),
@@ -723,7 +724,7 @@ class GitHubProvider(GitProvider):
         )
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]) -> "GitHubProvider":
+    def from_config(cls, config: dict[str, Any]) -> "GitHubProvider":
         """Create GitHub provider from configuration.
 
         Args:

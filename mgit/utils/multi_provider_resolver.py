@@ -8,7 +8,6 @@ import asyncio
 import concurrent.futures
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
 
 from ..commands.listing import RepositoryResult, list_repositories
 from ..config.yaml_manager import list_provider_names
@@ -21,9 +20,9 @@ logger = logging.getLogger(__name__)
 class MultiProviderResult:
     """Result container for multi-provider repository resolution."""
 
-    repositories: List[Repository]
-    successful_providers: List[str]
-    failed_providers: List[str]
+    repositories: list[Repository]
+    successful_providers: list[str]
+    failed_providers: list[str]
     total_found: int
     duplicates_removed: int
 
@@ -41,7 +40,7 @@ class MultiProviderResolver:
         self._semaphore = asyncio.Semaphore(concurrency_limit)
 
     def _detect_multi_provider_pattern(
-        self, project: str, config: Optional[str] = None, url: Optional[str] = None
+        self, project: str, config: str | None = None, url: str | None = None
     ) -> bool:
         """Detect if this should use multi-provider resolution.
 
@@ -61,7 +60,7 @@ class MultiProviderResolver:
 
     async def _query_single_provider(
         self, provider_name: str, project: str
-    ) -> List[RepositoryResult]:
+    ) -> list[RepositoryResult]:
         """Query a single provider for repositories.
 
         Args:
@@ -86,8 +85,8 @@ class MultiProviderResolver:
             return []
 
     def _deduplicate_repositories(
-        self, all_results: List[RepositoryResult]
-    ) -> tuple[List[Repository], int]:
+        self, all_results: list[RepositoryResult]
+    ) -> tuple[list[Repository], int]:
         """Deduplicate repositories by URL, then by org/name.
 
         Args:
@@ -126,8 +125,8 @@ class MultiProviderResolver:
         self,
         project: str,
         provider_manager=None,
-        config: Optional[str] = None,
-        url: Optional[str] = None,
+        config: str | None = None,
+        url: str | None = None,
     ) -> MultiProviderResult:
         """Resolve repositories using appropriate strategy.
 

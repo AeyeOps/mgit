@@ -9,9 +9,10 @@ import asyncio
 import functools
 import logging
 import time
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, Optional, Type, TypeVar, Union
+from typing import Any, TypeVar
 
 import typer
 from rich.console import Console
@@ -30,7 +31,7 @@ class MgitError(Exception):
     being able to handle specific error types.
     """
 
-    def __init__(self, message: str, exit_code: int = 1, details: Optional[str] = None):
+    def __init__(self, message: str, exit_code: int = 1, details: str | None = None):
         """Initialize MgitError.
 
         Args:
@@ -71,7 +72,7 @@ class AuthenticationError(MgitError):
     - Missing authentication information
     """
 
-    def __init__(self, message: str, provider: Optional[str] = None):
+    def __init__(self, message: str, provider: str | None = None):
         """Initialize AuthenticationError.
 
         Args:
@@ -91,7 +92,7 @@ class ConnectionError(MgitError):
     - DNS resolution failures
     """
 
-    def __init__(self, message: str, url: Optional[str] = None):
+    def __init__(self, message: str, url: str | None = None):
         """Initialize ConnectionError.
 
         Args:
@@ -111,7 +112,7 @@ class RepositoryOperationError(MgitError):
     - Invalid repository state
     """
 
-    def __init__(self, message: str, operation: str, repository: Optional[str] = None):
+    def __init__(self, message: str, operation: str, repository: str | None = None):
         """Initialize RepositoryOperationError.
 
         Args:
@@ -131,7 +132,7 @@ class ProjectNotFoundError(MgitError):
     Raised when a specified project cannot be found in the provider.
     """
 
-    def __init__(self, project_name: str, provider: Optional[str] = None):
+    def __init__(self, project_name: str, provider: str | None = None):
         """Initialize ProjectNotFoundError.
 
         Args:
@@ -150,7 +151,7 @@ class OrganizationNotFoundError(MgitError):
     Raised when a specified organization cannot be found or accessed.
     """
 
-    def __init__(self, org_name: str, provider: Optional[str] = None):
+    def __init__(self, org_name: str, provider: str | None = None):
         """Initialize OrganizationNotFoundError.
 
         Args:
@@ -172,7 +173,7 @@ class ValidationError(MgitError):
     - Invalid command arguments
     """
 
-    def __init__(self, message: str, field: Optional[str] = None):
+    def __init__(self, message: str, field: str | None = None):
         """Initialize ValidationError.
 
         Args:
@@ -193,7 +194,7 @@ class FileSystemError(MgitError):
     - Disk full
     """
 
-    def __init__(self, message: str, path: Optional[str] = None):
+    def __init__(self, message: str, path: str | None = None):
         """Initialize FileSystemError.
 
         Args:
@@ -233,7 +234,7 @@ class CLIError(MgitError):
     - Command execution failures
     """
 
-    def __init__(self, message: str, command: Optional[str] = None):
+    def __init__(self, message: str, command: str | None = None):
         """Initialize CLIError.
 
         Args:
@@ -254,7 +255,7 @@ class RetryExhausted(MgitError):
     """Raised when all retry attempts have been exhausted."""
 
     def __init__(
-        self, message: str, attempts: int, last_error: Optional[Exception] = None
+        self, message: str, attempts: int, last_error: Exception | None = None
     ):
         """Initialize RetryExhausted.
 
@@ -275,11 +276,11 @@ def retry_with_backoff(
     retries: int = DEFAULT_RETRY_ATTEMPTS,
     delay: float = DEFAULT_RETRY_DELAY,
     backoff: float = DEFAULT_RETRY_BACKOFF,
-    exceptions: tuple[Type[Exception], ...] = (
+    exceptions: tuple[type[Exception], ...] = (
         ConnectionError,
         RepositoryOperationError,
     ),
-    on_retry: Optional[Callable[[Exception, int], None]] = None,
+    on_retry: Callable[[Exception, int], None] | None = None,
 ) -> Callable[[T], T]:
     """Decorator to retry operations with exponential backoff.
 
@@ -303,7 +304,7 @@ def retry_with_backoff(
     def decorator(func: T) -> T:
         @functools.wraps(func)
         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            last_exception: Optional[Exception] = None
+            last_exception: Exception | None = None
             current_delay = delay
 
             for attempt in range(retries + 1):
@@ -340,7 +341,7 @@ def retry_with_backoff(
 
         @functools.wraps(func)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-            last_exception: Optional[Exception] = None
+            last_exception: Exception | None = None
             current_delay = delay
 
             for attempt in range(retries + 1):
@@ -388,9 +389,9 @@ def retry_with_backoff(
 def error_context(
     operation: str,
     *,
-    suppress: Optional[tuple[Type[Exception], ...]] = None,
-    transform: Optional[Dict[Type[Exception], Type[MgitError]]] = None,
-    details: Optional[Dict[str, Any]] = None,
+    suppress: tuple[type[Exception], ...] | None = None,
+    transform: dict[type[Exception], type[MgitError]] | None = None,
+    details: dict[str, Any] | None = None,
 ) -> Generator[None, None, None]:
     """Context manager for consistent error handling and transformation.
 
@@ -422,7 +423,7 @@ def error_context(
                     error_msg = f"Failed to {operation}: {str(e)}"
 
                     # Build kwargs for the MgitError constructor
-                    kwargs: Dict[str, Any] = {"message": error_msg}
+                    kwargs: dict[str, Any] = {"message": error_msg}
 
                     # Add operation-specific details
                     if details:
@@ -499,7 +500,7 @@ def temporary_error_handler(
 
 def error_handler(
     *,
-    exceptions: Optional[Union[Type[Exception], tuple[Type[Exception], ...]]] = None,
+    exceptions: type[Exception] | tuple[type[Exception], ...] | None = None,
     exit_on_error: bool = True,
     log_traceback: bool = True,
 ) -> Callable[[T], T]:
@@ -602,7 +603,7 @@ def error_handler(
 
 def async_error_handler(
     *,
-    exceptions: Optional[Union[Type[Exception], tuple[Type[Exception], ...]]] = None,
+    exceptions: type[Exception] | tuple[type[Exception], ...] | None = None,
     exit_on_error: bool = True,
     log_traceback: bool = True,
 ) -> Callable[[T], T]:
@@ -687,7 +688,7 @@ def async_error_handler(
 
 
 # Convenience function for validating inputs
-def validate_url(url: str, provider: Optional[str] = None) -> None:
+def validate_url(url: str, provider: str | None = None) -> None:
     """Validate that a URL is properly formatted.
 
     Args:
@@ -717,7 +718,7 @@ def validate_url(url: str, provider: Optional[str] = None) -> None:
         )
 
 
-def validate_path(path: Union[str, Path], must_exist: bool = False) -> Path:
+def validate_path(path: str | Path, must_exist: bool = False) -> Path:
     """Validate a file system path.
 
     Args:
@@ -746,7 +747,7 @@ def validate_path(path: Union[str, Path], must_exist: bool = False) -> Path:
 class ErrorReport:
     """Utility class for generating detailed error reports."""
 
-    def __init__(self, error: Exception, context: Optional[Dict[str, Any]] = None):
+    def __init__(self, error: Exception, context: dict[str, Any] | None = None):
         """Initialize ErrorReport.
 
         Args:
@@ -757,7 +758,7 @@ class ErrorReport:
         self.context = context or {}
         self.timestamp = time.time()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert error report to dictionary format.
 
         Returns:
@@ -810,7 +811,7 @@ class ErrorReport:
 
 
 def create_error_report(
-    error: Exception, operation: Optional[str] = None, **context: Any
+    error: Exception, operation: str | None = None, **context: Any
 ) -> ErrorReport:
     """Create an error report with context.
 

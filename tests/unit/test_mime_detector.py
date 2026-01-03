@@ -2,12 +2,13 @@
 Unit tests for MIME detector and content safety validation.
 """
 
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from mgit.content.mime_detector import MimeDetector, MimeInfo, ContentSafety
+import pytest
+
+from mgit.content.mime_detector import ContentSafety, MimeDetector
 
 
 class TestMimeDetector:
@@ -199,9 +200,9 @@ class TestMimeDetector:
 
         for mime_type, expected_safety in test_cases:
             safety = mime_detector._classify_content_safety(mime_type, 1024, ".test")
-            assert (
-                safety == expected_safety
-            ), f"Failed for {mime_type}: expected {expected_safety}, got {safety}"
+            assert safety == expected_safety, (
+                f"Failed for {mime_type}: expected {expected_safety}, got {safety}"
+            )
 
     def test_text_type_detection(self, mime_detector):
         """Test text vs binary type classification."""
@@ -215,14 +216,14 @@ class TestMimeDetector:
         binary_types = ["application/octet-stream", "image/jpeg", "application/zip"]
 
         for mime_type in text_types:
-            assert (
-                mime_detector._is_text_type(mime_type) is True
-            ), f"{mime_type} should be text"
+            assert mime_detector._is_text_type(mime_type) is True, (
+                f"{mime_type} should be text"
+            )
 
         for mime_type in binary_types:
-            assert (
-                mime_detector._is_text_type(mime_type) is False
-            ), f"{mime_type} should be binary"
+            assert mime_detector._is_text_type(mime_type) is False, (
+                f"{mime_type} should be binary"
+            )
 
     def test_size_limits_constants(self):
         """Test that size limit constants are set correctly."""

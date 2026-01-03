@@ -15,12 +15,15 @@ Usage:
     See existing providers (github.py, azdevops.py, etc.) for examples.
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, AsyncIterator, Dict, List, Optional
 import asyncio
 import time
+from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
+
+from mgit.providers.exceptions import RepositoryNotFoundError
 
 
 # Common data structures
@@ -30,16 +33,18 @@ class Repository:
 
     name: str
     clone_url: str
-    ssh_url: Optional[str] = None
+    organization: str | None = None
+    project: str | None = None
+    ssh_url: str | None = None
     is_disabled: bool = False
     is_private: bool = True
     default_branch: str = "main"
-    size: Optional[int] = None  # Size in KB
-    description: Optional[str] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    size: int | None = None  # Size in KB
+    description: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
     provider: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)  # Provider-specific data
+    metadata: dict[str, Any] = field(default_factory=dict)  # Provider-specific data
 
 
 @dataclass
@@ -49,7 +54,7 @@ class Organization:
     name: str
     url: str
     provider: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -58,8 +63,8 @@ class Project:
 
     name: str
     organization: str
-    description: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    description: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class AuthMethod(Enum):
@@ -89,10 +94,10 @@ class GitProvider(ABC):
 
     # Class attributes to be overridden by subclasses
     PROVIDER_NAME: str = ""
-    SUPPORTED_AUTH_METHODS: List[AuthMethod] = []
+    SUPPORTED_AUTH_METHODS: list[AuthMethod] = []
     DEFAULT_API_VERSION: str = ""
 
-    def __init__(self, config: Dict[str, Any]) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         """Initialize provider with configuration.
 
         Args:
@@ -107,14 +112,14 @@ class GitProvider(ABC):
         Raises:
             ConfigurationError: If required configuration is missing or invalid
         """
-        self.config: Dict[str, Any] = config
+        self.config: dict[str, Any] = config
         self._validate_config()
-        self._client: Optional[Any] = None
+        self._client: Any | None = None
         self._authenticated: bool = False
 
         # Rate limiter configuration
         self._rate_limiter_config = self._get_rate_limiter_config()
-        self._rate_limit_info: Optional[Dict[str, Any]] = None
+        self._rate_limit_info: dict[str, Any] | None = None
 
     @abstractmethod
     def _validate_config(self) -> None:
@@ -174,7 +179,7 @@ class GitProvider(ABC):
         pass
 
     @abstractmethod
-    async def list_organizations(self) -> List[Organization]:
+    async def list_organizations(self) -> list[Organization]:
         """List all accessible organizations/workspaces.
 
         This method should return all organizations that the authenticated user
@@ -195,7 +200,7 @@ class GitProvider(ABC):
         pass
 
     @abstractmethod
-    async def list_projects(self, organization: str) -> List[Project]:
+    async def list_projects(self, organization: str) -> list[Project]:
         """List all projects in an organization.
 
         Projects are an optional hierarchical level between organizations and
@@ -223,8 +228,8 @@ class GitProvider(ABC):
     async def list_repositories(
         self,
         organization: str,
-        project: Optional[str] = None,
-        filters: Optional[Dict[str, Any]] = None,
+        project: str | None = None,
+        filters: dict[str, Any] | None = None,
     ) -> AsyncIterator[Repository]:
         """List repositories with optional filtering.
 
@@ -256,8 +261,8 @@ class GitProvider(ABC):
 
     @abstractmethod
     async def get_repository(
-        self, organization: str, repository: str, project: Optional[str] = None
-    ) -> Optional[Repository]:
+        self, organization: str, repository: str, project: str | None = None
+    ) -> Repository | None:
         """Get a specific repository.
 
         This method should fetch detailed information about a single repository.
@@ -305,8 +310,8 @@ class GitProvider(ABC):
     async def count_repositories(
         self,
         organization: str,
-        project: Optional[str] = None,
-        filters: Optional[Dict[str, Any]] = None,
+        project: str | None = None,
+        filters: dict[str, Any] | None = None,
     ) -> int:
         """Count total repositories matching criteria.
 
@@ -342,7 +347,7 @@ class GitProvider(ABC):
         """
         return True  # Override in providers that don't
 
-    def get_rate_limit_info(self) -> Optional[Dict[str, Any]]:
+    def get_rate_limit_info(self) -> dict[str, Any] | None:
         """Get current rate limit information if available.
 
         Providers that implement rate limiting should override this method to
@@ -375,7 +380,7 @@ class GitProvider(ABC):
             # Close client connections if needed
             pass
 
-    def get_provider_info(self) -> Dict[str, Any]:
+    def get_provider_info(self) -> dict[str, Any]:
         """Get provider information and capabilities.
 
         This method returns information about the provider instance,
@@ -409,8 +414,8 @@ class GitProvider(ABC):
         self,
         organization: str,
         repository: str,
-        project: Optional[str] = None,
-        required_permissions: Optional[List[str]] = None,
+        project: str | None = None,
+        required_permissions: list[str] | None = None,
     ) -> bool:
         """Validate user has required access to a repository.
 
@@ -438,7 +443,7 @@ class GitProvider(ABC):
         except (PermissionError, RepositoryNotFoundError):
             return False
 
-    def _get_rate_limiter_config(self) -> Dict[str, Any]:
+    def _get_rate_limiter_config(self) -> dict[str, Any]:
         """Get rate limiter configuration with defaults.
 
         Configuration options:
@@ -482,17 +487,22 @@ class GitProvider(ABC):
                 # Respect max wait time
                 max_wait = self._rate_limiter_config["max_wait_seconds"]
                 if wait_seconds > max_wait:
-                    raise Exception(f"Rate limit wait time ({wait_seconds}s) exceeds maximum ({max_wait}s)")
+                    raise Exception(
+                        f"Rate limit wait time ({wait_seconds}s) exceeds maximum ({max_wait}s)"
+                    )
 
                 # Use exponential backoff with configurable multiplier
                 multiplier = self._rate_limiter_config["exponential_rate"]
                 max_backoff = self._rate_limiter_config["backoff_max_seconds"]
                 retry_count = self._retry_count()
-                exponential_wait = 1.0 * (multiplier ** retry_count)  # Start at 1s, multiply by rate each retry
+                exponential_wait = 1.0 * (
+                    multiplier**retry_count
+                )  # Start at 1s, multiply by rate each retry
                 wait_seconds = min(exponential_wait, max_backoff)
 
                 # Add jitter to prevent thundering herd (0.1-1.0 seconds)
                 import random
+
                 jitter = random.uniform(0.1, 1.0)
                 wait_seconds += jitter
 
@@ -504,11 +514,11 @@ class GitProvider(ABC):
 
     def _retry_count(self) -> int:
         """Get current retry count for exponential backoff."""
-        return getattr(self, '_retry_count_attr', 0)
+        return getattr(self, "_retry_count_attr", 0)
 
     def _increment_retry_count(self) -> None:
         """Increment retry count for exponential backoff."""
-        if not hasattr(self, '_retry_count_attr'):
+        if not hasattr(self, "_retry_count_attr"):
             self._retry_count_attr = 0
         self._retry_count_attr += 1
 
@@ -526,13 +536,16 @@ class GitProvider(ABC):
             response: HTTP response object with headers
         """
         # Default implementation - providers can override for their specific headers
-        headers = getattr(response, 'headers', {})
+        headers = getattr(response, "headers", {})
 
         # Common rate limit headers across providers
         rate_limit_headers = {
-            "limit": headers.get("X-RateLimit-Limit") or headers.get("X-Rate-Limit-Limit"),
-            "remaining": headers.get("X-RateLimit-Remaining") or headers.get("X-Rate-Limit-Remaining"),
-            "reset": headers.get("X-RateLimit-Reset") or headers.get("X-Rate-Limit-Reset"),
+            "limit": headers.get("X-RateLimit-Limit")
+            or headers.get("X-Rate-Limit-Limit"),
+            "remaining": headers.get("X-RateLimit-Remaining")
+            or headers.get("X-Rate-Limit-Remaining"),
+            "reset": headers.get("X-RateLimit-Reset")
+            or headers.get("X-Rate-Limit-Reset"),
         }
 
         # Only update if we have at least one header
@@ -563,7 +576,7 @@ class GitProvider(ABC):
         await self._check_rate_limit(response)
 
         # Reset retry count on successful response
-        if hasattr(response, 'status') and 200 <= response.status < 300:
+        if hasattr(response, "status") and 200 <= response.status < 300:
             self._reset_retry_count()
         else:
             self._increment_retry_count()

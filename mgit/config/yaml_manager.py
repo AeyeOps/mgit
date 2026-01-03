@@ -7,7 +7,7 @@ This module provides a clean YAML-based configuration system that uses
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ruamel.yaml import YAML
 
@@ -27,14 +27,14 @@ class ConfigurationManager:
     """Modern YAML-based configuration manager with comment preservation."""
 
     def __init__(self):
-        self._config_cache: Optional[Dict[str, Any]] = None
-        self._raw_config_cache: Optional[Any] = None  # Keep ruamel objects for saving
+        self._config_cache: dict[str, Any] | None = None
+        self._raw_config_cache: Any | None = None  # Keep ruamel objects for saving
         # Simple ruamel.yaml setup for comment preservation
         self._yaml = YAML()
         self._yaml.preserve_quotes = True
         self._yaml.indent(mapping=2, sequence=4, offset=2)
 
-    def _load_config(self) -> Dict[str, Any]:
+    def _load_config(self) -> dict[str, Any]:
         """Load configuration from YAML file."""
         if not CONFIG_FILE.exists():
             logger.debug(f"Config file not found: {CONFIG_FILE}")
@@ -78,7 +78,7 @@ class ConfigurationManager:
             logger.error(f"Failed to load config: {e}")
             raise
 
-    def load_config(self, force_reload: bool = False) -> Dict[str, Any]:
+    def load_config(self, force_reload: bool = False) -> dict[str, Any]:
         """Load the complete configuration with caching."""
         if self._config_cache is not None and not force_reload:
             return self._config_cache
@@ -86,12 +86,12 @@ class ConfigurationManager:
         self._config_cache = self._load_config()
         return self._config_cache
 
-    def get_provider_configs(self) -> Dict[str, Dict[str, Any]]:
+    def get_provider_configs(self) -> dict[str, dict[str, Any]]:
         """Get all named provider configurations."""
         config = self.load_config()
         return config.get("providers", {})
 
-    def get_provider_config(self, name: str) -> Dict[str, Any]:
+    def get_provider_config(self, name: str) -> dict[str, Any]:
         """Get a specific named provider configuration."""
         providers = self.get_provider_configs()
         if name not in providers:
@@ -101,12 +101,12 @@ class ConfigurationManager:
             )
         return providers[name]
 
-    def get_default_provider_name(self) -> Optional[str]:
+    def get_default_provider_name(self) -> str | None:
         """Get the default provider name from global config."""
         config = self.load_config()
         return config.get("global", {}).get("default_provider")
 
-    def get_default_provider_config(self) -> Dict[str, Any]:
+    def get_default_provider_config(self) -> dict[str, Any]:
         """Get the default provider configuration."""
         default_name = self.get_default_provider_name()
         if not default_name:
@@ -122,12 +122,12 @@ class ConfigurationManager:
 
         return self.get_provider_config(default_name)
 
-    def get_global_config(self) -> Dict[str, Any]:
+    def get_global_config(self) -> dict[str, Any]:
         """Get global configuration settings."""
         config = self.load_config()
         return config.get("global", {})
 
-    def list_provider_names(self) -> List[str]:
+    def list_provider_names(self) -> list[str]:
         """List all configured provider names."""
         return list(self.get_provider_configs().keys())
 
@@ -155,7 +155,7 @@ class ConfigurationManager:
                 f"URL must contain: dev.azure.com, visualstudio.com, github.com, or bitbucket.org"
             )
 
-    def save_config(self, config: Dict[str, Any]) -> None:
+    def save_config(self, config: dict[str, Any]) -> None:
         """Save configuration to YAML file with comment preservation."""
         try:
             # Ensure config directory exists
@@ -194,7 +194,7 @@ class ConfigurationManager:
             logger.error(f"Failed to save configuration: {e}")
             raise
 
-    def add_provider_config(self, name: str, provider_config: Dict[str, Any]) -> None:
+    def add_provider_config(self, name: str, provider_config: dict[str, Any]) -> None:
         """Add or update a named provider configuration."""
         config = self.load_config()
         config["providers"][name] = provider_config
@@ -241,27 +241,27 @@ config_manager = ConfigurationManager()
 
 
 # Public API functions
-def get_provider_configs() -> Dict[str, Dict[str, Any]]:
+def get_provider_configs() -> dict[str, dict[str, Any]]:
     """Get all named provider configurations."""
     return config_manager.get_provider_configs()
 
 
-def get_provider_config(name: str) -> Dict[str, Any]:
+def get_provider_config(name: str) -> dict[str, Any]:
     """Get a specific named provider configuration."""
     return config_manager.get_provider_config(name)
 
 
-def get_default_provider_config() -> Dict[str, Any]:
+def get_default_provider_config() -> dict[str, Any]:
     """Get the default provider configuration."""
     return config_manager.get_default_provider_config()
 
 
-def get_default_provider_name() -> Optional[str]:
+def get_default_provider_name() -> str | None:
     """Get the default provider name."""
     return config_manager.get_default_provider_name()
 
 
-def list_provider_names() -> List[str]:
+def list_provider_names() -> list[str]:
     """List all configured provider names."""
     return config_manager.list_provider_names()
 
@@ -271,12 +271,12 @@ def detect_provider_type(provider_name: str) -> str:
     return config_manager.detect_provider_type(provider_name)
 
 
-def get_global_config() -> Dict[str, Any]:
+def get_global_config() -> dict[str, Any]:
     """Get global configuration settings."""
     return config_manager.get_global_config()
 
 
-def get_global_setting(key: str, default: Optional[Any] = None) -> Any:
+def get_global_setting(key: str, default: Any | None = None) -> Any:
     """Get a specific global setting with optional default.
 
     Args:
@@ -290,7 +290,7 @@ def get_global_setting(key: str, default: Optional[Any] = None) -> Any:
     return global_config.get(key, default)
 
 
-def add_provider_config(name: str, provider_config: Dict[str, Any]) -> None:
+def add_provider_config(name: str, provider_config: dict[str, Any]) -> None:
     """Add or update a named provider configuration."""
     config_manager.add_provider_config(name, provider_config)
 

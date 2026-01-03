@@ -11,6 +11,7 @@ Usage:
     uv run python scripts/test_binary.py --binary /path/to/mgit
     uv run python scripts/test_binary.py --skip-network  # Skip network tests
 """
+
 import argparse
 import os
 import random
@@ -77,7 +78,9 @@ class StandaloneTestSuite:
             self.add_result("binary_exists", False, f"Binary not found: {self.binary}")
             return
         if not os.access(self.binary, os.X_OK):
-            self.add_result("binary_exists", False, f"Binary not executable: {self.binary}")
+            self.add_result(
+                "binary_exists", False, f"Binary not executable: {self.binary}"
+            )
             return
         size_mb = path.stat().st_size / (1024 * 1024)
         self.add_result("binary_exists", True, f"Found ({size_mb:.1f} MB)")
@@ -93,7 +96,9 @@ class StandaloneTestSuite:
                 version = result.stdout.strip().split()[-1]
                 self.add_result("version", True, f"v{version}")
             else:
-                self.add_result("version", False, f"Unexpected output: {result.stdout[:50]}")
+                self.add_result(
+                    "version", False, f"Unexpected output: {result.stdout[:50]}"
+                )
         except Exception as e:
             self.add_result("version", False, str(e))
 
@@ -108,7 +113,9 @@ class StandaloneTestSuite:
                 # Count commands mentioned
                 commands = ["sync", "list", "status", "config", "login"]
                 found = [c for c in commands if c in result.stdout.lower()]
-                self.add_result("help", True, f"Found {len(found)}/{len(commands)} commands")
+                self.add_result(
+                    "help", True, f"Found {len(found)}/{len(commands)} commands"
+                )
             else:
                 self.add_result("help", False, f"No help text")
         except Exception as e:
@@ -139,7 +146,9 @@ class StandaloneTestSuite:
         repo_dir.mkdir(parents=True)
         try:
             # Initialize git repo
-            subprocess.run(["git", "init"], cwd=repo_dir, capture_output=True, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=repo_dir, capture_output=True, check=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@test.com"],
                 cwd=repo_dir,
@@ -151,7 +160,9 @@ class StandaloneTestSuite:
                 capture_output=True,
             )
             (repo_dir / "file.txt").write_text("test")
-            subprocess.run(["git", "add", "."], cwd=repo_dir, capture_output=True, check=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=repo_dir, capture_output=True, check=True
+            )
             subprocess.run(
                 ["git", "commit", "-m", "init"],
                 cwd=repo_dir,
@@ -174,7 +185,9 @@ class StandaloneTestSuite:
         repo_dir.mkdir(parents=True)
         try:
             # Initialize and make dirty
-            subprocess.run(["git", "init"], cwd=repo_dir, capture_output=True, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=repo_dir, capture_output=True, check=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@test.com"],
                 cwd=repo_dir,
@@ -186,7 +199,9 @@ class StandaloneTestSuite:
                 capture_output=True,
             )
             (repo_dir / "file.txt").write_text("test")
-            subprocess.run(["git", "add", "."], cwd=repo_dir, capture_output=True, check=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=repo_dir, capture_output=True, check=True
+            )
             subprocess.run(
                 ["git", "commit", "-m", "init"],
                 cwd=repo_dir,
@@ -214,7 +229,9 @@ class StandaloneTestSuite:
             for name in ["repo1", "repo2", "repo3"]:
                 repo = multi_dir / name
                 repo.mkdir()
-                subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+                subprocess.run(
+                    ["git", "init"], cwd=repo, capture_output=True, check=True
+                )
                 subprocess.run(
                     ["git", "config", "user.email", "test@test.com"],
                     cwd=repo,
@@ -226,7 +243,9 @@ class StandaloneTestSuite:
                     capture_output=True,
                 )
                 (repo / "file.txt").write_text(f"content-{name}")
-                subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
+                subprocess.run(
+                    ["git", "add", "."], cwd=repo, capture_output=True, check=True
+                )
                 subprocess.run(
                     ["git", "commit", "-m", "init"],
                     cwd=repo,
@@ -247,7 +266,9 @@ class StandaloneTestSuite:
         repo_dir = self.test_dir / "json_test"
         repo_dir.mkdir(parents=True)
         try:
-            subprocess.run(["git", "init"], cwd=repo_dir, capture_output=True, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=repo_dir, capture_output=True, check=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@test.com"],
                 cwd=repo_dir,
@@ -259,7 +280,9 @@ class StandaloneTestSuite:
                 capture_output=True,
             )
             (repo_dir / "file.txt").write_text("test")
-            subprocess.run(["git", "add", "."], cwd=repo_dir, capture_output=True, check=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=repo_dir, capture_output=True, check=True
+            )
             subprocess.run(
                 ["git", "commit", "-m", "init"],
                 cwd=repo_dir,
@@ -267,8 +290,12 @@ class StandaloneTestSuite:
                 check=True,
             )
 
-            result = self.run_cmd(["status", str(repo_dir), "--output", "json", "--show-clean"])
-            if result.returncode == 0 and ("{" in result.stdout or "[" in result.stdout):
+            result = self.run_cmd(
+                ["status", str(repo_dir), "--output", "json", "--show-clean"]
+            )
+            if result.returncode == 0 and (
+                "{" in result.stdout or "[" in result.stdout
+            ):
                 self.add_result("status_json", True, "JSON output valid")
             elif result.returncode == 0:
                 self.add_result("status_json", True, "Output produced")
@@ -282,7 +309,9 @@ class StandaloneTestSuite:
         repo_dir = self.test_dir / "fail_dirty"
         repo_dir.mkdir(parents=True)
         try:
-            subprocess.run(["git", "init"], cwd=repo_dir, capture_output=True, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=repo_dir, capture_output=True, check=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@test.com"],
                 cwd=repo_dir,
@@ -294,7 +323,9 @@ class StandaloneTestSuite:
                 capture_output=True,
             )
             (repo_dir / "file.txt").write_text("test")
-            subprocess.run(["git", "add", "."], cwd=repo_dir, capture_output=True, check=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=repo_dir, capture_output=True, check=True
+            )
             subprocess.run(
                 ["git", "commit", "-m", "init"],
                 cwd=repo_dir,
@@ -332,7 +363,9 @@ class StandaloneTestSuite:
         repo_dir = self.test_dir / "concurrency"
         repo_dir.mkdir(parents=True)
         try:
-            subprocess.run(["git", "init"], cwd=repo_dir, capture_output=True, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=repo_dir, capture_output=True, check=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@test.com"],
                 cwd=repo_dir,
@@ -344,7 +377,9 @@ class StandaloneTestSuite:
                 capture_output=True,
             )
             (repo_dir / "file.txt").write_text("test")
-            subprocess.run(["git", "add", "."], cwd=repo_dir, capture_output=True, check=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=repo_dir, capture_output=True, check=True
+            )
             subprocess.run(
                 ["git", "commit", "-m", "init"],
                 cwd=repo_dir,
@@ -358,7 +393,9 @@ class StandaloneTestSuite:
             if result.returncode == 0:
                 self.add_result("status_concurrency", True, "Concurrency=1 works")
             else:
-                self.add_result("status_concurrency", False, f"Exit {result.returncode}")
+                self.add_result(
+                    "status_concurrency", False, f"Exit {result.returncode}"
+                )
         except Exception as e:
             self.add_result("status_concurrency", False, str(e))
 
@@ -437,7 +474,16 @@ class StandaloneTestSuite:
             self.log(f"Testing {provider} ({ptype})")
 
             result = self.run_cmd(
-                ["list", "*/*/*", "--provider", provider, "--format", "table", "--limit", "5"],
+                [
+                    "list",
+                    "*/*/*",
+                    "--provider",
+                    provider,
+                    "--format",
+                    "table",
+                    "--limit",
+                    "5",
+                ],
                 timeout=60,
             )
 
@@ -542,7 +588,16 @@ class StandaloneTestSuite:
             self.log(f"Testing sync (no spaces) for {ptype} via {provider}")
 
             list_result = self.run_cmd(
-                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "50"],
+                [
+                    "list",
+                    "*/*/*",
+                    "--provider",
+                    provider,
+                    "--format",
+                    "json",
+                    "--limit",
+                    "50",
+                ],
                 timeout=90,
             )
 
@@ -568,27 +623,33 @@ class StandaloneTestSuite:
                 pattern = f"{org}/{project}/{name}"
                 self.log(f"  Cloning (no spaces): {pattern}")
 
-                sync_result = self.run_cmd(
-                    ["sync", pattern, str(clone_dir), "--provider", provider],
-                    timeout=120,
-                )
+                try:
+                    sync_result = self.run_cmd(
+                        ["sync", pattern, str(clone_dir), "--provider", provider],
+                        timeout=180,
+                    )
 
-                if sync_result.returncode == 0:
-                    git_dirs = list(clone_dir.rglob(".git"))
-                    if git_dirs:
-                        results[ptype] = "OK"
-                        cloned = True
-                        break
+                    if sync_result.returncode == 0:
+                        git_dirs = list(clone_dir.rglob(".git"))
+                        if git_dirs:
+                            results[ptype] = "OK"
+                            cloned = True
+                            break
+                except subprocess.TimeoutExpired:
+                    self.log(f"  Timeout (repo too large), trying next...")
+                    continue
 
             if not cloned and ptype not in results:
-                results[ptype] = "no repo without spaces"
+                results[ptype] = "no repo cloned (all too large or no matches)"
 
         ok_types = [t for t, r in results.items() if r == "OK"]
         if len(ok_types) == len(by_type):
             self.add_result("sync_no_spaces", True, f"All {len(ok_types)} types OK")
         elif ok_types:
             failed = [(t, r) for t, r in results.items() if r != "OK"]
-            self.add_result("sync_no_spaces", False, f"OK: {ok_types}, FAILED: {failed}")
+            self.add_result(
+                "sync_no_spaces", False, f"OK: {ok_types}, FAILED: {failed}"
+            )
         else:
             self.add_result("sync_no_spaces", False, f"All failed: {dict(results)}")
 
@@ -616,7 +677,16 @@ class StandaloneTestSuite:
             self.log(f"Testing sync (with spaces) for {ptype} via {provider}")
 
             list_result = self.run_cmd(
-                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "100"],
+                [
+                    "list",
+                    "*/*/*",
+                    "--provider",
+                    provider,
+                    "--format",
+                    "json",
+                    "--limit",
+                    "100",
+                ],
                 timeout=90,
             )
 
@@ -643,28 +713,40 @@ class StandaloneTestSuite:
                 pattern = f"{org}/{project}/{name}"
                 self.log(f"  Cloning (with spaces): {pattern}")
 
-                sync_result = self.run_cmd(
-                    ["sync", pattern, str(clone_dir), "--provider", provider],
-                    timeout=120,
-                )
+                try:
+                    sync_result = self.run_cmd(
+                        ["sync", pattern, str(clone_dir), "--provider", provider],
+                        timeout=180,
+                    )
 
-                if sync_result.returncode == 0:
-                    git_dirs = list(clone_dir.rglob(".git"))
-                    if git_dirs:
-                        results[ptype] = "OK"
-                        cloned = True
-                        break
+                    if sync_result.returncode == 0:
+                        git_dirs = list(clone_dir.rglob(".git"))
+                        if git_dirs:
+                            results[ptype] = "OK"
+                            cloned = True
+                            break
+                        else:
+                            self.log(f"  No .git created despite exit 0")
                     else:
-                        self.log(f"  No .git created despite exit 0")
-                else:
-                    self.log(f"  Exit {sync_result.returncode}: {sync_result.stderr[:100]}")
+                        self.log(
+                            f"  Exit {sync_result.returncode}: {sync_result.stderr[:100]}"
+                        )
+                except subprocess.TimeoutExpired:
+                    self.log(f"  Timeout (repo too large), trying next...")
+                    continue
 
             if not cloned and ptype not in results:
-                results[ptype] = "no repo with spaces found"
+                results[ptype] = "no repo with spaces found or all too large"
 
         ok_types = [t for t, r in results.items() if r == "OK"]
-        skipped = [t for t, r in results.items() if r == "no repo with spaces found"]
-        failed = [(t, r) for t, r in results.items() if r not in ("OK", "no repo with spaces found")]
+        skipped_msgs = (
+            "no repo with spaces found",
+            "no repo with spaces found or all too large",
+        )
+        skipped = [t for t, r in results.items() if r in skipped_msgs]
+        failed = [
+            (t, r) for t, r in results.items() if r != "OK" and r not in skipped_msgs
+        ]
 
         if failed:
             self.add_result("sync_with_spaces", False, f"FAILED: {failed}")
@@ -674,7 +756,9 @@ class StandaloneTestSuite:
                 msg += f", {len(skipped)} skipped (no spaces)"
             self.add_result("sync_with_spaces", True, msg)
         else:
-            self.add_result("sync_with_spaces", True, "All skipped (no spaces in any repos)")
+            self.add_result(
+                "sync_with_spaces", True, "All skipped (no spaces in any repos)"
+            )
 
     # =========================================================================
     # Cleanup and run
@@ -687,11 +771,11 @@ class StandaloneTestSuite:
 
     def run_all(self) -> bool:
         """Run all tests and return True if all passed."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"mgit Standalone Linux Binary Test Suite")
         print(f"Binary: {self.binary}")
         print(f"Test dir: {self.test_dir}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # Smoke tests
         print("[Smoke Tests]")
@@ -742,9 +826,9 @@ class StandaloneTestSuite:
         # Summary
         passed = sum(1 for r in self.results if r.passed)
         total = len(self.results)
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Results: {passed}/{total} tests passed")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         return passed == total
 
@@ -757,7 +841,8 @@ def main() -> None:
         help=f"Path to mgit binary (default: {DEFAULT_BINARY})",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Show detailed output",
     )

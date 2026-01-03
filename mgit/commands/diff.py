@@ -10,28 +10,26 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional, TextIO
-from dataclasses import dataclass, asdict
-from datetime import datetime
+from typing import TextIO
 
 import typer
 from rich.console import Console
-from rich.progress import Progress, TaskID
+from rich.progress import Progress
 
-from mgit.git.manager import GitManager
-from mgit.git.utils import is_git_repository
-from mgit.changesets.models import RepositoryChangeset, FileChange, CommitInfo
+from mgit.changesets.models import CommitInfo, FileChange, RepositoryChangeset
 from mgit.changesets.storage import ChangesetStorage
-from mgit.content.embedding import ContentEmbeddingEngine, EmbeddingConfig
-from mgit.content.embedding import ContentStrategy
-from mgit.processing import DiffProcessor, RepositoryChange
+from mgit.content.embedding import (
+    ContentStrategy,
+)
 from mgit.discovery.change_discovery import ChangeDiscoveryEngine
+from mgit.git.utils import is_git_repository
+from mgit.processing import DiffProcessor, RepositoryChange
 
 logger = logging.getLogger(__name__)
 console = Console()
 
 
-def _find_repositories(path: Path, recursive: bool) -> List[Path]:
+def _find_repositories(path: Path, recursive: bool) -> list[Path]:
     """
     Find Git repositories in the given path.
 
@@ -66,7 +64,7 @@ def _find_repositories(path: Path, recursive: bool) -> List[Path]:
 
 def execute_diff_command(
     path: Path,
-    output: Optional[Path],
+    output: Path | None,
     recursive: bool,
     concurrency: int,
     verbose: bool,
@@ -76,8 +74,8 @@ def execute_diff_command(
     embed_content: bool = False,
     content_strategy: str = "sample",
     content_memory_mb: int = 100,
-    discover_pattern: Optional[str] = None,
-    discover_provider: Optional[str] = None,
+    discover_pattern: str | None = None,
+    discover_provider: str | None = None,
     merge_discovered: bool = False,
 ) -> None:
     """
@@ -230,7 +228,7 @@ def execute_diff_command(
         raise typer.Exit(1)
 
 
-def _get_output_stream(output: Optional[Path]) -> TextIO:
+def _get_output_stream(output: Path | None) -> TextIO:
     """Get the appropriate output stream for results."""
     if output:
         # Ensure output directory exists
@@ -241,7 +239,7 @@ def _get_output_stream(output: Optional[Path]) -> TextIO:
 
 
 def _write_changes_jsonl(
-    changes: List[RepositoryChange], stream: TextIO, verbose: bool
+    changes: list[RepositoryChange], stream: TextIO, verbose: bool
 ) -> None:
     """
     Write file-level change data to output stream in JSONL format.
@@ -347,7 +345,7 @@ def _write_changes_jsonl(
 
 def _convert_to_repository_changeset(change: RepositoryChange) -> "RepositoryChangeset":
     """Convert RepositoryChange to RepositoryChangeset for storage."""
-    from mgit.changesets.models import RepositoryChangeset, FileChange, CommitInfo
+    from mgit.changesets.models import RepositoryChangeset
 
     # Convert file changes
     file_changes = []
@@ -388,7 +386,7 @@ def _convert_to_repository_changeset(change: RepositoryChange) -> "RepositoryCha
 
 
 def _save_to_changeset_storage(
-    changes: List[RepositoryChange],
+    changes: list[RepositoryChange],
     storage: ChangesetStorage,
     collection_name: str,
     verbose: bool,
@@ -412,8 +410,8 @@ def _save_to_changeset_storage(
 
 
 def _filter_incremental_changes(
-    current_changes: List[RepositoryChange], previous_collection, verbose: bool
-) -> List[RepositoryChange]:
+    current_changes: list[RepositoryChange], previous_collection, verbose: bool
+) -> list[RepositoryChange]:
     """Filter changes to only include repositories with differences since last scan."""
     incremental_changes = []
 
@@ -467,7 +465,4 @@ def _has_meaningful_changes(current: RepositoryChange, previous) -> bool:
         previous.recent_commits[0].hash if previous.recent_commits else None
     )
 
-    if current_latest != previous_latest:
-        return True
-
-    return False
+    return current_latest != previous_latest

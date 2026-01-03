@@ -54,7 +54,9 @@ def _rotate_point(
     return x1, y1, z2
 
 
-def _sample_cone_surface(theta: float, h: float) -> tuple[float, float, float, float, float, float]:
+def _sample_cone_surface(
+    theta: float, h: float
+) -> tuple[float, float, float, float, float, float]:
     """
     Sample a point on the cone surface (foliage).
 
@@ -82,7 +84,9 @@ def _sample_cone_surface(theta: float, h: float) -> tuple[float, float, float, f
     return x, y, z, nx, ny, nz
 
 
-def _sample_trunk_surface(theta: float, h: float) -> tuple[float, float, float, float, float, float]:
+def _sample_trunk_surface(
+    theta: float, h: float
+) -> tuple[float, float, float, float, float, float]:
     """
     Sample a point on the trunk cylinder.
 
@@ -114,9 +118,15 @@ def render_tree_frame(angle: float, tilt: float = 0.2, use_color: bool = True) -
     Returns: Multi-line string of ASCII art
     """
     # Initialize screen buffer, z-buffer, and color buffer
-    output: list[list[str]] = [[" " for _ in range(SCREEN_WIDTH)] for _ in range(SCREEN_HEIGHT)]
-    zbuffer: list[list[float]] = [[0.0 for _ in range(SCREEN_WIDTH)] for _ in range(SCREEN_HEIGHT)]
-    colors: list[list[str]] = [["" for _ in range(SCREEN_WIDTH)] for _ in range(SCREEN_HEIGHT)]
+    output: list[list[str]] = [
+        [" " for _ in range(SCREEN_WIDTH)] for _ in range(SCREEN_HEIGHT)
+    ]
+    zbuffer: list[list[float]] = [
+        [0.0 for _ in range(SCREEN_WIDTH)] for _ in range(SCREEN_HEIGHT)
+    ]
+    colors: list[list[str]] = [
+        ["" for _ in range(SCREEN_WIDTH)] for _ in range(SCREEN_HEIGHT)
+    ]
 
     # Precompute trig values - tilt around X, spin around Y
     sin_a, cos_a = math.sin(tilt), math.cos(tilt)

@@ -7,9 +7,10 @@ nested progress contexts, and common operation patterns.
 """
 
 import asyncio
+from collections.abc import Callable, Iterable
 from contextlib import contextmanager
 from enum import Enum
-from typing import Callable, Dict, Iterable, List, Optional, TypeVar, Union
+from typing import TypeVar
 
 from rich.console import Console
 from rich.progress import (
@@ -86,7 +87,7 @@ class StatusColumn(ProgressColumn):
         return str(status).ljust(self.status_width)
 
 
-def get_progress_columns(style: ProgressStyle) -> List[ProgressColumn]:
+def get_progress_columns(style: ProgressStyle) -> list[ProgressColumn]:
     """Get appropriate progress columns for the given style.
 
     Args:
@@ -148,15 +149,15 @@ class ProgressManager:
     - Integration with async operations
     """
 
-    def __init__(self, console: Optional[Console] = None):
+    def __init__(self, console: Console | None = None):
         """Initialize the progress manager.
 
         Args:
             console: Rich console instance to use (creates new if None)
         """
         self.console = console or Console()
-        self._progress_stack: List[Progress] = []
-        self._task_stacks: List[Dict[str, TaskID]] = []
+        self._progress_stack: list[Progress] = []
+        self._task_stacks: list[dict[str, TaskID]] = []
 
     @contextmanager
     def progress_context(
@@ -191,8 +192,8 @@ class ProgressManager:
     def add_task(
         self,
         description: str,
-        total: Optional[float] = None,
-        progress: Optional[Progress] = None,
+        total: float | None = None,
+        progress: Progress | None = None,
         **fields,
     ) -> TaskID:
         """Add a task to the current or specified progress context.
@@ -221,7 +222,7 @@ class ProgressManager:
         return task_id
 
     def update_task(
-        self, task_id: Union[TaskID, str], progress: Optional[Progress] = None, **kwargs
+        self, task_id: TaskID | str, progress: Progress | None = None, **kwargs
     ):
         """Update a task in the current or specified progress context.
 
@@ -243,9 +244,9 @@ class ProgressManager:
 
     def advance_task(
         self,
-        task_id: Union[TaskID, str],
+        task_id: TaskID | str,
         advance: float = 1,
-        progress: Optional[Progress] = None,
+        progress: Progress | None = None,
     ):
         """Advance a task by the specified amount.
 
@@ -269,7 +270,7 @@ class ProgressManager:
     def track_operation(
         self,
         description: str,
-        total: Optional[int] = None,
+        total: int | None = None,
         style: ProgressStyle = ProgressStyle.SIMPLE,
     ):
         """Context manager for tracking a single operation.
@@ -300,7 +301,7 @@ class ProgressManager:
         description: str = "Processing tasks",
         style: ProgressStyle = ProgressStyle.FILE_OPERATION,
         max_concurrent: int = 4,
-    ) -> List[Union[T, Exception]]:
+    ) -> list[T | Exception]:
         """Track progress of multiple async tasks with concurrency control.
 
         Args:
@@ -313,7 +314,7 @@ class ProgressManager:
             List of results (values or exceptions)
         """
         tasks_list = list(tasks)
-        results: List[Union[T, Exception]] = []
+        results: list[T | Exception] = []
 
         async def run_with_progress(
             task_func: Callable, index: int, progress: Progress, task_id: TaskID
@@ -352,9 +353,9 @@ class ProgressManager:
 @contextmanager
 def track_operation(
     description: str,
-    total: Optional[int] = None,
+    total: int | None = None,
     style: ProgressStyle = ProgressStyle.SIMPLE,
-    console: Optional[Console] = None,
+    console: Console | None = None,
 ):
     """Convenience function to track a single operation.
 
@@ -379,7 +380,7 @@ def track_operation(
             raise
 
 
-def create_file_progress(console: Optional[Console] = None) -> Progress:
+def create_file_progress(console: Console | None = None) -> Progress:
     """Create a progress instance configured for file operations.
 
     Args:
@@ -394,7 +395,7 @@ def create_file_progress(console: Optional[Console] = None) -> Progress:
     )
 
 
-def create_network_progress(console: Optional[Console] = None) -> Progress:
+def create_network_progress(console: Console | None = None) -> Progress:
     """Create a progress instance configured for network operations.
 
     Args:
@@ -409,7 +410,7 @@ def create_network_progress(console: Optional[Console] = None) -> Progress:
     )
 
 
-def create_multi_step_progress(console: Optional[Console] = None) -> Progress:
+def create_multi_step_progress(console: Console | None = None) -> Progress:
     """Create a progress instance configured for multi-step operations.
 
     Args:

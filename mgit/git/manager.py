@@ -1,10 +1,9 @@
 """Git operations manager for mgit CLI tool."""
 
-import asyncio
 import logging
 import subprocess
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Any
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -15,7 +14,7 @@ class GitManager:
 
     # Fix type hint for dir_name
     async def git_clone(
-        self, repo_url: str, output_dir: Path, dir_name: Optional[str] = None
+        self, repo_url: str, output_dir: Path, dir_name: str | None = None
     ):
         """
         Use 'git clone' for the given repo_url, in output_dir.
@@ -63,7 +62,7 @@ class GitManager:
         cmd = [self.GIT_EXECUTABLE, "pull"]
         await self._run_subprocess(cmd, cwd=repo_dir)
 
-    async def get_current_branch(self, repo_dir: Path) -> Optional[str]:
+    async def get_current_branch(self, repo_dir: Path) -> str | None:
         """
         Get the current branch name for the repository.
 
@@ -89,7 +88,7 @@ class GitManager:
 
     async def get_recent_commits(
         self, repo_dir: Path, limit: int = 5
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get recent commit information from the repository.
 
@@ -131,7 +130,7 @@ class GitManager:
             logger.debug(f"Get recent commits failed in {repo_dir}: {e}")
             return []
 
-    async def diff_files(self, repo_dir: Path) -> Dict[str, Any]:
+    async def diff_files(self, repo_dir: Path) -> dict[str, Any]:
         """
         Get diff information for a repository including git status.
 

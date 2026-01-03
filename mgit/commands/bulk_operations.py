@@ -4,12 +4,12 @@ Provides common logic for clone and pull operations across multiple repositories
 """
 
 import asyncio
+import io
 import logging
 import shutil
 import subprocess
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 from rich.console import Console
 from rich.progress import Progress
@@ -50,17 +50,18 @@ class BulkOperationProcessor:
         self.git_manager = git_manager
         self.provider_manager = provider_manager
         self.operation_type = operation_type
-        self.failures: List[Tuple[str, str]] = []
+        self.failures: list[tuple[str, str]] = []
 
     async def process_repositories(
         self,
-        repositories: List[Repository],
+        repositories: list[Repository],
         target_path: Path,
         concurrency: int = 4,
         update_mode: UpdateMode = UpdateMode.skip,
         confirmed_force_remove: bool = False,
-        dirs_to_remove: Optional[List[Tuple[str, str, Path]]] = None,
-    ) -> List[Tuple[str, str]]:
+        dirs_to_remove: list[tuple[str, str, Path]] | None = None,
+        show_progress: bool = True,
+    ) -> list[tuple[str, str]]:
         """
         Process repositories asynchronously with progress tracking.
 
@@ -79,7 +80,11 @@ class BulkOperationProcessor:
         sem = asyncio.Semaphore(concurrency)
         repo_tasks = {}
 
-        with Progress() as progress:
+        progress_console = console
+        if not show_progress:
+            progress_console = Console(file=io.StringIO(), force_terminal=False)
+
+        with Progress(console=progress_console) as progress:
             overall_task_id = progress.add_task(
                 "[green]Processing Repositories...",
                 total=len(repositories),
@@ -163,7 +168,7 @@ class BulkOperationProcessor:
         overall_task_id: int,
         display_name: str,
         confirmed_force_remove: bool,
-        dirs_to_remove: List[Tuple[str, str, Path]],
+        dirs_to_remove: list[tuple[str, str, Path]],
     ) -> bool:
         """
         Handle existing directory based on update mode.
@@ -332,10 +337,10 @@ class BulkOperationProcessor:
 
 
 def check_force_mode_confirmation(
-    repositories: List[Repository],
+    repositories: list[Repository],
     target_path: Path,
     update_mode: UpdateMode,
-) -> Tuple[bool, List[Tuple[str, str, Path]]]:
+) -> tuple[bool, list[tuple[str, str, Path]]]:
     """
     Check for existing directories in force mode and get user confirmation.
 

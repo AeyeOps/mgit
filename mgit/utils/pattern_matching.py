@@ -5,24 +5,26 @@ Provides analysis and validation of repository patterns used in multi-provider o
 """
 
 import re
-from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
+
 
 @dataclass
 class PatternAnalysis:
     """Analysis result of a repository pattern."""
+
     original_pattern: str
     normalized_pattern: str
     is_pattern: bool
     is_multi_provider: bool
-    validation_errors: List[str]
-    provider_hint: Optional[str] = None
-    url_hint: Optional[str] = None
+    validation_errors: list[str]
+    provider_hint: str | None = None
+    url_hint: str | None = None
+
 
 def analyze_pattern(
     pattern: str,
-    explicit_provider: Optional[str] = None,
-    explicit_url: Optional[str] = None
+    explicit_provider: str | None = None,
+    explicit_url: str | None = None,
 ) -> PatternAnalysis:
     """
     Analyze a repository pattern and determine its characteristics.
@@ -41,27 +43,31 @@ def analyze_pattern(
             normalized_pattern=pattern,
             is_pattern=False,
             is_multi_provider=False,
-            validation_errors=["Pattern cannot be empty"]
+            validation_errors=["Pattern cannot be empty"],
         )
 
     # Check for wildcard characters
-    has_wildcards = bool(re.search(r'[\*\?]', pattern))
+    has_wildcards = bool(re.search(r"[\*\?]", pattern))
 
     # Split pattern into segments
-    segments = pattern.split('/')
+    segments = pattern.split("/")
     segment_count = len(segments)
 
     # Validate segment count (should be 3 for org/project/repo pattern)
     validation_errors = []
     if segment_count != 3:
-        validation_errors.append(f"Pattern must have exactly 3 segments separated by '/'. Got {segment_count} segments.")
+        validation_errors.append(
+            f"Pattern must have exactly 3 segments separated by '/'. Got {segment_count} segments."
+        )
 
     # Check for invalid characters in segments
     # Allow alphanumeric, spaces, dots, underscores, hyphens, and wildcards
     # Git and most providers support these characters
     for i, segment in enumerate(segments):
-        if segment and not re.match(r'^[a-zA-Z0-9_\-\*\?\. ]+$', segment):
-            validation_errors.append(f"Segment {i+1} contains invalid characters: {segment}")
+        if segment and not re.match(r"^[a-zA-Z0-9_\-\*\?\. ]+$", segment):
+            validation_errors.append(
+                f"Segment {i + 1} contains invalid characters: {segment}"
+            )
 
     # Determine if this is a multi-provider operation
     is_multi_provider = False
@@ -79,10 +85,11 @@ def analyze_pattern(
         normalized_pattern=normalized_pattern,
         is_pattern=has_wildcards,
         is_multi_provider=is_multi_provider,
-        validation_errors=validation_errors
+        validation_errors=validation_errors,
     )
 
-def validate_pattern(pattern: str) -> List[str]:
+
+def validate_pattern(pattern: str) -> list[str]:
     """
     Validate a repository pattern and return any errors.
 
@@ -94,6 +101,7 @@ def validate_pattern(pattern: str) -> List[str]:
     """
     analysis = analyze_pattern(pattern)
     return analysis.validation_errors
+
 
 def is_multi_provider_pattern(pattern: str) -> bool:
     """
@@ -108,7 +116,8 @@ def is_multi_provider_pattern(pattern: str) -> bool:
     analysis = analyze_pattern(pattern)
     return analysis.is_multi_provider
 
-def extract_provider_hint(pattern: str) -> Optional[str]:
+
+def extract_provider_hint(pattern: str) -> str | None:
     """
     Extract provider hint from pattern if possible.
 

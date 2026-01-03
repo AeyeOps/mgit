@@ -5,7 +5,7 @@ named configurations and supports multiple providers of the same type.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 from mgit.config.yaml_manager import (
@@ -34,7 +34,7 @@ class ProviderManager:
     """
 
     def __init__(
-        self, provider_name: Optional[str] = None, auto_detect_url: Optional[str] = None
+        self, provider_name: str | None = None, auto_detect_url: str | None = None
     ):
         """Initialize provider manager.
 
@@ -44,9 +44,9 @@ class ProviderManager:
         """
         self.provider_name = provider_name
         self.auto_detect_url = auto_detect_url
-        self._provider: Optional[GitProvider] = None
-        self._provider_type: Optional[str] = None
-        self._config: Optional[Dict[str, Any]] = None
+        self._provider: GitProvider | None = None
+        self._provider_type: str | None = None
+        self._config: dict[str, Any] | None = None
 
         # Resolve provider configuration
         self._resolve_provider()
@@ -67,7 +67,7 @@ class ProviderManager:
                 self._provider_type = self._detect_provider_from_url(
                     self.auto_detect_url
                 )
-                self._config = self._find_config_by_type(self._provider_type)
+                _, self._config = self._find_config_by_type(self._provider_type)
                 logger.debug(
                     f"Auto-detected provider type '{self._provider_type}' from URL"
                 )
@@ -109,7 +109,9 @@ class ProviderManager:
         except Exception as e:
             raise ValueError(f"Failed to parse URL '{url}': {e}")
 
-    def _find_config_by_type(self, provider_type: str) -> Dict[str, Any]:
+    def _find_config_by_type(
+        self, provider_type: str, *, set_name: bool = True
+    ) -> tuple[str, dict[str, Any]]:
         """Find first configuration of given provider type."""
         from mgit.config.yaml_manager import get_provider_configs
 
@@ -117,11 +119,12 @@ class ProviderManager:
         for name, config in providers.items():
             try:
                 if detect_provider_type(name) == provider_type:
-                    self.provider_name = name
+                    if set_name:
+                        self.provider_name = name
                     logger.debug(
                         f"Found '{name}' configuration for provider type '{provider_type}'"
                     )
-                    return config
+                    return name, config
             except ValueError:
                 continue
 
@@ -245,11 +248,11 @@ class ProviderManager:
         return self._provider_type or "unknown"
 
     @property
-    def config(self) -> Dict[str, Any]:
+    def config(self) -> dict[str, Any]:
         """Get the provider configuration."""
         return self._config or {}
 
-    def get_available_providers(self) -> Dict[str, str]:
+    def get_available_providers(self) -> dict[str, str]:
         """Get all available provider names and their types.
 
         Returns:
@@ -372,7 +375,7 @@ class ProviderManager:
             name = None
             is_disabled = False
             if hasattr(repository, "provider"):
-                repo_provider_type = getattr(repository, "provider")
+                repo_provider_type = repository.provider
                 clone_url = getattr(repository, "clone_url", None)
                 name = getattr(repository, "name", None)
                 is_disabled = getattr(repository, "is_disabled", False)
@@ -382,18 +385,17 @@ class ProviderManager:
                 name = repository.get("name")
                 is_disabled = repository.get("is_disabled", False)
 
-            # If repo indicates a different provider type, create a temp manager
-            manager = self
+            provider = self.get_provider()
             if repo_provider_type and repo_provider_type != self._provider_type:
                 try:
-                    temp_config = self._find_config_by_type(repo_provider_type)
-                    manager = ProviderManager(provider_name=self.provider_name)
-                    manager._provider_type = repo_provider_type
-                    manager._config = temp_config
+                    _, temp_config = self._find_config_by_type(
+                        repo_provider_type, set_name=False
+                    )
+                    provider = ProviderFactory.create_provider(
+                        repo_provider_type, temp_config
+                    )
                 except Exception:
-                    manager = self
-
-            provider = manager.get_provider()
+                    provider = self.get_provider()
 
             # Convert to Repository object if needed
             if isinstance(repository, dict):

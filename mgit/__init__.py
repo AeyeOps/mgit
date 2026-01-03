@@ -15,7 +15,7 @@ else:
 
 if pyproject_path.exists():
     # Development or source installation
-    with open(pyproject_path, "r") as f:
+    with open(pyproject_path) as f:
         for line in f:
             if line.strip().startswith('version = "'):
                 __version__ = line.split('"')[1]

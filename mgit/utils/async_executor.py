@@ -8,9 +8,10 @@ progress tracking, and error collection for batch operations.
 import asyncio
 import logging
 import subprocess
+from collections.abc import Callable, Coroutine
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Any, TypeVar
 
 from rich.console import Console
 from rich.progress import Progress, TaskID
@@ -58,7 +59,7 @@ class AsyncExecutor:
         self,
         concurrency: int = 4,
         mode: ExecutionMode = ExecutionMode.CONCURRENT,
-        rich_console: Optional[Console] = None,
+        rich_console: Console | None = None,
     ):
         """
         Initialize the AsyncExecutor.
@@ -77,15 +78,15 @@ class AsyncExecutor:
 
     async def run_batch(
         self,
-        items: List[T],
+        items: list[T],
         process_func: Callable[[T], Coroutine[Any, Any, Any]],
         task_description: str = "Processing items...",
-        item_description: Optional[Callable[[T], str]] = None,
+        item_description: Callable[[T], str] | None = None,
         show_progress: bool = True,
         collect_errors: bool = True,
-        on_error: Optional[Callable[[T, Exception], None]] = None,
-        on_success: Optional[Callable[[T, Any], None]] = None,
-    ) -> Tuple[List[Any], List[Tuple[T, Exception]]]:
+        on_error: Callable[[T, Exception], None] | None = None,
+        on_success: Callable[[T, Any], None] | None = None,
+    ) -> tuple[list[Any], list[tuple[T, Exception]]]:
         """
         Run a batch of async operations with progress tracking.
 
@@ -105,7 +106,7 @@ class AsyncExecutor:
             - errors: List of (item, exception) tuples for failed items
         """
         results = [None] * len(items)
-        errors: List[Tuple[T, Exception]] = []
+        errors: list[tuple[T, Exception]] = []
 
         if not show_progress:
             # Run without progress bars
@@ -143,7 +144,7 @@ class AsyncExecutor:
                 overall_task = progress.add_task(task_description, total=len(items))
 
                 # Create individual task tracking
-                item_tasks: Dict[int, TaskID] = {}
+                item_tasks: dict[int, TaskID] = {}
                 for idx, item in enumerate(items):
                     desc = (
                         item_description(item)
@@ -200,11 +201,11 @@ class AsyncExecutor:
         idx: int,
         item: T,
         process_func: Callable[[T], Coroutine[Any, Any, Any]],
-        results: List[Any],
-        errors: List[Tuple[T, Exception]],
+        results: list[Any],
+        errors: list[tuple[T, Exception]],
         collect_errors: bool,
-        on_error: Optional[Callable[[T, Exception], None]],
-        on_success: Optional[Callable[[T, Any], None]],
+        on_error: Callable[[T, Exception], None] | None,
+        on_success: Callable[[T, Any], None] | None,
     ):
         """Process item with semaphore for concurrency control."""
         async with self.semaphore:
@@ -224,11 +225,11 @@ class AsyncExecutor:
         idx: int,
         item: T,
         process_func: Callable[[T], Coroutine[Any, Any, Any]],
-        results: List[Any],
-        errors: List[Tuple[T, Exception]],
+        results: list[Any],
+        errors: list[tuple[T, Exception]],
         collect_errors: bool,
-        on_error: Optional[Callable[[T, Exception], None]],
-        on_success: Optional[Callable[[T, Any], None]],
+        on_error: Callable[[T, Exception], None] | None,
+        on_success: Callable[[T, Any], None] | None,
     ):
         """Process a single item."""
         try:
@@ -249,15 +250,15 @@ class AsyncExecutor:
         idx: int,
         item: T,
         process_func: Callable[[T], Coroutine[Any, Any, Any]],
-        results: List[Any],
-        errors: List[Tuple[T, Exception]],
+        results: list[Any],
+        errors: list[tuple[T, Exception]],
         progress: Progress,
         overall_task: TaskID,
         item_task: TaskID,
-        item_description: Optional[Callable[[T], str]],
+        item_description: Callable[[T], str] | None,
         collect_errors: bool,
-        on_error: Optional[Callable[[T, Exception], None]],
-        on_success: Optional[Callable[[T, Any], None]],
+        on_error: Callable[[T, Exception], None] | None,
+        on_success: Callable[[T, Any], None] | None,
     ):
         """Process item with progress tracking."""
         desc = item_description(item) if item_description else f"Item {idx + 1}"
@@ -299,15 +300,15 @@ class AsyncExecutor:
         idx: int,
         item: T,
         process_func: Callable[[T], Coroutine[Any, Any, Any]],
-        results: List[Any],
-        errors: List[Tuple[T, Exception]],
+        results: list[Any],
+        errors: list[tuple[T, Exception]],
         progress: Progress,
         overall_task: TaskID,
         item_task: TaskID,
         desc: str,
         collect_errors: bool,
-        on_error: Optional[Callable[[T, Exception], None]],
-        on_success: Optional[Callable[[T, Any], None]],
+        on_error: Callable[[T, Exception], None] | None,
+        on_success: Callable[[T, Any], None] | None,
     ):
         """Process with progress bar updates."""
         progress.update(
@@ -339,7 +340,7 @@ class AsyncExecutor:
         progress.advance(overall_task, 1)
 
     async def run_single(
-        self, coro: Coroutine[Any, Any, T], timeout: Optional[float] = None
+        self, coro: Coroutine[Any, Any, T], timeout: float | None = None
     ) -> T:
         """
         Run a single async operation with optional timeout.
@@ -360,7 +361,7 @@ class AsyncExecutor:
 
     async def gather_with_errors(
         self, *coros: Coroutine[Any, Any, Any], return_exceptions: bool = True
-    ) -> List[Union[Any, Exception]]:
+    ) -> list[Any | Exception]:
         """
         Gather multiple coroutines, optionally returning exceptions instead of raising.
 
@@ -378,12 +379,12 @@ class AsyncExecutor:
 
 
 async def run_concurrent(
-    items: List[T],
+    items: list[T],
     process_func: Callable[[T], Coroutine[Any, Any, Any]],
     concurrency: int = 4,
     show_progress: bool = True,
     task_description: str = "Processing items...",
-) -> Tuple[List[Any], List[Tuple[T, Exception]]]:
+) -> tuple[list[Any], list[tuple[T, Exception]]]:
     """
     Convenience function to run items concurrently with default settings.
 
@@ -407,11 +408,11 @@ async def run_concurrent(
 
 
 async def run_sequential(
-    items: List[T],
+    items: list[T],
     process_func: Callable[[T], Coroutine[Any, Any, Any]],
     show_progress: bool = True,
     task_description: str = "Processing items...",
-) -> Tuple[List[Any], List[Tuple[T, Exception]]]:
+) -> tuple[list[Any], list[tuple[T, Exception]]]:
     """
     Convenience function to run items sequentially.
 
@@ -449,12 +450,12 @@ class SubprocessExecutor(AsyncExecutor):
 
     async def run_commands(
         self,
-        commands: List[Tuple[str, List[str], Path]],
+        commands: list[tuple[str, list[str], Path]],
         task_description: str = "Running commands...",
         show_progress: bool = True,
-    ) -> Tuple[
-        List[Tuple[int, bytes, bytes]],
-        List[Tuple[Tuple[str, List[str], Path], Exception]],
+    ) -> tuple[
+        list[tuple[int, bytes, bytes]],
+        list[tuple[tuple[str, list[str], Path], Exception]],
     ]:
         """
         Run multiple subprocess commands with progress tracking.
@@ -469,8 +470,8 @@ class SubprocessExecutor(AsyncExecutor):
         """
 
         async def run_command(
-            cmd_info: Tuple[str, List[str], Path],
-        ) -> Tuple[int, bytes, bytes]:
+            cmd_info: tuple[str, list[str], Path],
+        ) -> tuple[int, bytes, bytes]:
             name, cmd_args, cwd = cmd_info
             process = await asyncio.create_subprocess_exec(
                 *cmd_args,

@@ -7,7 +7,8 @@ operations through the BitBucket API.
 import asyncio
 import base64
 import re
-from typing import Any, AsyncIterator, Dict, List, Optional
+from collections.abc import AsyncIterator
+from typing import Any
 
 import aiohttp
 
@@ -54,7 +55,7 @@ class BitBucketProvider(GitProvider):
         r"https?://api\.bitbucket\.org",
     ]
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """Initialize BitBucket provider.
 
         Args:
@@ -81,9 +82,9 @@ class BitBucketProvider(GitProvider):
         self.workspace = config.get("workspace", "")
         # Default to app_password auth method for unified structure
         self.auth_method = "token"
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         self.logger = SecurityLogger(__name__)
-        self._rate_limit_info: Optional[Dict[str, Any]] = None
+        self._rate_limit_info: dict[str, Any] | None = None
 
         super().__init__(config)
 
@@ -200,7 +201,7 @@ class BitBucketProvider(GitProvider):
             self._session = None
             self._authenticated = False
 
-    async def list_organizations(self) -> List[Organization]:
+    async def list_organizations(self) -> list[Organization]:
         """List accessible BitBucket workspaces.
 
         Returns:
@@ -225,11 +226,11 @@ class BitBucketProvider(GitProvider):
                     metadata={
                         "type": "workspace",
                         "configured": True,
-                        "note": "Using configured workspace only"
+                        "note": "Using configured workspace only",
                     },
                 )
             ]
-        
+
         # If no workspace configured, try to list all (original behavior as fallback)
         await self._ensure_session()
         headers = self._get_auth_headers()
@@ -282,7 +283,7 @@ class BitBucketProvider(GitProvider):
         except aiohttp.ClientError as e:
             raise ConnectionError(f"Network error while listing workspaces: {e}")
 
-    async def list_projects(self, organization: str) -> List[Project]:
+    async def list_projects(self, organization: str) -> list[Project]:
         """List projects in a BitBucket workspace.
 
         Args:
@@ -347,8 +348,8 @@ class BitBucketProvider(GitProvider):
     async def list_repositories(
         self,
         organization: str,
-        project: Optional[str] = None,
-        filters: Optional[Dict[str, Any]] = None,
+        project: str | None = None,
+        filters: dict[str, Any] | None = None,
     ) -> AsyncIterator[Repository]:
         """List BitBucket repositories.
 
@@ -372,7 +373,7 @@ class BitBucketProvider(GitProvider):
 
         await self._ensure_session()
         headers = self._get_auth_headers()
-        
+
         # Use the configured workspace if organization doesn't match
         # This handles cases where queries like "cstorepro/*/repo" are used
         # but the provider is configured for a different workspace
@@ -392,7 +393,7 @@ class BitBucketProvider(GitProvider):
                 )
                 return
                 yield  # Make this an async generator (but unreachable)
-        
+
         url = f"{self.url}/repositories/{workspace_to_use}"
 
         # Add query parameters for filters
@@ -437,8 +438,8 @@ class BitBucketProvider(GitProvider):
             raise ConnectionError(f"Network error while listing repositories: {e}")
 
     async def get_repository(
-        self, organization: str, repository: str, project: Optional[str] = None
-    ) -> Optional[Repository]:
+        self, organization: str, repository: str, project: str | None = None
+    ) -> Repository | None:
         """Get specific BitBucket repository.
 
         Args:
@@ -519,7 +520,7 @@ class BitBucketProvider(GitProvider):
         """
         return True
 
-    def get_rate_limit_info(self) -> Optional[Dict[str, Any]]:
+    def get_rate_limit_info(self) -> dict[str, Any] | None:
         """Get BitBucket API rate limit information.
 
         Returns:
@@ -570,7 +571,7 @@ class BitBucketProvider(GitProvider):
             await self._session.close()
         await super().close()
 
-    def _get_auth_headers(self) -> Dict[str, str]:
+    def _get_auth_headers(self) -> dict[str, str]:
         """Get authentication headers based on auth method."""
         headers = {"Accept": "application/json"}
 
@@ -581,7 +582,7 @@ class BitBucketProvider(GitProvider):
 
         return headers
 
-    def _convert_to_repository(self, repo_data: Dict[str, Any]) -> Repository:
+    def _convert_to_repository(self, repo_data: dict[str, Any]) -> Repository:
         """Convert BitBucket API repository data to Repository object."""
         # Extract clone URLs
         clone_url = ""
@@ -599,9 +600,22 @@ class BitBucketProvider(GitProvider):
         if "mainbranch" in repo_data and repo_data["mainbranch"]:
             default_branch = repo_data["mainbranch"].get("name", "main")
 
+        workspace = None
+        project = None
+        if "workspace" in repo_data and repo_data["workspace"]:
+            workspace = repo_data["workspace"].get("slug") or repo_data[
+                "workspace"
+            ].get("name")
+        if "project" in repo_data and repo_data["project"]:
+            project = repo_data["project"].get("name") or repo_data["project"].get(
+                "key"
+            )
+
         return Repository(
             name=repo_data["name"],
             clone_url=clone_url,
+            organization=workspace,
+            project=project,
             ssh_url=ssh_url,
             is_disabled=False,  # BitBucket doesn't have disabled repos
             is_private=repo_data.get("is_private", True),
@@ -624,7 +638,7 @@ class BitBucketProvider(GitProvider):
 
     # BitBucket-specific helper methods
 
-    async def get_workspace_permissions(self, workspace: str) -> Dict[str, Any]:
+    async def get_workspace_permissions(self, workspace: str) -> dict[str, Any]:
         """Get current user's permissions for a workspace.
 
         Args:
@@ -664,7 +678,7 @@ class BitBucketProvider(GitProvider):
 
     async def list_repository_branches(
         self, organization: str, repository: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List branches in a repository.
 
         Args:

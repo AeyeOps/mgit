@@ -5,6 +5,7 @@ mgit build system - Display available make commands.
 Parses the Makefile to extract targets and their descriptions.
 Usage: make [target] or uv run python scripts/make.py [command]
 """
+
 import re
 import subprocess
 import sys
@@ -115,7 +116,7 @@ def show_help_rich(targets: dict[str, str]):
     usage.append("make ", style="cyan")
     usage.append("<target>", style="bold yellow")
     usage.append(" ARGS=", style="dim yellow")
-    usage.append("\"...\"", style="yellow")
+    usage.append('"..."', style="yellow")
     console.print(usage)
     console.print()
 
@@ -132,7 +133,7 @@ def show_help_plain(targets: dict[str, str]):
     for name, description in targets.items():
         print(f"  {name:<14} {description}")
     print()
-    print("Usage: make <target>  or  make <target> ARGS=\"...\"")
+    print('Usage: make <target>  or  make <target> ARGS="..."')
     print()
 
 

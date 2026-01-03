@@ -7,14 +7,14 @@ changes across multiple repositories discovered through query patterns.
 
 import asyncio
 import logging
-from pathlib import Path
-from typing import List, Dict, Optional, Set, Any, Tuple
 from dataclasses import dataclass
+from pathlib import Path
 
-from mgit.providers.base import Repository
+from mgit.changesets.models import CommitInfo, FileChange, RepositoryChangeset
 from mgit.commands.listing import list_repositories
-from mgit.changesets.models import RepositoryChangeset
 from mgit.config.yaml_manager import list_provider_names
+from mgit.git.utils import get_repo_components
+from mgit.providers.base import Repository
 
 logger = logging.getLogger(__name__)
 
@@ -24,20 +24,20 @@ class DiscoveredRepositoryChange:
     """Represents changes in a repository discovered through provider queries."""
 
     repository: Repository
-    local_path: Optional[Path]  # Local clone path if exists
-    changeset: Optional[RepositoryChangeset]  # Change information if locally available
+    local_path: Path | None  # Local clone path if exists
+    changeset: RepositoryChangeset | None  # Change information if locally available
     provider_name: str
     discovery_query: str
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
 class ChangeDiscoveryResult:
     """Result of change discovery across providers and repositories."""
 
-    discovered_repositories: List[DiscoveredRepositoryChange]
-    successful_providers: List[str]
-    failed_providers: List[str]
+    discovered_repositories: list[DiscoveredRepositoryChange]
+    successful_providers: list[str]
+    failed_providers: list[str]
     local_repositories_found: int
     remote_only_repositories: int
     total_repositories_with_changes: int
@@ -54,6 +54,44 @@ class ChangeDiscoveryResult:
         )
 
 
+def _convert_change_to_changeset(change) -> RepositoryChangeset:
+    """Convert RepositoryChange to RepositoryChangeset for storage."""
+    file_changes = []
+    for file_data in change.uncommitted_files:
+        file_changes.append(
+            FileChange(
+                filename=file_data["filename"],
+                change_type=file_data["change_type"],
+                index_status=file_data["index_status"],
+                worktree_status=file_data["worktree_status"],
+            )
+        )
+
+    commits = []
+    for commit_data in change.recent_commits:
+        commits.append(
+            CommitInfo(
+                hash=commit_data["hash"],
+                author_name=commit_data["author_name"],
+                author_email=commit_data["author_email"],
+                date=commit_data["date"],
+                message=commit_data["message"],
+            )
+        )
+
+    return RepositoryChangeset(
+        repository_path=change.repository_path,
+        repository_name=change.repository_name,
+        timestamp=change.timestamp,
+        has_uncommitted_changes=change.has_uncommitted_changes,
+        current_branch=change.current_branch,
+        git_status=change.git_status,
+        uncommitted_files=file_changes,
+        recent_commits=commits,
+        error=change.error,
+    )
+
+
 class ChangeDiscoveryEngine:
     """
     Engine for discovering repositories and their changes across providers.
@@ -62,7 +100,7 @@ class ChangeDiscoveryEngine:
     to provide comprehensive view of repository states across multiple providers.
     """
 
-    def __init__(self, local_scan_root: Optional[Path] = None, concurrency: int = 10):
+    def __init__(self, local_scan_root: Path | None = None, concurrency: int = 10):
         """
         Initialize change discovery engine.
 
@@ -80,11 +118,11 @@ class ChangeDiscoveryEngine:
     async def discover_repository_changes(
         self,
         query_pattern: str,
-        provider_name: Optional[str] = None,
-        provider_url: Optional[str] = None,
+        provider_name: str | None = None,
+        provider_url: str | None = None,
         local_scan_only: bool = False,
         include_remote_only: bool = True,
-        limit: Optional[int] = None,
+        limit: int | None = None,
     ) -> ChangeDiscoveryResult:
         """
         Discover repositories matching pattern and detect their changes.
@@ -177,10 +215,10 @@ class ChangeDiscoveryEngine:
     async def _discover_repositories_via_providers(
         self,
         query_pattern: str,
-        provider_name: Optional[str],
-        provider_url: Optional[str],
-        limit: Optional[int],
-    ) -> List[Tuple[Repository, str]]:
+        provider_name: str | None,
+        provider_url: str | None,
+        limit: int | None,
+    ) -> list[tuple[Repository, str]]:
         """
         Discover repositories through provider system.
 
@@ -248,8 +286,8 @@ class ChangeDiscoveryEngine:
         return discovered_repos
 
     async def _query_single_provider(
-        self, query_pattern: str, provider_name: str, limit: Optional[int]
-    ) -> List[Repository]:
+        self, query_pattern: str, provider_name: str, limit: int | None
+    ) -> list[Repository]:
         """Query a single provider for repositories."""
         try:
             repository_results = await list_repositories(
@@ -267,10 +305,10 @@ class ChangeDiscoveryEngine:
 
     async def _process_discovered_repositories(
         self,
-        discovered_repos: List[Tuple[Repository, str]],
+        discovered_repos: list[tuple[Repository, str]],
         include_remote_only: bool,
         query_pattern: str,
-    ) -> List[DiscoveredRepositoryChange]:
+    ) -> list[DiscoveredRepositoryChange]:
         """Process discovered repositories to detect local changes."""
         result_repos = []
 
@@ -278,7 +316,7 @@ class ChangeDiscoveryEngine:
         semaphore = asyncio.Semaphore(self.concurrency)
 
         async def process_single_repo(
-            repo_info: Tuple[Repository, str]
+            repo_info: tuple[Repository, str],
         ) -> DiscoveredRepositoryChange:
             async with semaphore:
                 repository, provider_name = repo_info
@@ -293,11 +331,12 @@ class ChangeDiscoveryEngine:
                         logger.debug(
                             f"Detecting changes in local repository: {local_path}"
                         )
-                        changeset = (
+                        repo_change = (
                             await self.diff_processor._detect_repository_changes(
                                 local_path
                             )
                         )
+                        changeset = _convert_change_to_changeset(repo_change)
                     elif not include_remote_only:
                         # Skip remote-only repositories if not requested
                         return None
@@ -336,7 +375,7 @@ class ChangeDiscoveryEngine:
         return result_repos
 
     async def _discover_local_only(
-        self, query_pattern: str, limit: Optional[int]
+        self, query_pattern: str, limit: int | None
     ) -> ChangeDiscoveryResult:
         """Discover repositories by scanning local filesystem only."""
         if not self.local_scan_root:
@@ -368,7 +407,12 @@ class ChangeDiscoveryEngine:
             # Convert to DiscoveredRepositoryChange format
             result_repos = []
             for i, local_path in enumerate(local_repos):
-                changeset = changesets[i] if i < len(changesets) else None
+                repo_change = changesets[i] if i < len(changesets) else None
+                changeset = (
+                    _convert_change_to_changeset(repo_change)
+                    if repo_change is not None
+                    else None
+                )
 
                 # Create minimal repository info for local-only mode
                 dummy_repo = Repository(
@@ -417,7 +461,7 @@ class ChangeDiscoveryEngine:
                 query_pattern=query_pattern,
             )
 
-    def _find_local_repository_path(self, repository: Repository) -> Optional[Path]:
+    def _find_local_repository_path(self, repository: Repository) -> Path | None:
         """
         Find local path for a remote repository.
 
@@ -428,24 +472,42 @@ class ChangeDiscoveryEngine:
             return None
 
         # Common clone path patterns to check
-        potential_paths = [
+        potential_paths = []
+
+        components = None
+        if repository.clone_url:
+            components = get_repo_components(repository.clone_url)
+        if components:
+            host, org, project, repo = components
+            potential_paths.append(self.local_scan_root / host / org / project / repo)
+
+        org_name = repository.organization
+        repo_name = repository.name
+        project_name = repository.project
+
+        if org_name:
             # Direct organization/repository structure
-            self.local_scan_root / repository.organization / repository.name,
-            # Flat repository name structure
-            self.local_scan_root / repository.name,
+            potential_paths.append(self.local_scan_root / org_name / repo_name)
             # Project-based structure (for Azure DevOps)
-            self.local_scan_root
-            / repository.organization
-            / (repository.project or "default")
-            / repository.name,
+            potential_paths.append(
+                self.local_scan_root
+                / org_name
+                / (project_name or "default")
+                / repo_name
+            )
             # Provider-specific structures
-            self.local_scan_root / "github" / repository.organization / repository.name,
-            self.local_scan_root / "azure" / repository.organization / repository.name,
-            self.local_scan_root
-            / "bitbucket"
-            / repository.organization
-            / repository.name,
-        ]
+            potential_paths.append(
+                self.local_scan_root / "github" / org_name / repo_name
+            )
+            potential_paths.append(
+                self.local_scan_root / "azure" / org_name / repo_name
+            )
+            potential_paths.append(
+                self.local_scan_root / "bitbucket" / org_name / repo_name
+            )
+
+        # Flat repository name structure
+        potential_paths.append(self.local_scan_root / repo_name)
 
         # Check each potential path
         for path in potential_paths:
@@ -459,9 +521,9 @@ class ChangeDiscoveryEngine:
 # Convenience functions for common use cases
 async def discover_changes_by_pattern(
     pattern: str,
-    local_root: Optional[Path] = None,
-    provider: Optional[str] = None,
-    limit: Optional[int] = None,
+    local_root: Path | None = None,
+    provider: str | None = None,
+    limit: int | None = None,
 ) -> ChangeDiscoveryResult:
     """
     Convenience function for discovering repository changes by pattern.
@@ -482,7 +544,7 @@ async def discover_changes_by_pattern(
 
 
 async def discover_local_changes_only(
-    local_root: Path, pattern: str = "*/*/*", limit: Optional[int] = None
+    local_root: Path, pattern: str = "*/*/*", limit: int | None = None
 ) -> ChangeDiscoveryResult:
     """
     Convenience function for local-only change discovery.

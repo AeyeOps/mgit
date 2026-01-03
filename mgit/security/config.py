@@ -8,7 +8,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class SecurityConfig:
         "allow_insecure_connections": False,
     }
 
-    def __init__(self, config_file: Optional[Union[str, Path]] = None):
+    def __init__(self, config_file: str | Path | None = None):
         """Initialize security configuration.
 
         Args:
@@ -106,7 +106,7 @@ class SecurityConfig:
             return
 
         try:
-            with open(self.config_file, "r") as f:
+            with open(self.config_file) as f:
                 file_settings = json.load(f)
 
             # Update settings with file values
@@ -219,7 +219,7 @@ class SecurityConfig:
 
         return True
 
-    def get_api_security_settings(self) -> Dict[str, Any]:
+    def get_api_security_settings(self) -> dict[str, Any]:
         """Get API-related security settings.
 
         Returns:
@@ -232,7 +232,7 @@ class SecurityConfig:
             "allow_insecure": self.settings["allow_insecure_connections"],
         }
 
-    def get_validation_settings(self) -> Dict[str, Any]:
+    def get_validation_settings(self) -> dict[str, Any]:
         """Get input validation settings.
 
         Returns:
@@ -245,7 +245,7 @@ class SecurityConfig:
             "max_input_length": self.settings["max_input_length"],
         }
 
-    def get_logging_settings(self) -> Dict[str, Any]:
+    def get_logging_settings(self) -> dict[str, Any]:
         """Get logging-related security settings.
 
         Returns:
@@ -260,7 +260,7 @@ class SecurityConfig:
             "log_level": self.settings["log_level"],
         }
 
-    def save_to_file(self, file_path: Optional[Union[str, Path]] = None) -> None:
+    def save_to_file(self, file_path: str | Path | None = None) -> None:
         """Save current settings to file.
 
         Args:
@@ -284,7 +284,7 @@ class SecurityConfig:
 
 
 # Global security configuration instance
-_security_config: Optional[SecurityConfig] = None
+_security_config: SecurityConfig | None = None
 
 
 def get_security_settings() -> SecurityConfig:
@@ -315,7 +315,7 @@ def get_security_settings() -> SecurityConfig:
 
 
 def init_security_config(
-    config_file: Optional[Union[str, Path]] = None,
+    config_file: str | Path | None = None,
 ) -> SecurityConfig:
     """Initialize global security configuration.
 

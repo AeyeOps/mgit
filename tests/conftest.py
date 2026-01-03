@@ -7,8 +7,9 @@ This module contains fixtures that are available to all tests in the test suite.
 import asyncio
 import shutil
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Any, Dict, Generator, List
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -105,7 +106,7 @@ def config_dir(temp_home_dir: Path) -> Path:
 
 
 @pytest.fixture
-def mock_git_repo(temp_dir: Path) -> Dict[str, Any]:
+def mock_git_repo(temp_dir: Path) -> dict[str, Any]:
     """
     Create a mock git repository structure.
 
@@ -147,7 +148,7 @@ def mock_git_repo(temp_dir: Path) -> Dict[str, Any]:
 
 
 @pytest.fixture
-def multiple_git_repos(temp_dir: Path) -> List[Dict[str, Any]]:
+def multiple_git_repos(temp_dir: Path) -> list[dict[str, Any]]:
     """
     Create multiple mock git repositories.
 
@@ -204,7 +205,7 @@ def mock_azure_client():
 
 
 @pytest.fixture
-def mock_repositories() -> List[Repository]:
+def mock_repositories() -> list[Repository]:
     """
     Create mock repository objects.
 
@@ -319,7 +320,7 @@ def isolated_cli_runner(temp_home_dir: Path) -> CliRunner:
 
 
 @pytest.fixture
-def sample_config() -> Dict[str, Any]:
+def sample_config() -> dict[str, Any]:
     """
     Create a sample configuration dictionary.
 
@@ -341,7 +342,7 @@ def sample_config() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def config_file(config_dir: Path, sample_config: Dict[str, Any]) -> Path:
+def config_file(config_dir: Path, sample_config: dict[str, Any]) -> Path:
     """
     Create a configuration file with sample data.
 
