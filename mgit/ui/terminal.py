@@ -1,8 +1,11 @@
 """Terminal capability detection for animation support."""
 
 import os
+import platform
 import sys
 from enum import Enum, auto
+
+_IS_WINDOWS = platform.system() == "Windows"
 
 
 class TerminalCaps(Enum):
@@ -35,6 +38,9 @@ def get_terminal_capabilities() -> TerminalCaps:
     # Check TERM variable
     term = os.environ.get("TERM", "")
     if term in ("dumb", ""):
+        # Windows terminals don't set TERM but modern ones support ANSI
+        if _IS_WINDOWS:
+            return TerminalCaps.ANSI
         return TerminalCaps.DUMB
 
     # Check for known non-ANSI terminals

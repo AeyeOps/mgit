@@ -1,16 +1,40 @@
 """Help animation orchestration for mgit CLI."""
 
 import contextlib
-import select
+import platform
 import signal
 import sys
-import termios
 import time
-import tty
 from typing import Any
 
-from mgit.ui.ascii_tree import get_static_tree, get_tree_height, render_tree_frame
-from mgit.ui.terminal import (
+# Platform-specific imports for terminal handling
+_IS_WINDOWS = platform.system() == "Windows"
+
+if _IS_WINDOWS:
+    try:
+        import msvcrt
+    except ImportError:
+        msvcrt = None  # type: ignore
+    termios = None  # type: ignore
+    tty = None  # type: ignore
+    select = None  # type: ignore
+else:
+    try:
+        import select
+        import termios
+        import tty
+    except ImportError:
+        select = None  # type: ignore
+        termios = None  # type: ignore
+        tty = None  # type: ignore
+    msvcrt = None  # type: ignore
+
+from mgit.ui.ascii_tree import (  # noqa: E402
+    get_static_tree,
+    get_tree_height,
+    render_tree_frame,
+)
+from mgit.ui.terminal import (  # noqa: E402
     TerminalCaps,
     get_terminal_capabilities,
     hide_cursor,
@@ -54,33 +78,51 @@ def _restore_signal_handler(previous: SignalHandler) -> None:
 
 def _check_for_keypress() -> bool:
     """Check if any key has been pressed (non-blocking). Returns True if key pressed."""
-    try:
-        # Check if stdin has data available (non-blocking)
-        if select.select([sys.stdin], [], [], 0)[0]:
-            sys.stdin.read(1)  # Consume the character
+    if _IS_WINDOWS:
+        # Windows: use msvcrt for keyboard detection
+        if msvcrt and msvcrt.kbhit():
+            msvcrt.getch()  # Consume the character
             return True
-    except Exception:
-        pass
-    return False
+        return False
+    else:
+        # Unix: use select on stdin
+        try:
+            if select and select.select([sys.stdin], [], [], 0)[0]:
+                sys.stdin.read(1)  # Consume the character
+                return True
+        except Exception:
+            pass
+        return False
 
 
 def _set_raw_mode() -> Any:
     """Set terminal to raw mode for keypress detection. Returns old settings."""
-    try:
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        tty.setcbreak(fd)  # Use cbreak instead of raw - allows Ctrl+C
-        return old_settings
-    except Exception:
+    if _IS_WINDOWS:
+        # Windows doesn't need raw mode setup for msvcrt
+        return None
+    else:
+        # Unix: use termios to set cbreak mode
+        try:
+            if termios and tty:
+                fd = sys.stdin.fileno()
+                old_settings = termios.tcgetattr(fd)
+                tty.setcbreak(fd)  # Use cbreak instead of raw - allows Ctrl+C
+                return old_settings
+        except Exception:
+            pass
         return None
 
 
 def _restore_terminal(old_settings: Any) -> None:
     """Restore terminal to previous settings."""
+    if _IS_WINDOWS:
+        # Windows doesn't need terminal restoration
+        return
     if old_settings is not None:
         try:
-            fd = sys.stdin.fileno()
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            if termios:
+                fd = sys.stdin.fileno()
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         except Exception:
             pass
 
