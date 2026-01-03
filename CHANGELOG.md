@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Linux Build Install**: `make build-linux` now installs the binary to `/opt/bin/mgit` by default.
 
 ### Changed
-- **Progress UI**: Large concurrent batches now switch to a compact progress view to keep updates visible.
+- **Progress UI**: Concurrent batches now show an overall bar plus per-worker bars, keeping progress visible without scrolling.
 
 ## [0.8.0] - 2026-01-03
 
