@@ -29,6 +29,7 @@ from mgit.git import GitManager
 from mgit.git.utils import build_repo_path, get_git_remote_url
 from mgit.providers import detect_provider_by_url
 from mgit.providers.manager import ProviderManager
+from mgit.providers.exceptions import RepositoryNotFoundError
 from mgit.providers.base import Repository
 from mgit.utils.async_executor import AsyncExecutor
 from mgit.utils.directory_scanner import find_repositories_in_directory
@@ -307,14 +308,52 @@ async def resolve_repositories_for_sync(
             return repositories, False
 
         else:
-            # Non-pattern query: use provider manager directly
+            # Non-pattern query: exact match (org/project/repo) when no wildcards
+            segments = pattern.split("/")
+            if len(segments) == 3:
+                org_name, project_name, repo_name = segments
+                provider = provider_manager.get_provider()
+                repo_list: List[Repository] = []
+
+                try:
+                    repo = await provider.get_repository(
+                        org_name, repo_name, project_name
+                    )
+                    if repo:
+                        repo_list = [repo]
+                except RepositoryNotFoundError:
+                    repo_list = []
+                except Exception as e:
+                    logger.error(f"Error getting repository '{pattern}': {e}")
+                    raise
+
+                # Case-insensitive fallback if provider didn't return a direct match
+                if not repo_list:
+                    try:
+                        async for repo in provider.list_repositories(
+                            org_name, project_name
+                        ):
+                            if repo.name.lower() == repo_name.lower():
+                                repo_list.append(repo)
+                    except Exception as e:
+                        logger.error(f"Error listing repositories for '{pattern}': {e}")
+                        raise
+
+                console.print(
+                    f"[green]Found {len(repo_list)} repositories[/green] for exact match"
+                )
+                return repo_list, False
+
+            # Fallback: list repositories based on provided pattern scope
             repositories = provider_manager.list_repositories(pattern)
-            if hasattr(repositories, '__len__'):
+            if hasattr(repositories, "__len__"):
                 repo_list = list(repositories)
             else:
                 repo_list = [repositories] if repositories else []
 
-            console.print(f"[green]Found {len(repo_list)} repositories[/green] for exact match")
+            console.print(
+                f"[green]Found {len(repo_list)} repositories[/green] for exact match"
+            )
 
             return repo_list, False
 
