@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import asyncio
+import contextlib
 import logging
 import os
 import warnings
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import typer
 from rich.console import Console
@@ -61,7 +62,7 @@ CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # Configuration loading with YAML system
-def get_config_value(key: str, default_value: str | None = None) -> str:
+def get_config_value(key: str, default_value: Optional[str] = None) -> str:
     """
     Get a configuration value with the following priority:
     1. Environment variable (highest priority)
@@ -222,7 +223,7 @@ app = typer.Typer(
 )
 
 
-def _infer_provider_from_query(query: str) -> str | None:
+def _infer_provider_from_query(query: str) -> Optional[str]:
     try:
         from mgit.config.yaml_manager import get_provider_configs
 
@@ -292,14 +293,14 @@ def version_callback(value: bool):
 @app.callback(invoke_without_command=True)
 def main_options(
     ctx: typer.Context,
-    version: bool | None = typer.Option(
+    version: Optional[bool] = typer.Option(
         None,
         "--version",
         callback=version_callback,
         is_eager=True,
         help="Show the application's version and exit.",
     ),
-    help_flag: bool | None = typer.Option(
+    help_flag: Optional[bool] = typer.Option(
         None,
         "--help",
         "-h",
@@ -331,7 +332,7 @@ def main_options(
             show_animated_help(help_text)
         except KeyboardInterrupt:
             # User interrupted, exit cleanly
-            raise typer.Exit(code=130)
+            raise typer.Exit(code=130) from None
         raise typer.Exit()
 
 
@@ -360,7 +361,7 @@ UpdateMode = BulkUpdateMode
 # -----------------------------------------------------------------------------
 
 
-def _find_existing_azdevops_config(organization: str) -> str | None:
+def _find_existing_azdevops_config(organization: str) -> Optional[str]:
     """Find existing Azure DevOps configuration for the same organization."""
     try:
         providers = get_provider_configs()
@@ -387,7 +388,7 @@ def _find_existing_azdevops_config(organization: str) -> str | None:
     return None
 
 
-def _find_existing_github_config() -> str | None:
+def _find_existing_github_config() -> Optional[str]:
     """Find existing GitHub configuration."""
     try:
         providers = get_provider_configs()
@@ -409,7 +410,7 @@ def _find_existing_github_config() -> str | None:
     return None
 
 
-def _find_existing_bitbucket_config(username: str) -> str | None:
+def _find_existing_bitbucket_config(username: str) -> Optional[str]:
     """Find existing BitBucket configuration for the same username."""
     try:
         providers = get_provider_configs()
@@ -453,11 +454,8 @@ def _test_provider_connection(
             return connection_result
         finally:
             # Always clean up the temporary config
-            try:
+            with contextlib.suppress(Exception):
                 remove_provider_config(temp_name)
-            except Exception:
-                # Ignore cleanup errors
-                pass
 
     except Exception as e:
         logger.debug(f"Connection test failed: {e}")
@@ -471,31 +469,31 @@ def _test_provider_connection(
     help="Login to git provider and validate credentials. Supports Azure DevOps, GitHub, and BitBucket."
 )
 def login(
-    config: str | None = typer.Option(
+    config: Optional[str] = typer.Option(
         None,
         "--config",
         "-cfg",
         help="Named provider configuration to test (e.g., 'work_ado', 'github_personal').",
     ),
-    provider_type: str | None = typer.Option(
+    provider_type: Optional[str] = typer.Option(
         None,
         "--provider",
         "-p",
         help="Provider type for new configuration (azuredevops, github, bitbucket).",
     ),
-    name: str | None = typer.Option(
+    name: Optional[str] = typer.Option(
         None,
         "--name",
         "-n",
         help="Name for new provider configuration (e.g., 'my_github').",
     ),
-    organization: str | None = typer.Option(
+    organization: Optional[str] = typer.Option(
         None,
         "--org",
         "-o",
         help="Provider organization/workspace URL for new configuration.",
     ),
-    token: str | None = typer.Option(
+    token: Optional[str] = typer.Option(
         None,
         "--token",
         "-t",
@@ -528,7 +526,7 @@ def login(
                 raise typer.Exit(code=1)
         except Exception as e:
             console.print(f"[red]✗[/red] Error testing configuration '{config}': {e}")
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from e
         return
 
     # Case 2: Create new configuration
@@ -756,7 +754,7 @@ def login(
             console.print(
                 "[yellow]Tip: Check that your token has the required permissions for repository access.[/yellow]"
             )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 # store_credentials function removed - using YAML configuration system instead
@@ -770,13 +768,13 @@ def config(
     list_providers: bool = typer.Option(
         False, "--list", "-l", help="List all configured providers."
     ),
-    show_provider: str | None = typer.Option(
+    show_provider: Optional[str] = typer.Option(
         None, "--show", "-s", help="Show details for a specific provider."
     ),
-    set_default: str | None = typer.Option(
+    set_default: Optional[str] = typer.Option(
         None, "--set-default", "-d", help="Set the default provider."
     ),
-    remove_provider: str | None = typer.Option(
+    remove_provider: Optional[str] = typer.Option(
         None, "--remove", "-r", help="Remove a provider configuration."
     ),
     global_settings: bool = typer.Option(
@@ -844,7 +842,7 @@ def config(
 
         except Exception as e:
             console.print(f"[red]✗[/red] Error showing provider '{show_provider}': {e}")
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from e
         return
 
     # Set default provider
@@ -854,7 +852,7 @@ def config(
             console.print(f"[green]✓[/green] Set '{set_default}' as default provider")
         except Exception as e:
             console.print(f"[red]✗[/red] Error setting default provider: {e}")
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from e
         return
 
     # Remove provider
@@ -866,7 +864,7 @@ def config(
             )
         except Exception as e:
             console.print(f"[red]✗[/red] Error removing provider: {e}")
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from e
         return
 
     # Show global settings
@@ -883,7 +881,7 @@ def config(
 
         except Exception as e:
             console.print(f"[red]✗[/red] Error showing global settings: {e}")
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from e
         return
 
     # Default behavior - show help
@@ -902,13 +900,13 @@ def config(
 @app.command(name="list")
 def list_command(
     query: str = typer.Argument(..., help="Query pattern (org/project/repo)"),
-    provider: str | None = typer.Option(
+    provider: Optional[str] = typer.Option(
         None, "--provider", "-p", help="Provider configuration name"
     ),
     format_type: str = typer.Option(
         "table", "--format", "-f", help="Output format (table, json)"
     ),
-    limit: int | None = typer.Option(
+    limit: Optional[int] = typer.Option(
         None, "--limit", "-l", help="Maximum results to return"
     ),
 ):
@@ -928,7 +926,7 @@ def list_command(
             format_results(results, format_type)
         except MgitError as e:
             console.print(f"[red]Error: {e}[/red]")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
 
     asyncio.run(do_list())
 
@@ -1201,7 +1199,7 @@ def status_command(
                 raise typer.Exit(code=1)
         except MgitError as e:
             console.print(f"[red]Error: {e}[/red]")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
 
     asyncio.run(do_status())
 
@@ -1211,22 +1209,22 @@ def status_command(
 # -----------------------------------------------------------------------------
 @app.command()
 def sync(
-    pattern: str | None = typer.Argument(
+    pattern: Optional[str] = typer.Argument(
         None, help="Repository pattern (remote) or local path (local mode)"
     ),
-    path: str | None = typer.Argument(
+    path: Optional[str] = typer.Argument(
         None, help="Target path for remote sync (default: .)"
     ),
-    filter_pattern: str | None = typer.Option(
+    filter_pattern: Optional[str] = typer.Option(
         None, "--filter", help="Explicit remote pattern (forces remote mode)"
     ),
-    provider: str | None = typer.Option(
+    provider: Optional[str] = typer.Option(
         None, "--provider", "-p", help="Specific provider (otherwise search all)"
     ),
     force: bool = typer.Option(
         False, "--force", "-f", help="Delete and re-clone all repositories"
     ),
-    concurrency: int | None = typer.Option(
+    concurrency: Optional[int] = typer.Option(
         None, "--concurrency", "-c", help="Number of concurrent operations"
     ),
     dry_run: bool = typer.Option(

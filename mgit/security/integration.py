@@ -5,7 +5,7 @@ to existing mgit components.
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from .config import get_security_settings, init_security_config
 from .logging import SecurityLogger, setup_secure_logging
@@ -264,8 +264,8 @@ def create_security_cli_commands():
     @security_app.command("events")
     def show_security_events(
         count: int = typer.Option(10, help="Number of events to show"),
-        event_type: str | None = typer.Option(None, help="Filter by event type"),
-        severity: str | None = typer.Option(None, help="Filter by severity"),
+        event_type: Optional[str] = typer.Option(None, help="Filter by event type"),
+        severity: Optional[str] = typer.Option(None, help="Filter by severity"),
     ):
         """Show recent security events."""
         monitor = get_security_monitor()
@@ -302,7 +302,7 @@ def create_security_cli_commands():
 
     @security_app.command("init")
     def init_security_config(
-        config_file: str | None = typer.Option(
+        config_file: Optional[str] = typer.Option(
             None, help="Security configuration file"
         ),
     ):

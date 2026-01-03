@@ -22,7 +22,6 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 # Default binary location - explicit to avoid PATH conflicts
 DEFAULT_BINARY = "/opt/bin/mgit"
@@ -117,7 +116,7 @@ class StandaloneTestSuite:
                     "help", True, f"Found {len(found)}/{len(commands)} commands"
                 )
             else:
-                self.add_result("help", False, f"No help text")
+                self.add_result("help", False, "No help text")
         except Exception as e:
             self.add_result("help", False, str(e))
 
@@ -542,7 +541,7 @@ class StandaloneTestSuite:
         else:
             self.add_result("list_bad_pattern", False, "Should reject invalid pattern")
 
-    def _extract_json(self, output: str) -> Optional[list]:
+    def _extract_json(self, output: str) -> list | None:
         """Extract JSON array from output that may contain log lines."""
         import json
 
@@ -636,7 +635,7 @@ class StandaloneTestSuite:
                             cloned = True
                             break
                 except subprocess.TimeoutExpired:
-                    self.log(f"  Timeout (repo too large), trying next...")
+                    self.log("  Timeout (repo too large), trying next...")
                     continue
 
             if not cloned and ptype not in results:
@@ -726,13 +725,13 @@ class StandaloneTestSuite:
                             cloned = True
                             break
                         else:
-                            self.log(f"  No .git created despite exit 0")
+                            self.log("  No .git created despite exit 0")
                     else:
                         self.log(
                             f"  Exit {sync_result.returncode}: {sync_result.stderr[:100]}"
                         )
                 except subprocess.TimeoutExpired:
-                    self.log(f"  Timeout (repo too large), trying next...")
+                    self.log("  Timeout (repo too large), trying next...")
                     continue
 
             if not cloned and ptype not in results:
@@ -772,7 +771,7 @@ class StandaloneTestSuite:
     def run_all(self) -> bool:
         """Run all tests and return True if all passed."""
         print(f"\n{'=' * 60}")
-        print(f"mgit Standalone Linux Binary Test Suite")
+        print("mgit Standalone Linux Binary Test Suite")
         print(f"Binary: {self.binary}")
         print(f"Test dir: {self.test_dir}")
         print(f"{'=' * 60}\n")

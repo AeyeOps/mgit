@@ -76,48 +76,58 @@ echo -e "${GREEN}Step 4: Creating Windows build script (uv-based)${NC}"
 cat > "${PROJECT_DIR}/build_windows.bat" << 'EOF'
 @echo off
 echo === Building mgit for Windows ===
+echo Build started: %DATE% %TIME%
 echo.
 
-REM Clean up any existing environment directory
-echo Cleaning up any existing mgit-build environment...
-if exist "C:\ProgramData\anaconda3\envs\mgit-build" (
-    echo Found existing environment directory, removing...
-    rmdir /s /q "C:\ProgramData\anaconda3\envs\mgit-build"
+REM Ensure mamba is available
+where mamba >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Error: Mamba is not installed or not in PATH
+    exit /b 1
 )
 
-echo Creating new Python 3.10 environment...
-call conda create -n mgit-build python=3.10 -y
+REM Check if environment already exists with correct Python version
+set REQUIRED_PYTHON=3.12.9
+echo.
+echo Checking for mamba environment 'mgit-build' with Python %REQUIRED_PYTHON%...
+call mamba env list | findstr /C:"mgit-build" >nul 2>&1
+if %errorlevel% neq 0 goto :create_env
+
+echo Found existing 'mgit-build' environment
+echo Checking Python version...
+call mamba run -n mgit-build python --version > %TEMP%\pyver.txt 2>&1
+set /p PYVER=<%TEMP%\pyver.txt
+echo   Current: %PYVER%
+echo   Required: Python %REQUIRED_PYTHON%
+findstr /C:"%REQUIRED_PYTHON%" %TEMP%\pyver.txt >nul 2>&1
+if %errorlevel% equ 0 goto :env_ready
+
+echo Python version mismatch - recreating environment...
+call mamba env remove -n mgit-build -y >nul 2>&1
+
+:create_env
+echo Creating mamba environment with Python %REQUIRED_PYTHON%...
+call mamba create -n mgit-build python=%REQUIRED_PYTHON% -y
 if %errorlevel% neq 0 (
     echo Error: Failed to create mamba environment
     exit /b 1
 )
+echo Created mgit-build environment with Python %REQUIRED_PYTHON%
 
-echo Activating environment...
-call conda activate mgit-build
+:env_ready
+echo Environment ready
 
+echo Installing uv in environment...
+call mamba run -n mgit-build python -m pip install -U uv
 if %errorlevel% neq 0 (
-    echo Error: Failed to activate environment
+    echo Error: Failed to install uv
     exit /b 1
 )
 
-REM Ensure uv is installed
 echo.
-echo Checking uv installation...
-where uv >nul 2>&1
-if %errorlevel% neq 0 (
-    echo Installing uv...
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr https://astral.sh/uv/install.ps1 -UseBasicParsing | iex"
-    if %errorlevel% neq 0 (
-        echo Error: Failed to install uv
-        exit /b 1
-    )
-) else (
-    echo uv is installed
-)
-
-echo.
-echo Syncing environment with uv (including dev extras)...
-uv sync --all-extras --dev
+echo Syncing environment with uv (including dev extras, Python 3.12.9)...
+call mamba run -n mgit-build uv python install 3.12.9
+call mamba run -n mgit-build uv sync --all-extras --dev --python 3.12.9
 if %errorlevel% neq 0 (
     echo Error: uv sync failed
     exit /b 1
@@ -126,7 +136,9 @@ if %errorlevel% neq 0 (
 echo.
 echo Building Windows executable with PyInstaller...
 echo Using existing mgit.spec (cross-platform compatible)...
-uv run pyinstaller mgit.spec --clean
+REM Create build directory structure (prevents PyInstaller race condition)
+if not exist "build\mgit" mkdir build\mgit
+call mamba run -n mgit-build uv run pyinstaller mgit.spec --clean
 if %errorlevel% neq 0 (
     echo Error: Build failed
     exit /b 1
@@ -143,6 +155,14 @@ if exist "dist\mgit.exe" (
     echo.
     echo File details:
     dir dist\mgit.exe
+    echo.
+    echo Installing to System32...
+    copy /Y dist\mgit.exe %WinDir%\System32\mgit.exe
+    if %errorlevel% equ 0 (
+        echo Installed mgit.exe to %WinDir%\System32
+    ) else (
+        echo Warning: Could not install to System32 - may need admin rights
+    )
 ) else if exist "dist\mgit" (
     echo Note: Built as 'mgit' without .exe extension
     dir dist\mgit
@@ -165,9 +185,20 @@ echo ""
 echo "Building at: ${WIN_PROJECT_DIR}"
 echo ""
 
-# Just run it with cmd.exe - no options, no questions
-# Make sure we're in a Windows directory, not a UNC path
-cmd.exe /c "cd /d ${WIN_PROJECT_DIR} && call build_windows.bat"
+# Run cmd.exe and pipe output to both console and log file
+set +e
+cmd.exe /c "cd /d ${WIN_PROJECT_DIR} && call build_windows.bat" 2>&1 | tee "${PROJECT_DIR}/build_windows.log"
+cmd_status=${PIPESTATUS[0]}
+set -e
+if [[ ${cmd_status} -ne 0 ]]; then
+    echo -e "${RED}Windows build command failed with exit code ${cmd_status}.${NC}"
+fi
+
+# Always copy build log to source directory
+if [[ -f "${PROJECT_DIR}/build_windows.log" ]]; then
+    cp "${PROJECT_DIR}/build_windows.log" "${SOURCE_DIR}/dist/"
+    echo "✓ Build log copied to ${SOURCE_DIR}/dist/build_windows.log"
+fi
 
 # Check if successful and copy back
 if [[ -f "${PROJECT_DIR}/dist/mgit.exe" ]]; then
@@ -180,6 +211,7 @@ if [[ -f "${PROJECT_DIR}/dist/mgit.exe" ]]; then
 else
     echo ""
     echo -e "${RED}Build failed - mgit.exe not found${NC}"
-    echo "Check the build output above for errors"
+    echo "Last 200 lines of build_windows.log:"
+    tail -n 200 "${SOURCE_DIR}/dist/build_windows.log" 2>/dev/null || echo "build_windows.log not found"
     exit 1
 fi

@@ -19,10 +19,18 @@ if __name__ == "__main__":
     for name in DIRS_TO_REMOVE:
         path = root / name
         if path.exists():
-            shutil.rmtree(path)
-            print(f"Removed {name}/")
+            if path.is_dir():
+                shutil.rmtree(path)
+                print(f"Removed {name}/")
+            else:
+                path.unlink()
+                print(f"Removed {name}")
     for pattern in PATTERNS_TO_REMOVE:
         for path in root.glob(pattern):
-            shutil.rmtree(path)
-            print(f"Removed {path.name}/")
+            if path.is_dir():
+                shutil.rmtree(path)
+                print(f"Removed {path.name}/")
+            else:
+                path.unlink()
+                print(f"Removed {path.name}")
     print("Clean complete.")
