@@ -21,6 +21,7 @@ from rich.table import Table
 from ..config.yaml_manager import list_provider_names
 from ..exceptions import MgitError
 from ..providers.base import Repository
+from ..providers.exceptions import ConfigurationError
 from ..providers.manager import ProviderManager
 from ..utils.query_parser import matches_pattern, parse_query, validate_query
 
@@ -484,6 +485,9 @@ async def list_repositories(
 
                             return provider_results
 
+                        except ConfigurationError:
+                            # Fail-fast: configuration errors should propagate
+                            raise
                         except Exception as e:
                             logger.warning(
                                 f"Failed to process provider {provider_name_item}: {e}"
@@ -502,9 +506,11 @@ async def list_repositories(
                     return_exceptions=True,
                 )
 
-                # Collect results
+                # Collect results - fail-fast on configuration errors
                 for result in provider_results:
-                    if isinstance(result, list):
+                    if isinstance(result, ConfigurationError):
+                        raise MgitError(str(result))
+                    elif isinstance(result, list):
                         all_results.extend(result)
                     elif isinstance(result, Exception):
                         logger.warning(f"Provider processing failed: {result}")
@@ -530,6 +536,9 @@ async def list_repositories(
                             progress=None,
                             provider_task_id=None,
                         )
+                    except ConfigurationError:
+                        # Fail-fast: configuration errors should propagate
+                        raise
                     except Exception as e:
                         logger.warning(
                             f"Failed to process provider {provider_name_item}: {e}"
@@ -540,8 +549,11 @@ async def list_repositories(
                 *(process_provider(pname) for pname in matching_providers),
                 return_exceptions=True,
             )
+            # Collect results - fail-fast on configuration errors
             for result in provider_results:
-                if isinstance(result, list):
+                if isinstance(result, ConfigurationError):
+                    raise MgitError(str(result))
+                elif isinstance(result, list):
                     all_results.extend(result)
                 elif isinstance(result, Exception):
                     logger.warning(f"Provider processing failed: {result}")

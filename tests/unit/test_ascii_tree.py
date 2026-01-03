@@ -1,7 +1,6 @@
 """Unit tests for ASCII tree renderer."""
 
 import math
-import pytest
 
 from mgit.ui.ascii_tree import (
     LUMINANCE_CHARS,
@@ -141,7 +140,7 @@ class TestStaticTree:
     def test_static_tree_has_content(self):
         """Static tree should have multiple lines."""
         tree = get_static_tree()
-        lines = [l for l in tree.split("\n") if l.strip()]
+        lines = [line for line in tree.split("\n") if line.strip()]
         assert len(lines) > 5
 
     def test_static_tree_contains_mgit(self):

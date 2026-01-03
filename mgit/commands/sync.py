@@ -493,6 +493,7 @@ async def sync_local_command(
         task_description="Scanning local repositories...",
         show_progress=False,
     )
+    repo_states = [state for state in repo_states if state]
 
     for repo_path, error in errors:
         repo_states.append(
@@ -543,6 +544,7 @@ async def sync_local_command(
         item_description=lambda state: _format_repo_display(root_path, state.path),
         show_progress=progress,
     )
+    results = [result for result in results if result]
 
     for repo_path, error in errors:
         results.append(
