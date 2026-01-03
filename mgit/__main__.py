@@ -319,10 +319,21 @@ def main_options(
     """
     # Handle --help flag or no subcommand (show animated help)
     if help_flag or ctx.invoked_subcommand is None:
+        import io
+        import sys
+
         from mgit.ui.help_animation import show_animated_help
 
-        # Get the help text from Typer/Click
-        help_text = ctx.get_help()
+        # Capture the help text - Typer/Rich prints it as a side effect
+        # so we redirect stdout to capture it
+        old_stdout = sys.stdout
+        sys.stdout = io.StringIO()
+        try:
+            ctx.get_help()  # This prints to stdout (now captured)
+            help_text = sys.stdout.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
         try:
             show_animated_help(help_text)
         except KeyboardInterrupt:

@@ -167,6 +167,15 @@ def print_static_tree(use_color: bool = True) -> None:
     sys.stdout.flush()
 
 
+def _is_animation_enabled() -> bool:
+    """Check if help animation is enabled in config."""
+    try:
+        from mgit.config.yaml_manager import get_global_setting
+        return get_global_setting("help_animation", True)
+    except Exception:
+        return True  # Default to enabled if config unavailable
+
+
 def show_animated_help(help_text: str) -> None:
     """
     Show help with optional animation based on terminal capabilities.
@@ -174,18 +183,18 @@ def show_animated_help(help_text: str) -> None:
     In capable terminals: shows spinning tree animation, then static tree on top of help text.
     In limited terminals: shows static tree on top of help text.
     In pipes: shows static tree on top of help text (no color).
+
+    Animation can be disabled via config: global.help_animation = false
     """
     caps = get_terminal_capabilities()
     use_color = caps in (TerminalCaps.ANSI, TerminalCaps.BASIC)
 
     try:
-        if caps == TerminalCaps.ANSI:
+        if caps == TerminalCaps.ANSI and _is_animation_enabled():
             run_tree_animation()
         # Tree always appears on top, then help text below
-        # Use sys.stdout.write for guaranteed ordering with Rich
         print_static_tree(use_color=use_color)
         sys.stdout.write(help_text)
-        sys.stdout.write("\n")
         sys.stdout.flush()
 
     except KeyboardInterrupt:
