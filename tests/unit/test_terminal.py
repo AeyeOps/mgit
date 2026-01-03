@@ -2,17 +2,16 @@
 
 import os
 import sys
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 from mgit.ui.terminal import (
     TerminalCaps,
     get_terminal_capabilities,
     get_terminal_size,
     hide_cursor,
-    show_cursor,
     move_cursor_up,
     move_to_start_of_frame,
+    show_cursor,
 )
 
 
@@ -83,7 +82,14 @@ class TestTerminalCapabilities:
         monkeypatch.setattr(sys, "stdout", mock_stdout)
         monkeypatch.setenv("TERM", "xterm-256color")
         # Clear all CI/NO_COLOR vars
-        for var in ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "TRAVIS", "NO_COLOR"]:
+        for var in [
+            "CI",
+            "GITHUB_ACTIONS",
+            "GITLAB_CI",
+            "JENKINS_URL",
+            "TRAVIS",
+            "NO_COLOR",
+        ]:
             monkeypatch.delenv(var, raising=False)
 
         caps = get_terminal_capabilities()

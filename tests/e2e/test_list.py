@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 def run_mgit_command(args: List[str]) -> tuple[int, str, str]:
     """Run mgit CLI command and return exit code, stdout, stderr."""
     result = subprocess.run(
-        ["poetry", "run", "mgit"] + args,
+        ["uv", "run", "mgit"] + args,
         capture_output=True,
         text=True,
         timeout=60,  # Longer timeout for list operations

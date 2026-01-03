@@ -62,6 +62,19 @@ uv run python scripts/make_version.py --bump minor    # 0.7.2 -> 0.8.0
 uv run python scripts/make_version.py --bump major    # 0.7.2 -> 1.0.0
 ```
 
+## Architecture Decision Records (ADRs)
+
+Key architectural decisions are documented in `docs/ADR/`:
+
+| ADR | Title | Summary |
+|-----|-------|---------|
+| [001](docs/ADR/001-provider-abstraction.md) | Provider Abstraction | Common interface for GitHub/Azure DevOps/BitBucket |
+| [002](docs/ADR/002-configuration-hierarchy.md) | Configuration Hierarchy | CLI args > env vars > config file precedence |
+| [003](docs/ADR/003-concurrent-operations.md) | Concurrent Operations | Semaphore-based throttling, provider-specific limits |
+| [004](docs/ADR/004-pattern-matching-strategy.md) | Pattern Matching | org/project/repo format, wildcard support |
+
+Consult ADRs before making architectural changes.
+
 ## Architecture
 
 ### Provider Abstraction Layer

@@ -5,6 +5,10 @@
 - `tests/` holds the pytest suite; `docs/` contains provider guides; `scripts/` has build helpers.
 - `mgit.spec` drives PyInstaller builds; `dist/` and `build/` are build outputs.
 
+## Architecture Decision Records
+- ADRs in `docs/ADR/` document key design decisions (provider abstraction, config hierarchy, concurrency, pattern matching).
+- Read relevant ADRs before modifying core architecture.
+
 ## Build, Test, and Development Commands
 - Setup (preferred): `uv sync --all-extras --dev` (Poetry alternative: `poetry install --with dev`).
 - Run locally: `uv run mgit --help` or `python -m mgit`.
