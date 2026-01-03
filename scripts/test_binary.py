@@ -518,38 +518,36 @@ class StandaloneTestSuite:
         except json.JSONDecodeError:
             return None
 
-    def test_sync_real_clone(self) -> None:
-        """Test sync command with REAL git clone for EACH provider type.
+    def test_sync_no_spaces(self) -> None:
+        """Test sync with repos that have NO spaces in names.
 
-        Clones an actual repository from each configured provider TYPE.
-        This exercises the full sync pipeline for GitHub, Azure DevOps, and BitBucket.
+        Tests one repo from each provider type (GitHub, Azure DevOps, BitBucket)
+        where org/project/repo names contain no spaces.
         """
         if not self.providers:
-            self.add_result("sync_clone", False, "No providers configured")
+            self.add_result("sync_no_spaces", False, "No providers configured")
             return
 
-        # Group providers by type - test ONE from each type
         by_type: dict[str, list[str]] = {}
         for name, ptype in self.providers.items():
             by_type.setdefault(ptype, []).append(name)
 
-        results: dict[str, str] = {}  # type -> "OK" or error message
+        results: dict[str, str] = {}
 
         for ptype, providers in by_type.items():
             provider = random.choice(providers)
-            clone_dir = self.test_dir / f"sync_{ptype}"
+            clone_dir = self.test_dir / f"sync_nospace_{ptype}"
             clone_dir.mkdir(parents=True, exist_ok=True)
 
-            self.log(f"Testing sync for {ptype} via {provider}")
+            self.log(f"Testing sync (no spaces) for {ptype} via {provider}")
 
-            # Get repos to clone - use higher limit to find repos without spaces
             list_result = self.run_cmd(
                 ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "50"],
                 timeout=90,
             )
 
             if list_result.returncode != 0:
-                results[ptype] = f"list failed"
+                results[ptype] = "list failed"
                 continue
 
             repos = self._extract_json(list_result.stdout)
@@ -557,20 +555,93 @@ class StandaloneTestSuite:
                 results[ptype] = "no repos or JSON parse error"
                 continue
 
-            # Find a repo without spaces in path
+            # Find repo WITHOUT spaces
             cloned = False
             for repo in repos:
                 org = repo.get("organization", repo.get("workspace", ""))
                 project = repo.get("project") or "*"
                 name = repo.get("name", repo.get("repository", ""))
 
-                # Skip repos with spaces (known sync bug with pattern parsing)
                 if " " in str(org) or " " in str(project) or " " in str(name):
-                    self.log(f"  Skipping (spaces): {org}/{project}/{name}")
-                    continue
+                    continue  # Skip repos with spaces
 
                 pattern = f"{org}/{project}/{name}"
-                self.log(f"  Cloning: {pattern}")
+                self.log(f"  Cloning (no spaces): {pattern}")
+
+                sync_result = self.run_cmd(
+                    ["sync", pattern, str(clone_dir), "--provider", provider],
+                    timeout=120,
+                )
+
+                if sync_result.returncode == 0:
+                    git_dirs = list(clone_dir.rglob(".git"))
+                    if git_dirs:
+                        results[ptype] = "OK"
+                        cloned = True
+                        break
+
+            if not cloned and ptype not in results:
+                results[ptype] = "no repo without spaces"
+
+        ok_types = [t for t, r in results.items() if r == "OK"]
+        if len(ok_types) == len(by_type):
+            self.add_result("sync_no_spaces", True, f"All {len(ok_types)} types OK")
+        elif ok_types:
+            failed = [(t, r) for t, r in results.items() if r != "OK"]
+            self.add_result("sync_no_spaces", False, f"OK: {ok_types}, FAILED: {failed}")
+        else:
+            self.add_result("sync_no_spaces", False, f"All failed: {dict(results)}")
+
+    def test_sync_with_spaces(self) -> None:
+        """Test sync with repos that HAVE spaces in names.
+
+        Tests one repo from each provider type where org/project/repo contains spaces.
+        This validates the space handling fix in manager.py.
+        """
+        if not self.providers:
+            self.add_result("sync_with_spaces", False, "No providers configured")
+            return
+
+        by_type: dict[str, list[str]] = {}
+        for name, ptype in self.providers.items():
+            by_type.setdefault(ptype, []).append(name)
+
+        results: dict[str, str] = {}
+
+        for ptype, providers in by_type.items():
+            provider = random.choice(providers)
+            clone_dir = self.test_dir / f"sync_spaces_{ptype}"
+            clone_dir.mkdir(parents=True, exist_ok=True)
+
+            self.log(f"Testing sync (with spaces) for {ptype} via {provider}")
+
+            list_result = self.run_cmd(
+                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "100"],
+                timeout=90,
+            )
+
+            if list_result.returncode != 0:
+                results[ptype] = "list failed"
+                continue
+
+            repos = self._extract_json(list_result.stdout)
+            if not repos:
+                results[ptype] = "no repos or JSON parse error"
+                continue
+
+            # Find repo WITH spaces
+            cloned = False
+            for repo in repos:
+                org = repo.get("organization", repo.get("workspace", ""))
+                project = repo.get("project") or "*"
+                name = repo.get("name", repo.get("repository", ""))
+
+                has_space = " " in str(org) or " " in str(project) or " " in str(name)
+                if not has_space:
+                    continue  # Only test repos WITH spaces
+
+                pattern = f"{org}/{project}/{name}"
+                self.log(f"  Cloning (with spaces): {pattern}")
 
                 sync_result = self.run_cmd(
                     ["sync", pattern, str(clone_dir), "--provider", provider],
@@ -584,24 +655,26 @@ class StandaloneTestSuite:
                         cloned = True
                         break
                     else:
-                        self.log(f"  No .git created")
+                        self.log(f"  No .git created despite exit 0")
                 else:
-                    self.log(f"  Exit {sync_result.returncode}")
+                    self.log(f"  Exit {sync_result.returncode}: {sync_result.stderr[:100]}")
 
             if not cloned and ptype not in results:
-                results[ptype] = "no suitable repo (all have spaces)"
+                results[ptype] = "no repo with spaces found"
 
-        # Report results per type
         ok_types = [t for t, r in results.items() if r == "OK"]
-        failed_types = [(t, r) for t, r in results.items() if r != "OK"]
+        skipped = [t for t, r in results.items() if r == "no repo with spaces found"]
+        failed = [(t, r) for t, r in results.items() if r not in ("OK", "no repo with spaces found")]
 
-        if len(ok_types) == len(by_type):
-            self.add_result("sync_clone", True, f"All {len(ok_types)} types OK")
+        if failed:
+            self.add_result("sync_with_spaces", False, f"FAILED: {failed}")
         elif ok_types:
-            failed_msg = ", ".join(f"{t}:{r}" for t, r in failed_types)
-            self.add_result("sync_clone", False, f"OK: {ok_types}, FAILED: {failed_msg}")
+            msg = f"{len(ok_types)} types OK"
+            if skipped:
+                msg += f", {len(skipped)} skipped (no spaces)"
+            self.add_result("sync_with_spaces", True, msg)
         else:
-            self.add_result("sync_clone", False, f"All failed: {dict(results)}")
+            self.add_result("sync_with_spaces", True, "All skipped (no spaces in any repos)")
 
     # =========================================================================
     # Cleanup and run
@@ -658,7 +731,10 @@ class StandaloneTestSuite:
             self.test_list_real_providers()
             self.test_list_nonexistent_provider()
             self.test_list_invalid_pattern()
-            self.test_sync_real_clone()
+
+            print("\n[Sync Tests - Each Provider Type]")
+            self.test_sync_no_spaces()
+            self.test_sync_with_spaces()
 
         # Cleanup
         self.cleanup()

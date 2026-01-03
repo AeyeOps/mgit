@@ -518,7 +518,8 @@ async def sync_local_command(
 
     if dry_run:
         _render_local_plan(root_path, planned_results, force)
-        _render_local_summary(planned_results, dry_run=True)
+        if summary:
+            _render_local_summary(planned_results, dry_run=True)
         return
 
     if force:
