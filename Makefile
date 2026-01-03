@@ -1,31 +1,44 @@
-.PHONY: help test lint format build build-install install clean version test-binary
+.PHONY: help test test-e2e lint format build build-install install clean version test-binary
 
-# Default target - show help
+# Show this help menu
 help:
 	@uv run python scripts/make.py
 
+# Run pytest test suite
 test:
 	@uv run python scripts/make.py test $(ARGS)
 
+# Run e2e tests against real provider APIs
+test-e2e:
+	@uv run python scripts/make.py test-e2e $(ARGS)
+
+# Run ruff linter to check code quality
 lint:
 	@uv run python scripts/make.py lint $(ARGS)
 
+# Run ruff formatter on codebase
 format:
 	@uv run python scripts/make.py format $(ARGS)
 
+# Build standalone executables
 build:
 	@uv run python scripts/make.py build $(ARGS)
 
+# Build and install to /opt/bin/mgit
 build-install:
 	@uv run python scripts/make.py build --target linux --install
 
+# Alias for build-install
 install: build-install
 
+# Remove build artifacts and caches
 clean:
 	@uv run python scripts/make.py clean
 
+# Bump project version (use ARGS="--bump patch|minor|major")
 version:
 	@uv run python scripts/make.py version $(ARGS)
 
+# Test the standalone binary at /opt/bin/mgit
 test-binary:
 	@uv run python scripts/make.py test-binary $(ARGS)
