@@ -287,10 +287,20 @@ class ProviderManager:
                     async for repo in provider.list_repositories(project, None):
                         repos.append(repo)
                 else:
-                    # Azure DevOps style: parse org/project if needed
-                    if "/" in project:
-                        # Project is in format "org/project"
-                        org_name, project_name = project.split("/", 1)
+                    # Azure DevOps style: parse org/project/repo pattern
+                    parts = project.split("/")
+                    if len(parts) >= 3:
+                        # Full pattern: org/project/repo - use org and project only
+                        org_name = parts[0]
+                        project_name = parts[1]
+                        # Note: parts[2] is the repo pattern, filtering happens elsewhere
+                        async for repo in provider.list_repositories(
+                            org_name, project_name
+                        ):
+                            repos.append(repo)
+                    elif len(parts) == 2:
+                        # Two parts: org/project
+                        org_name, project_name = parts
                         async for repo in provider.list_repositories(
                             org_name, project_name
                         ):
