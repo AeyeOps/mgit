@@ -96,19 +96,19 @@ class TestRenderTreeFrame:
 
     def test_frame_has_correct_dimensions(self):
         """Rendered frame should have expected line count."""
-        frame = render_tree_frame(0.0)
+        frame = render_tree_frame(0.0, use_color=False)
         lines = frame.split("\n")
         assert len(lines) == SCREEN_HEIGHT
 
     def test_frame_lines_have_correct_width(self):
         """Each line should have expected character count."""
-        frame = render_tree_frame(0.0)
+        frame = render_tree_frame(0.0, use_color=False)
         for line in frame.split("\n"):
             assert len(line) == SCREEN_WIDTH
 
     def test_frame_contains_only_valid_chars(self):
         """Frame should only contain luminance characters and spaces."""
-        frame = render_tree_frame(0.0)
+        frame = render_tree_frame(0.0, use_color=False)
         valid_chars = set(LUMINANCE_CHARS)
         for char in frame:
             if char != "\n":
@@ -116,17 +116,22 @@ class TestRenderTreeFrame:
 
     def test_different_angles_produce_different_frames(self):
         """Different rotation angles should produce different output."""
-        frame1 = render_tree_frame(0.0)
-        frame2 = render_tree_frame(math.pi / 2)
+        frame1 = render_tree_frame(0.0, use_color=False)
+        frame2 = render_tree_frame(math.pi / 2, use_color=False)
 
         # Frames should be different (lighting changes with rotation)
         assert frame1 != frame2
 
     def test_frame_is_not_empty(self):
         """Frame should contain some non-space characters (the tree)."""
-        frame = render_tree_frame(0.0)
+        frame = render_tree_frame(0.0, use_color=False)
         non_space_chars = [c for c in frame if c not in " \n"]
         assert len(non_space_chars) > 50  # Should have substantial content
+
+    def test_frame_with_color_contains_ansi_codes(self):
+        """Colored frame should contain ANSI escape codes."""
+        frame = render_tree_frame(0.0, use_color=True)
+        assert "\033[" in frame  # ANSI escape sequence
 
 
 class TestStaticTree:

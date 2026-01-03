@@ -2,22 +2,26 @@
 """
 Standalone Linux binary test suite.
 
-Tests the compiled mgit binary at /opt/bin/mgit without network access.
-Uses /tmp/ for test artifacts.
+Tests the compiled mgit binary at /opt/bin/mgit with REAL network operations.
+Uses /tmp/ for test artifacts. Requires configured providers for network tests.
 
 Usage:
-    uv run python scripts/make_standalone_linux.py
-    uv run python scripts/make_standalone_linux.py --verbose
-    uv run python scripts/make_standalone_linux.py --binary /path/to/mgit
+    uv run python scripts/test_binary.py
+    uv run python scripts/test_binary.py --verbose
+    uv run python scripts/test_binary.py --binary /path/to/mgit
+    uv run python scripts/test_binary.py --skip-network  # Skip network tests
 """
 import argparse
 import os
+import random
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 # Default binary location - explicit to avoid PATH conflicts
 DEFAULT_BINARY = "/opt/bin/mgit"
@@ -32,11 +36,13 @@ class TestResult:
 
 
 class StandaloneTestSuite:
-    def __init__(self, binary: str, verbose: bool = False):
+    def __init__(self, binary: str, verbose: bool = False, skip_network: bool = False):
         self.binary = binary
         self.verbose = verbose
+        self.skip_network = skip_network
         self.results: list[TestResult] = []
         self.test_dir = Path(tempfile.mkdtemp(prefix="mgit_standalone_test_"))
+        self.providers: dict[str, str] = {}  # name -> type
 
     def log(self, msg: str) -> None:
         if self.verbose:
@@ -372,16 +378,183 @@ class StandaloneTestSuite:
             self.add_result("invalid_command", False, str(e))
 
     def test_missing_args(self) -> None:
-        """Test handling of missing required arguments."""
+        """Test handling of missing required arguments.
+
+        Note: sync without args does local sync (valid behavior).
+        We test list without pattern which requires a query.
+        """
         try:
-            result = self.run_cmd(["sync"])  # sync without pattern
-            # Should fail or show help
+            result = self.run_cmd(["list"])  # list without pattern
+            # Should fail or show help - list requires QUERY argument
             if result.returncode != 0 or "usage" in result.stdout.lower():
                 self.add_result("missing_args", True, "Handled missing args")
             else:
                 self.add_result("missing_args", False, "Should require args")
         except Exception as e:
             self.add_result("missing_args", False, str(e))
+
+    # =========================================================================
+    # Network Tests: Real Provider Operations
+    # =========================================================================
+    def get_providers(self) -> dict[str, str]:
+        """Get configured providers from config --list."""
+        result = self.run_cmd(["config", "--list"])
+        if result.returncode != 0:
+            return {}
+
+        providers = {}
+        for line in result.stdout.split("\n"):
+            # Parse lines like: "  work_ado (azuredevops)"
+            match = re.search(r"^\s+([^\s]+)\s+\(([^)]+)\)", line)
+            if match:
+                name, ptype = match.groups()
+                providers[name] = ptype
+
+        return providers
+
+    def test_list_real_providers(self) -> None:
+        """Test list command against REAL provider APIs.
+
+        This test exercises actual network calls to configured providers.
+        It groups providers by type and tests one from each type.
+        """
+        self.providers = self.get_providers()
+
+        if not self.providers:
+            self.add_result("list_providers", False, "No providers configured")
+            return
+
+        # Group by type, pick one from each
+        by_type: dict[str, list[str]] = {}
+        for name, ptype in self.providers.items():
+            by_type.setdefault(ptype, []).append(name)
+
+        self.log(f"Provider types: {list(by_type.keys())}")
+
+        failed_providers = []
+        for ptype, names in by_type.items():
+            provider = random.choice(names)
+            self.log(f"Testing {provider} ({ptype})")
+
+            result = self.run_cmd(
+                ["list", "*/*/*", "--provider", provider, "--format", "table", "--limit", "5"],
+                timeout=60,
+            )
+
+            if result.returncode != 0:
+                failed_providers.append(f"{provider}({ptype})")
+                self.log(f"  FAILED: {result.stderr[:100]}")
+            else:
+                self.log(f"  OK: {len(result.stdout.split(chr(10)))} lines")
+
+        if not failed_providers:
+            self.add_result(
+                "list_providers",
+                True,
+                f"All {len(by_type)} provider types OK",
+            )
+        else:
+            self.add_result(
+                "list_providers",
+                False,
+                f"Failed: {', '.join(failed_providers)}",
+            )
+
+    def test_list_nonexistent_provider(self) -> None:
+        """Test that non-existent provider returns non-zero exit code.
+
+        This is a critical fail-fast test - configuration errors MUST fail.
+        """
+        result = self.run_cmd(
+            ["list", "*/*/*", "--provider", "nonexistent_provider_12345"],
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            self.add_result("list_bad_provider", True, f"Exit code {result.returncode}")
+        else:
+            self.add_result(
+                "list_bad_provider",
+                False,
+                "FAIL-FAST VIOLATION: Should exit non-zero for bad provider",
+            )
+
+    def test_list_invalid_pattern(self) -> None:
+        """Test that invalid query patterns are rejected."""
+        if not self.providers:
+            self.add_result("list_bad_pattern", False, "No providers to test with")
+            return
+
+        provider = next(iter(self.providers.keys()))
+        result = self.run_cmd(
+            ["list", "invalid/pattern/with/too/many/parts", "--provider", provider],
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            self.add_result("list_bad_pattern", True, "Invalid pattern rejected")
+        else:
+            self.add_result("list_bad_pattern", False, "Should reject invalid pattern")
+
+    def test_sync_real_clone(self) -> None:
+        """Test sync command with REAL git clone operation.
+
+        Clones an actual repository from a configured provider.
+        This exercises the full sync pipeline including git operations.
+        """
+        if not self.providers:
+            self.add_result("sync_clone", False, "No providers configured")
+            return
+
+        # Try to find a small repo to clone
+        # First, list repos and pick one
+        provider = next(iter(self.providers.keys()))
+        list_result = self.run_cmd(
+            ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "1"],
+            timeout=60,
+        )
+
+        if list_result.returncode != 0 or not list_result.stdout.strip():
+            self.add_result("sync_clone", False, f"Could not list repos from {provider}")
+            return
+
+        # Extract a repo pattern from the JSON output
+        import json
+        try:
+            repos = json.loads(list_result.stdout)
+            if not repos:
+                self.add_result("sync_clone", False, "No repos found to clone")
+                return
+
+            # Get the first repo's info
+            repo = repos[0]
+            org = repo.get("organization", repo.get("workspace", "*"))
+            project = repo.get("project", "*")
+            name = repo.get("name", repo.get("repository", "*"))
+            pattern = f"{org}/{project}/{name}"
+        except (json.JSONDecodeError, KeyError, IndexError) as e:
+            self.add_result("sync_clone", False, f"Could not parse repo list: {e}")
+            return
+
+        # Clone to temp directory
+        clone_dir = self.test_dir / "sync_test"
+        clone_dir.mkdir(parents=True, exist_ok=True)
+
+        self.log(f"Cloning {pattern} to {clone_dir}")
+        sync_result = self.run_cmd(
+            ["sync", pattern, str(clone_dir), "--provider", provider],
+            timeout=120,
+        )
+
+        if sync_result.returncode == 0:
+            # Verify a git repo was created
+            cloned_repos = list(clone_dir.rglob(".git"))
+            if cloned_repos:
+                self.add_result("sync_clone", True, f"Cloned {len(cloned_repos)} repo(s)")
+            else:
+                self.add_result("sync_clone", False, "No .git directory created")
+        else:
+            self.add_result("sync_clone", False, f"Exit {sync_result.returncode}: {sync_result.stderr[:100]}")
 
     # =========================================================================
     # Cleanup and run
@@ -430,6 +603,16 @@ class StandaloneTestSuite:
         self.test_invalid_command()
         self.test_missing_args()
 
+        # Network tests - hit real provider APIs
+        if self.skip_network:
+            print("\n[Network Tests] SKIPPED (--skip-network)")
+        else:
+            print("\n[Network Tests - Real Provider APIs]")
+            self.test_list_real_providers()
+            self.test_list_nonexistent_provider()
+            self.test_list_invalid_pattern()
+            self.test_sync_real_clone()
+
         # Cleanup
         self.cleanup()
 
@@ -455,9 +638,14 @@ def main() -> None:
         action="store_true",
         help="Show detailed output",
     )
+    parser.add_argument(
+        "--skip-network",
+        action="store_true",
+        help="Skip network tests (only run local tests)",
+    )
     args = parser.parse_args()
 
-    suite = StandaloneTestSuite(args.binary, args.verbose)
+    suite = StandaloneTestSuite(args.binary, args.verbose, args.skip_network)
     success = suite.run_all()
     sys.exit(0 if success else 1)
 

@@ -46,7 +46,6 @@ hiddenimports = [
     'rich.live',
     # YAML support
     'yaml',
-    'pyyaml',
     'ruamel.yaml',
     'ruamel.yaml.main',
     'ruamel.yaml.loader',
@@ -56,7 +55,6 @@ hiddenimports = [
     'click',
     # Dotenv support
     'dotenv',
-    'python_dotenv',
     # Python standard library modules that might be missed
     'typing_extensions',
     'importlib_metadata',
