@@ -32,13 +32,13 @@ def embed_pat_in_url(url: str, pat: str) -> str:
 
 def get_git_remote_url(repo_path: Path) -> Optional[str]:
     """
-    Get the remote URL of a git repository.
+    Get the origin remote URL of a git repository.
 
     Args:
         repo_path: Path to the git repository.
 
     Returns:
-        The remote URL or None if not found.
+        The origin remote URL or None if not found.
     """
     git_dir = repo_path / ".git"
     if not git_dir.exists():
@@ -48,10 +48,20 @@ def get_git_remote_url(repo_path: Path) -> Optional[str]:
     if not config_path.exists():
         return None
 
+    current_remote = None
     with open(config_path, "r", encoding="utf-8") as f:
         for line in f:
-            if "url =" in line:
-                return line.split("=")[1].strip()
+            stripped = line.strip()
+            if stripped.startswith("[") and stripped.endswith("]"):
+                current_remote = None
+                if stripped.lower().startswith('[remote "'):
+                    remote_name = stripped[len('[remote "'): -2]
+                    current_remote = remote_name
+                continue
+
+            if current_remote == "origin" and stripped.startswith("url"):
+                _, value = stripped.split("=", 1)
+                return value.strip()
     return None
 
 

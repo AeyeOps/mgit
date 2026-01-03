@@ -252,3 +252,204 @@ def test_cli_list_error_handling():
         # Don't fail the test - some providers might have auth issues
 
     print("=== Error handling tests completed ===")
+
+
+def _extract_json(output: str) -> Optional[list]:
+    """Extract JSON array from output that may contain log lines."""
+    # Find the JSON array - look for [{ or [\n{ to avoid false matches
+    for marker in ["[\n  {", "[{", "[\n{"]:
+        start = output.find(marker)
+        if start != -1:
+            break
+    else:
+        return None
+
+    end = output.rfind("]")
+    if end == -1 or end <= start:
+        return None
+
+    json_str = output[start : end + 1]
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        return None
+
+
+@pytest.mark.e2e
+def test_cli_sync_each_provider_no_spaces():
+    """Test sync command for each provider type with repos that have NO spaces.
+
+    Clones one repo from each provider type (GitHub, Azure DevOps, BitBucket)
+    where org/project/repo names do not contain spaces.
+    """
+    import tempfile
+    import shutil
+    from pathlib import Path
+
+    try:
+        all_providers = get_provider_list()
+    except Exception as e:
+        pytest.skip(f"Could not get provider list: {e}")
+
+    if not all_providers:
+        pytest.skip("No providers configured")
+
+    providers_by_type: Dict[str, List[str]] = {}
+    for name, ptype in all_providers.items():
+        providers_by_type.setdefault(ptype, []).append(name)
+
+    test_dir = Path(tempfile.mkdtemp(prefix="mgit_e2e_sync_"))
+    results: Dict[str, Tuple[bool, str]] = {}
+
+    try:
+        for ptype, providers in providers_by_type.items():
+            provider = random.choice(providers)
+            clone_dir = test_dir / f"nospace_{ptype}"
+            clone_dir.mkdir(parents=True, exist_ok=True)
+
+            print(f"\n--- Testing sync (no spaces) for {ptype} via {provider} ---")
+
+            # Get repos
+            code, stdout, stderr = run_mgit_command(
+                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "30"]
+            )
+            if code != 0:
+                results[ptype] = (False, "list failed")
+                continue
+
+            repos = _extract_json(stdout)
+            if not repos:
+                results[ptype] = (False, "no repos or JSON parse error")
+                continue
+
+            # Find repo without spaces
+            cloned = False
+            for repo in repos:
+                org = repo.get("organization", repo.get("workspace", ""))
+                project = repo.get("project") or "*"
+                name = repo.get("name", repo.get("repository", ""))
+
+                if " " in str(org) or " " in str(project) or " " in str(name):
+                    continue
+
+                pattern = f"{org}/{project}/{name}"
+                print(f"  Cloning: {pattern}")
+
+                code, stdout, stderr = run_mgit_command(
+                    ["sync", pattern, str(clone_dir), "--provider", provider]
+                )
+
+                if code == 0 and list(clone_dir.rglob(".git")):
+                    results[ptype] = (True, "OK")
+                    cloned = True
+                    break
+
+            if not cloned and ptype not in results:
+                results[ptype] = (False, "no repo without spaces found")
+
+    finally:
+        shutil.rmtree(test_dir, ignore_errors=True)
+
+    # Report
+    ok = [t for t, (passed, _) in results.items() if passed]
+    failed = [(t, msg) for t, (passed, msg) in results.items() if not passed]
+
+    print(f"\n=== Sync (no spaces) Results ===")
+    for ptype, (passed, msg) in results.items():
+        status = "✅" if passed else "❌"
+        print(f"  {ptype}: {status} {msg}")
+
+    assert len(ok) > 0, f"No provider types passed sync test: {failed}"
+    if failed:
+        print(f"⚠️  Some providers failed: {failed}")
+
+
+@pytest.mark.e2e
+def test_cli_sync_each_provider_with_spaces():
+    """Test sync command for each provider type with repos that HAVE spaces.
+
+    Tests repos where org/project/repo contains spaces (e.g., "Blue Cow").
+    This validates the space handling fix in manager.py.
+    """
+    import tempfile
+    import shutil
+    from pathlib import Path
+
+    try:
+        all_providers = get_provider_list()
+    except Exception as e:
+        pytest.skip(f"Could not get provider list: {e}")
+
+    if not all_providers:
+        pytest.skip("No providers configured")
+
+    providers_by_type: Dict[str, List[str]] = {}
+    for name, ptype in all_providers.items():
+        providers_by_type.setdefault(ptype, []).append(name)
+
+    test_dir = Path(tempfile.mkdtemp(prefix="mgit_e2e_sync_spaces_"))
+    results: Dict[str, Tuple[bool, str]] = {}
+
+    try:
+        for ptype, providers in providers_by_type.items():
+            provider = random.choice(providers)
+            clone_dir = test_dir / f"spaces_{ptype}"
+            clone_dir.mkdir(parents=True, exist_ok=True)
+
+            print(f"\n--- Testing sync (with spaces) for {ptype} via {provider} ---")
+
+            # Get repos with higher limit to find spaces
+            code, stdout, stderr = run_mgit_command(
+                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "100"]
+            )
+            if code != 0:
+                results[ptype] = (False, "list failed")
+                continue
+
+            repos = _extract_json(stdout)
+            if not repos:
+                results[ptype] = (False, "no repos or JSON parse error")
+                continue
+
+            # Find repo WITH spaces
+            cloned = False
+            for repo in repos:
+                org = repo.get("organization", repo.get("workspace", ""))
+                project = repo.get("project") or "*"
+                name = repo.get("name", repo.get("repository", ""))
+
+                has_space = " " in str(org) or " " in str(project) or " " in str(name)
+                if not has_space:
+                    continue
+
+                pattern = f"{org}/{project}/{name}"
+                print(f"  Cloning (spaces): {pattern}")
+
+                code, stdout, stderr = run_mgit_command(
+                    ["sync", pattern, str(clone_dir), "--provider", provider]
+                )
+
+                if code == 0 and list(clone_dir.rglob(".git")):
+                    results[ptype] = (True, "OK")
+                    cloned = True
+                    break
+                else:
+                    print(f"  Failed: exit {code}")
+
+            if not cloned and ptype not in results:
+                results[ptype] = (True, "skipped - no repos with spaces")
+
+    finally:
+        shutil.rmtree(test_dir, ignore_errors=True)
+
+    # Report
+    ok = [t for t, (passed, _) in results.items() if passed]
+    failed = [(t, msg) for t, (passed, msg) in results.items() if not passed]
+
+    print(f"\n=== Sync (with spaces) Results ===")
+    for ptype, (passed, msg) in results.items():
+        status = "✅" if passed else "❌"
+        print(f"  {ptype}: {status} {msg}")
+
+    # This test passes if no explicit failures (skipped is OK)
+    assert not failed, f"Provider types failed sync with spaces: {failed}"

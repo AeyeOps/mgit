@@ -11,9 +11,10 @@ from pathlib import Path
 # Try to use Rich for colorful output, fall back to plain text
 try:
     from rich.console import Console
-    from rich.table import Table
     from rich.panel import Panel
+    from rich.table import Table
     from rich.text import Text
+
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False
@@ -110,7 +111,7 @@ def show_help_rich():
     table.add_column("Description", style="white")
     table.add_column("Example", style="dim cyan")
 
-    for name, (script, description, examples) in COMMANDS.items():
+    for name, (_script, description, examples) in COMMANDS.items():
         table.add_row(name, description, examples[0].replace("uv run python scripts/make.py ", ""))
 
     console.print(table)
@@ -143,7 +144,7 @@ def show_help_plain():
     print()
     print("Commands:")
     print("-" * 50)
-    for name, (script, description, examples) in COMMANDS.items():
+    for name, (_script, description, _examples) in COMMANDS.items():
         print(f"  {name:<14} {description}")
     print()
     print("Usage: uv run python scripts/make.py <command> [args...]")
