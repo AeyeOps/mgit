@@ -1,9 +1,12 @@
 """Help animation orchestration for mgit CLI."""
 
 import contextlib
+import select
 import signal
 import sys
+import termios
 import time
+import tty
 from typing import Any
 
 from mgit.ui.ascii_tree import get_static_tree, get_tree_height, render_tree_frame
@@ -49,12 +52,45 @@ def _restore_signal_handler(previous: SignalHandler) -> None:
             signal.signal(signal.SIGINT, previous)
 
 
+def _check_for_keypress() -> bool:
+    """Check if any key has been pressed (non-blocking). Returns True if key pressed."""
+    try:
+        # Check if stdin has data available (non-blocking)
+        if select.select([sys.stdin], [], [], 0)[0]:
+            sys.stdin.read(1)  # Consume the character
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _set_raw_mode() -> Any:
+    """Set terminal to raw mode for keypress detection. Returns old settings."""
+    try:
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        tty.setcbreak(fd)  # Use cbreak instead of raw - allows Ctrl+C
+        return old_settings
+    except Exception:
+        return None
+
+
+def _restore_terminal(old_settings: Any) -> None:
+    """Restore terminal to previous settings."""
+    if old_settings is not None:
+        try:
+            fd = sys.stdin.fileno()
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        except Exception:
+            pass
+
+
 def run_tree_animation(duration: float = ANIMATION_DURATION, fps: float = ANIMATION_FPS) -> None:
     """
     Run the spinning tree animation.
 
     Displays an animated ASCII tree that rotates for the specified duration,
-    then clears the animation area before returning.
+    then clears the animation area before returning. Press any key to skip.
     """
     frame_time = 1.0 / fps
     angle = 0.0  # Rotation around vertical axis
@@ -64,12 +100,17 @@ def run_tree_animation(duration: float = ANIMATION_DURATION, fps: float = ANIMAT
     first_frame = True
 
     previous_handler = _setup_signal_handler()
+    old_terminal_settings = _set_raw_mode()  # Enable keypress detection
 
     try:
         hide_cursor()
 
         while time.monotonic() - start_time < duration:
             frame_start = time.monotonic()
+
+            # Check for keypress to skip animation
+            if _check_for_keypress():
+                break
 
             # Render frame with current rotation angle
             frame = render_tree_frame(angle)
@@ -108,17 +149,22 @@ def run_tree_animation(duration: float = ANIMATION_DURATION, fps: float = ANIMAT
         move_to_start_of_frame(tree_height)
         sys.stdout.flush()
         show_cursor()
+        _restore_terminal(old_terminal_settings)
         _restore_signal_handler(previous_handler)
         raise KeyboardInterrupt from None
 
     finally:
         show_cursor()
+        _restore_terminal(old_terminal_settings)
         _restore_signal_handler(previous_handler)
 
 
 def print_static_tree(use_color: bool = True) -> None:
     """Print the static ASCII tree (for non-animated contexts)."""
-    print(get_static_tree(use_color=use_color))
+    # Use sys.stdout.write with explicit flush for guaranteed ordering
+    sys.stdout.write(get_static_tree(use_color=use_color))
+    sys.stdout.write("\n")
+    sys.stdout.flush()
 
 
 def show_animated_help(help_text: str) -> None:
@@ -136,12 +182,16 @@ def show_animated_help(help_text: str) -> None:
         if caps == TerminalCaps.ANSI:
             run_tree_animation()
         # Tree always appears on top, then help text below
+        # Use sys.stdout.write for guaranteed ordering with Rich
         print_static_tree(use_color=use_color)
-        sys.stdout.flush()  # Ensure tree prints before Rich help text
-        print(help_text)
+        sys.stdout.write(help_text)
+        sys.stdout.write("\n")
+        sys.stdout.flush()
 
     except KeyboardInterrupt:
         # User interrupted - just show help without tree
-        print()  # Clean newline
-        print(help_text)
+        sys.stdout.write("\n")
+        sys.stdout.write(help_text)
+        sys.stdout.write("\n")
+        sys.stdout.flush()
         raise
