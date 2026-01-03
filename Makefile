@@ -1,4 +1,4 @@
-.PHONY: help test test-e2e lint format build build-install install clean version test-binary
+.PHONY: help test test-e2e lint format build build-linux build-windows build-install install clean version test-binary
 
 # Show this help menu
 help:
@@ -12,6 +12,10 @@ test:
 test-e2e:
 	@uv run python scripts/make.py test-e2e $(ARGS)
 
+# Test the standalone binary with real network calls
+test-binary:
+	@uv run python scripts/make.py test-binary $(ARGS)
+
 # Run ruff linter to check code quality
 lint:
 	@uv run python scripts/make.py lint $(ARGS)
@@ -20,13 +24,21 @@ lint:
 format:
 	@uv run python scripts/make.py format $(ARGS)
 
-# Build standalone executables
+# Build standalone executable (default target)
 build:
 	@uv run python scripts/make.py build $(ARGS)
 
-# Build and install to /opt/bin/mgit
+# Build Linux standalone binary
+build-linux:
+	@uv run python scripts/make_build.py --target linux
+
+# Build Windows standalone binary
+build-windows:
+	@uv run python scripts/make_build.py --target windows
+
+# Build Linux binary and install to /opt/bin/mgit
 build-install:
-	@uv run python scripts/make.py build --target linux --install
+	@uv run python scripts/make_build.py --target linux --install
 
 # Alias for build-install
 install: build-install
@@ -38,7 +50,3 @@ clean:
 # Bump project version (use ARGS="--bump patch|minor|major")
 version:
 	@uv run python scripts/make.py version $(ARGS)
-
-# Test the standalone binary at /opt/bin/mgit
-test-binary:
-	@uv run python scripts/make.py test-binary $(ARGS)

@@ -12,13 +12,13 @@ import random
 from typing import Dict, List, Optional, Tuple
 
 
-def run_mgit_command(args: List[str]) -> tuple[int, str, str]:
+def run_mgit_command(args: List[str], timeout: int = 60) -> tuple[int, str, str]:
     """Run mgit CLI command and return exit code, stdout, stderr."""
     result = subprocess.run(
         ["uv", "run", "mgit"] + args,
         capture_output=True,
         text=True,
-        timeout=60,  # Longer timeout for list operations
+        timeout=timeout,
     )
     return result.returncode, result.stdout, result.stderr
 
@@ -311,7 +311,8 @@ def test_cli_sync_each_provider_no_spaces():
 
             # Get repos
             code, stdout, stderr = run_mgit_command(
-                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "30"]
+                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "30"],
+                timeout=90,
             )
             if code != 0:
                 results[ptype] = (False, "list failed")
@@ -336,7 +337,8 @@ def test_cli_sync_each_provider_no_spaces():
                 print(f"  Cloning: {pattern}")
 
                 code, stdout, stderr = run_mgit_command(
-                    ["sync", pattern, str(clone_dir), "--provider", provider]
+                    ["sync", pattern, str(clone_dir), "--provider", provider],
+                    timeout=180,  # 3 min for git clone
                 )
 
                 if code == 0 and list(clone_dir.rglob(".git")):
@@ -400,7 +402,8 @@ def test_cli_sync_each_provider_with_spaces():
 
             # Get repos with higher limit to find spaces
             code, stdout, stderr = run_mgit_command(
-                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "100"]
+                ["list", "*/*/*", "--provider", provider, "--format", "json", "--limit", "100"],
+                timeout=120,  # Higher limit = more time
             )
             if code != 0:
                 results[ptype] = (False, "list failed")
@@ -426,7 +429,8 @@ def test_cli_sync_each_provider_with_spaces():
                 print(f"  Cloning (spaces): {pattern}")
 
                 code, stdout, stderr = run_mgit_command(
-                    ["sync", pattern, str(clone_dir), "--provider", provider]
+                    ["sync", pattern, str(clone_dir), "--provider", provider],
+                    timeout=180,  # 3 min for git clone
                 )
 
                 if code == 0 and list(clone_dir.rglob(".git")):

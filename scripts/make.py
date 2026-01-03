@@ -150,6 +150,8 @@ def run_command(command: str, args: list[str], targets: dict[str, str]) -> int:
         "lint": "make_lint.py",
         "format": "make_format.py",
         "build": "make_build.py",
+        "build-linux": "make_build.py",
+        "build-windows": "make_build.py",
         "build-install": "make_build.py",
         "clean": "make_clean.py",
         "version": "make_version.py",
@@ -172,8 +174,12 @@ def run_command(command: str, args: list[str], targets: dict[str, str]) -> int:
     if command == "test-e2e":
         args = ["-m", "e2e", *args]
 
-    # Special handling for build-install
-    if command == "build-install":
+    # Special handling for build targets
+    if command == "build-linux":
+        args = ["--target", "linux", *args]
+    elif command == "build-windows":
+        args = ["--target", "windows", *args]
+    elif command == "build-install":
         args = ["--target", "linux", "--install", *args]
 
     # Run the script with passed arguments
