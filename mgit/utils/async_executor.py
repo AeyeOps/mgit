@@ -14,7 +14,15 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 from rich.console import Console
-from rich.progress import Progress, TaskID
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskID,
+    TextColumn,
+    TimeElapsedColumn,
+)
+from rich.table import Column
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +83,8 @@ class AsyncExecutor:
             asyncio.Semaphore(concurrency) if mode == ExecutionMode.CONCURRENT else None
         )
         self.console = rich_console or Console(stderr=True)
+        self._bar_width = 28
+        self._min_desc_width = 24
 
     async def run_batch(
         self,
@@ -140,30 +150,25 @@ class AsyncExecutor:
                     )
         else:
             # Run with progress tracking
-            with Progress(console=self.console) as progress:
+            with self._create_progress() as progress:
                 overall_task = progress.add_task(task_description, total=len(items))
-                compact_progress = self._should_use_compact_progress(len(items))
 
-                if compact_progress:
-                    if self.mode == ExecutionMode.CONCURRENT:
-                        tasks = [
-                            self._process_item_with_compact_progress(
-                                idx,
-                                item,
-                                process_func,
-                                results,
-                                errors,
-                                progress,
-                                overall_task,
-                                item_description,
-                                collect_errors,
-                                on_error,
-                                on_success,
-                            )
-                            for idx, item in enumerate(items)
-                        ]
-                        await asyncio.gather(*tasks)
-                    else:
+                if self.mode == ExecutionMode.CONCURRENT:
+                    await self._run_concurrent_with_worker_progress(
+                        items,
+                        process_func,
+                        results,
+                        errors,
+                        progress,
+                        overall_task,
+                        item_description,
+                        collect_errors,
+                        on_error,
+                        on_success,
+                    )
+                else:
+                    compact_progress = self._should_use_compact_progress(len(items))
+                    if compact_progress:
                         for idx, item in enumerate(items):
                             await self._process_item_with_compact_progress(
                                 idx,
@@ -178,41 +183,21 @@ class AsyncExecutor:
                                 on_error,
                                 on_success,
                             )
-                else:
-                    # Create individual task tracking
-                    item_tasks: dict[int, TaskID] = {}
-                    for idx, item in enumerate(items):
-                        desc = (
-                            item_description(item)
-                            if item_description
-                            else f"Item {idx + 1}"
-                        )
-                        task_id = progress.add_task(
-                            f"[grey50]Pending: {desc}[/grey50]", total=1
-                        )
-                        item_tasks[idx] = task_id
-
-                    # Process items based on mode
-                    if self.mode == ExecutionMode.CONCURRENT:
-                        tasks = [
-                            self._process_item_with_progress(
-                                idx,
-                                item,
-                                process_func,
-                                results,
-                                errors,
-                                progress,
-                                overall_task,
-                                item_tasks[idx],
-                                item_description,
-                                collect_errors,
-                                on_error,
-                                on_success,
-                            )
-                            for idx, item in enumerate(items)
-                        ]
-                        await asyncio.gather(*tasks)
                     else:
+                        # Create individual task tracking
+                        item_tasks: dict[int, TaskID] = {}
+                        for idx, item in enumerate(items):
+                            raw_desc = (
+                                item_description(item)
+                                if item_description
+                                else f"Item {idx + 1}"
+                            )
+                            desc = self._format_description(raw_desc)
+                            task_id = progress.add_task(
+                                f"[grey50]Pending: {desc}[/grey50]", total=1
+                            )
+                            item_tasks[idx] = task_id
+
                         # Sequential execution with progress
                         for idx, item in enumerate(items):
                             await self._process_item_with_progress(
@@ -297,7 +282,8 @@ class AsyncExecutor:
         on_success: Callable[[T, Any], None] | None,
     ):
         """Process item with progress tracking."""
-        desc = item_description(item) if item_description else f"Item {idx + 1}"
+        raw_desc = item_description(item) if item_description else f"Item {idx + 1}"
+        desc = self._format_description(raw_desc)
 
         if self.mode == ExecutionMode.CONCURRENT and self.semaphore:
             async with self.semaphore:
@@ -375,6 +361,132 @@ class AsyncExecutor:
 
         progress.advance(overall_task, 1)
 
+    async def _run_concurrent_with_worker_progress(
+        self,
+        items: list[T],
+        process_func: Callable[[T], Coroutine[Any, Any, Any]],
+        results: list[Any],
+        errors: list[tuple[T, Exception]],
+        progress: Progress,
+        overall_task: TaskID,
+        item_description: Callable[[T], str] | None,
+        collect_errors: bool,
+        on_error: Callable[[T, Exception], None] | None,
+        on_success: Callable[[T, Any], None] | None,
+    ) -> None:
+        worker_count = max(self.concurrency, 1)
+        queue: asyncio.Queue[tuple[int, T] | None] = asyncio.Queue()
+
+        for idx, item in enumerate(items):
+            queue.put_nowait((idx, item))
+        for _ in range(worker_count):
+            queue.put_nowait(None)
+
+        worker_tasks = [
+            progress.add_task(f"[grey50]Worker {i + 1}: idle[/grey50]", total=1)
+            for i in range(worker_count)
+        ]
+
+        async def worker(worker_idx: int) -> None:
+            task_id = worker_tasks[worker_idx]
+            while True:
+                payload = await queue.get()
+                if payload is None:
+                    progress.update(
+                        task_id,
+                        description=f"[grey50]Worker {worker_idx + 1}: idle[/grey50]",
+                        completed=0,
+                    )
+                    queue.task_done()
+                    break
+
+                idx, item = payload
+                raw_desc = (
+                    item_description(item) if item_description else f"Item {idx + 1}"
+                )
+                desc = self._format_description(
+                    raw_desc, prefix=f"Worker {worker_idx + 1}: "
+                )
+                progress.update(
+                    task_id,
+                    description=f"[cyan]{desc}[/cyan]",
+                    completed=1,
+                )
+
+                try:
+                    result = await process_func(item)
+                    results[idx] = result
+                    progress.update(
+                        task_id,
+                        description=f"[green]✓ {desc}[/green]",
+                        completed=1,
+                    )
+                    if on_success:
+                        on_success(item, result)
+                except Exception as e:
+                    logger.warning(f"Error processing {desc}: {e}")
+                    errors.append((item, e))
+                    progress.update(
+                        task_id,
+                        description=f"[red]✗ {desc}[/red]",
+                        completed=1,
+                    )
+                    if on_error:
+                        on_error(item, e)
+                    if not collect_errors:
+                        queue.task_done()
+                        raise
+
+                progress.advance(overall_task, 1)
+                queue.task_done()
+
+        await asyncio.gather(*(worker(i) for i in range(worker_count)))
+
+    def _create_progress(self) -> Progress:
+        columns = [
+            SpinnerColumn(),
+            TextColumn(
+                "[progress.description]{task.description}",
+                justify="left",
+                table_column=Column(ratio=1, overflow="ellipsis", no_wrap=True),
+            ),
+            BarColumn(
+                bar_width=self._bar_width,
+                table_column=Column(justify="right"),
+            ),
+            TextColumn("{task.percentage:>3.0f}%", justify="right"),
+            TimeElapsedColumn(table_column=Column(justify="right")),
+        ]
+        return Progress(*columns, console=self.console, expand=True)
+
+    def _format_description(self, text: str, prefix: str | None = None) -> str:
+        display = f"{prefix or ''}{text}"
+        max_len = self._get_max_description_width()
+        return self._truncate_middle(display, max_len)
+
+    def _get_max_description_width(self) -> int:
+        try:
+            width = self.console.size.width
+        except Exception:
+            width = 0
+
+        if width <= 0:
+            return 60
+
+        reserved = self._bar_width + 16
+        max_len = width - reserved
+        return max(max_len, self._min_desc_width)
+
+    @staticmethod
+    def _truncate_middle(text: str, max_len: int) -> str:
+        if max_len <= 0 or len(text) <= max_len:
+            return text
+        if max_len <= 3:
+            return text[:max_len]
+        head_len = (max_len - 3) // 2
+        tail_len = max_len - 3 - head_len
+        return f"{text[:head_len]}...{text[-tail_len:]}"
+
     def _should_use_compact_progress(self, item_count: int) -> bool:
         try:
             height = self.console.size.height
@@ -402,7 +514,8 @@ class AsyncExecutor:
         on_success: Callable[[T, Any], None] | None,
     ):
         """Process item with compact progress tracking."""
-        desc = item_description(item) if item_description else f"Item {idx + 1}"
+        raw_desc = item_description(item) if item_description else f"Item {idx + 1}"
+        desc = self._format_description(raw_desc)
 
         if self.mode == ExecutionMode.CONCURRENT and self.semaphore:
             async with self.semaphore:
