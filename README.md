@@ -354,8 +354,8 @@ mgit list "*/*/terraform-*"
 # Clone all API services for a project
 mgit sync "myorg/*/api-*" ./api-services
 
-# Update all repositories in workspace
-mgit sync "." ./my-workspace
+# Update all repositories in workspace (local walk mode)
+mgit sync ./my-workspace
 
 # Check which repos need attention
 mgit status ./my-workspace --all
@@ -415,7 +415,7 @@ mgit list "*/*/*-service" --format json
 |---------|-------------|---------|
 | `mgit login` | Configure provider access | `mgit login --provider github --name work` |
 | `mgit list <pattern>` | Find repositories | `mgit list "myorg/*/*"` |
-| `mgit sync <pattern> <path>` | Clone missing repos, update existing | `mgit sync "*/api-*" ./apis` |
+| `mgit sync [<path>|<pattern>] [path]` | Local pull (path) or remote sync (pattern) | `mgit sync ./workspace` |
 | `mgit status <path>` | Check repository status | `mgit status ./workspace` |
 | `mgit diff [path]` | Detect and export repo change data (JSONL) | `mgit diff . --output changes.jsonl` |
 | `mgit diff-remote <pattern>` | Discover remote repo changes | `mgit diff-remote "myorg/*/*" --limit 50` |
@@ -631,19 +631,25 @@ mgit config --list
 
 ### Command Details: `mgit sync`
 
-The `sync` command is mgit's primary repository management tool, providing intelligent synchronization across multiple Git providers. This section provides comprehensive documentation for advanced usage.
+The `sync` command is mgit's primary repository management tool, providing both local walk mode (scan and pull existing repos) and remote provider synchronization. This section provides comprehensive documentation for advanced usage.
 
 #### Command Syntax
 ```bash
-mgit sync <pattern> <path> [OPTIONS]
+# Local walk mode (default)
+mgit sync [path]
+
+# Remote provider sync
+mgit sync <pattern> [path]
+mgit sync --filter <pattern> [path]
 ```
 
 #### Arguments and Options
 
 | Parameter | Required | Short | Description | Example |
 |-----------|----------|-------|-------------|---------|
-| `pattern` | Yes | - | Pattern to match repositories (org/project/repo) | `"myorg/*/*"`, `"*/*/api-*"` |
-| `path` | Yes | - | Target directory for synchronization (relative or absolute) | `./repos`, `/home/user/code` |
+| `pattern` | Remote only | - | Pattern to match repositories (org/project/repo) | `"myorg/*/*"`, `"*/*/api-*"` |
+| `path` | No | - | Local scan root (local mode) or target directory (remote mode) | `./repos`, `/home/user/code` |
+| `--filter` | No | - | Explicit remote pattern (forces remote mode) | `--filter "myorg/*/*"` |
 | `--provider` | No | `-p` | Use specific provider configuration | `--provider github_work` |
 | `--concurrency` | No | `-c` | Number of parallel operations (default: 4) | `--concurrency 10` |
 | `--force` | No | `-f` | Force re-clone all repositories (requires confirmation) | `--force` |
@@ -660,9 +666,19 @@ mgit sync <pattern> <path> [OPTIONS]
 | Dirty (uncommitted changes) | Skip | Repository will be skipped (unless `--force`) |
 | Non-Git directory | Skip | Directory exists but is not a Git repository |
 
+**Local walk mode notes:**
+- Scans a directory tree for existing Git repositories and runs `git pull` on clean repos
+- Repositories without a remote or with uncommitted changes are skipped (unless `--force`)
+
 #### Real-World Examples
 
 ```bash
+# Local walk mode (current directory)
+mgit sync
+
+# Local walk mode (specific path)
+mgit sync ./workspace
+
 # Basic usage - sync repos matching pattern
 mgit sync "MyOrg/*/*" ./myproject-repos
 
@@ -711,7 +727,7 @@ done
 # Selective synchronization with post-processing
 mgit list "MyOrg/*api*" --format json | \
   jq -r '.[].repository' | \
-  xargs -I {} mgit sync MyOrg ./apis --filter {}
+  xargs -I {} mgit sync --filter {} ./apis
 
 # Parallel provider operations
 mgit sync WorkProject ./work --provider github_work &

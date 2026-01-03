@@ -1,0 +1,149 @@
+"""Help animation orchestration for mgit CLI."""
+
+import contextlib
+import signal
+import sys
+import time
+from typing import Any
+
+from mgit.ui.ascii_tree import get_static_tree, get_tree_height, render_tree_frame
+from mgit.ui.terminal import (
+    TerminalCaps,
+    get_terminal_capabilities,
+    hide_cursor,
+    move_to_start_of_frame,
+    show_cursor,
+)
+
+# Animation settings
+ANIMATION_DURATION = 3.5  # seconds
+ANIMATION_FPS = 12  # frames per second
+ROTATION_SPEED = 0.15  # radians per frame
+
+
+class AnimationInterrupted(Exception):
+    """Raised when animation is interrupted by user."""
+
+
+# Type alias for signal handler (signal module has complex types)
+SignalHandler = Any
+
+
+def _setup_signal_handler() -> SignalHandler:
+    """Set up signal handler for clean Ctrl+C handling. Returns previous handler."""
+    previous_handler: SignalHandler = None
+
+    def handler(signum: int, frame: object) -> None:
+        raise AnimationInterrupted()
+
+    with contextlib.suppress(OSError, ValueError):
+        previous_handler = signal.signal(signal.SIGINT, handler)
+
+    return previous_handler
+
+
+def _restore_signal_handler(previous: SignalHandler) -> None:
+    """Restore previous signal handler."""
+    if previous is not None:
+        with contextlib.suppress(OSError, ValueError):
+            signal.signal(signal.SIGINT, previous)
+
+
+def run_tree_animation(duration: float = ANIMATION_DURATION, fps: float = ANIMATION_FPS) -> None:
+    """
+    Run the spinning tree animation.
+
+    Displays an animated ASCII tree that rotates for the specified duration,
+    then clears the animation area before returning.
+    """
+    frame_time = 1.0 / fps
+    angle = 0.0  # Rotation around vertical axis
+
+    tree_height = get_tree_height()
+    start_time = time.monotonic()
+    first_frame = True
+
+    previous_handler = _setup_signal_handler()
+
+    try:
+        hide_cursor()
+
+        while time.monotonic() - start_time < duration:
+            frame_start = time.monotonic()
+
+            # Render frame with current rotation angle
+            frame = render_tree_frame(angle)
+
+            # Move cursor back to start for overwrite (except first frame)
+            if not first_frame:
+                move_to_start_of_frame(tree_height)
+            first_frame = False
+
+            # Output frame
+            sys.stdout.write(frame)
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+
+            # Advance rotation
+            angle += ROTATION_SPEED
+
+            # Maintain frame rate
+            elapsed = time.monotonic() - frame_start
+            sleep_time = frame_time - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+        # Clear animation area after completion
+        move_to_start_of_frame(tree_height)
+        for _ in range(tree_height):
+            sys.stdout.write(" " * 65 + "\n")
+        move_to_start_of_frame(tree_height)
+        sys.stdout.flush()
+
+    except AnimationInterrupted:
+        # Clean exit on Ctrl+C - clear animation and re-raise as KeyboardInterrupt
+        move_to_start_of_frame(tree_height)
+        for _ in range(tree_height):
+            sys.stdout.write(" " * 65 + "\n")
+        move_to_start_of_frame(tree_height)
+        sys.stdout.flush()
+        show_cursor()
+        _restore_signal_handler(previous_handler)
+        raise KeyboardInterrupt from None
+
+    finally:
+        show_cursor()
+        _restore_signal_handler(previous_handler)
+
+
+def print_static_tree() -> None:
+    """Print the static ASCII tree (for non-animated contexts)."""
+    print(get_static_tree())
+
+
+def show_animated_help(help_text: str) -> None:
+    """
+    Show help with optional animation based on terminal capabilities.
+
+    In capable terminals: shows spinning tree animation, then static tree + help text.
+    In limited terminals: shows static tree, then help text.
+    In pipes: shows help text, then static tree.
+    """
+    caps = get_terminal_capabilities()
+
+    try:
+        if caps == TerminalCaps.ANSI:
+            run_tree_animation()
+            # After animation, show help text first, then static tree as decoration
+            print(help_text)
+            print_static_tree()
+        else:
+            # For pipes and dumb terminals, show help first for usability
+            print(help_text)
+            print_static_tree()
+
+    except KeyboardInterrupt:
+        # User interrupted - just show help without tree
+        print()  # Clean newline
+        print(help_text)
+        raise
