@@ -1,110 +1,75 @@
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.poetry]
+[project]
 name = "mgit"
 version = "0.7.2"
 description = "Multi-provider Git management tool"
-authors = ["Steve Antonakakis <steve.antonakakis@gmail.com>"]
 readme = "README.md"
-license = "MIT"
-packages = [{include = "mgit"}]
+requires-python = ">=3.10,<3.14"
+license = {text = "MIT"}
+authors = [{ name = "Steve Antonakakis", email = "steve.antonakakis@gmail.com" }]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "aiohttp>=3.9.0",
+    "azure-devops>=7.1.0b1",
+    "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+    "typer>=0.9.0,<0.16.0",
+    "click>=8.1.7,<8.2.0",
+    "PyYAML>=6.0",
+    "ruamel.yaml>=0.18.0",
+    "cryptography>=44.0.1",
 ]
 
-[tool.poetry.dependencies]
-python = ">=3.9.2,<3.13"
-aiohttp = "^3.9.0"
-azure-devops = "^7.1.0b1"
-python-dotenv = "^1.0.0"
-rich = "^13.0.0"
-typer = "^0.9.0"
-click = "==8.1.7"
-pyyaml = "^6.0"
-"ruamel.yaml" = "^0.18.0"
-cryptography = ">=44.0.1"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.0.0"
-pytest-cov = "^4.0.0"
-pytest-asyncio = "^0.21.0"
-black = "^24.3.0"
-ruff = "^0.1.0"
-mypy = "^1.0.0"
-pyinstaller = "^6.0"
-poethepoet = "^0.24.0"
-bandit = {extras = ["toml"], version = "^1.8.0"}
-safety = "^3.0.0"
-pip-audit = "^2.9.0"
-pytest-benchmark = "^4.0.0"
-memory-profiler = "^0.61.0"
-
-[tool.poetry.scripts]
+[project.scripts]
 mgit = "mgit.__main__:entrypoint"
 
-[tool.poe.tasks]
-[tool.poe.tasks.build-linux]
-help = "Build Linux executable mgit"
-cmd = "pyinstaller mgit.spec --clean"
+[dependency-groups]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.8.0",
+    "pyright>=1.1.390",
+    "pyinstaller>=6.0",
+    "bandit[toml]>=1.8.0",
+    "pip-audit>=2.9.0",
+    "pytest-benchmark>=4.0.0",
+    "memory-profiler>=0.61.0",
+]
 
-[tool.poe.tasks.build-windows]
-help = "Build Windows executable mgit.exe from WSL2"
-cmd = "scripts/build_windows_from_wsl.sh"
+[tool.uv]
+default-groups = ["dev"]
 
-[tool.poe.tasks.build-all]
-sequence = ["build-linux", "build-windows"]
-
-[tool.poe.tasks.clean]
-cmd = "rm -rf build dist *.spec"
-
-[tool.poe.tasks.test]
-cmd = "pytest"
-
-[tool.poe.tasks.lint]
-cmd = "ruff check ."
-
-[tool.poe.tasks.format]
-cmd = "black ."
-
-[tool.poe.tasks.format-check]
-cmd = "black --check --diff ."
-
-[tool.poe.tasks.bump-patch]
-cmd = "poetry version patch"
-help = "Bump patch version"
-
-[tool.poe.tasks.bump-minor]
-cmd = "poetry version minor"
-help = "Bump minor version"
-
-[tool.poe.tasks.bump-major]
-cmd = "poetry version major"
-help = "Bump major version"
-
-[tool.black]
-line-length = 88
-target-version = ['py38']
+[tool.hatch.build.targets.wheel]
+packages = ["mgit"]
 
 [tool.ruff]
 line-length = 88
+target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = ["E", "F", "UP", "B", "SIM", "I"]
 ignore = ["E501"]
 
-[tool.mypy]
-python_version = "3.8"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+reportMissingTypeStubs = false
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -131,44 +96,4 @@ addopts = [
     "--cov-report=html",
     "--cov-report=xml",
     "--cov-fail-under=0",
-]
-
-# PEP 621 metadata for uv/pip
-[project]
-name = "mgit"
-version = "0.7.0"
-description = "Multi-provider Git management tool"
-readme = "README.md"
-requires-python = ">=3.9.2,<3.13"
-license = {text = "MIT"}
-authors = [{ name = "Steve Antonakakis", email = "steve.antonakakis@gmail.com" }]
-dependencies = [
-  "aiohttp>=3.9.0",
-  "azure-devops>=7.1.0b1",
-  "python-dotenv>=1.0.0",
-  "rich>=13.0.0",
-  "typer>=0.9.0,<0.10.0",
-  "click>=8.1.7,<8.2.0",
-  "PyYAML>=6.0",
-  "ruamel.yaml>=0.18.0",
-  "cryptography>=44.0.1",
-]
-
-[project.scripts]
-mgit = "mgit.__main__:entrypoint"
-
-[project.optional-dependencies]
-dev = [
-  "pytest>=7.0.0",
-  "pytest-cov>=4.0.0",
-  "pytest-asyncio>=0.21.0",
-  "black>=24.3.0",
-  "ruff>=0.1.0",
-  "mypy>=1.0.0",
-  "pyinstaller>=6.0",
-  "bandit[toml]>=1.8.0",
-  "safety>=3.0.0",
-  "pip-audit>=2.9.0",
-  "pytest-benchmark>=4.0.0",
-  "memory-profiler>=0.61.0",
 ]

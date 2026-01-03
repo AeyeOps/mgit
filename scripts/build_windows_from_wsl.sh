@@ -60,7 +60,7 @@ echo "Copying to: ${PROJECT_DIR}"
 # Copy only necessary files (skip dist, build, cache dirs)
 cp -r "${SOURCE_DIR}/mgit" "${PROJECT_DIR}/" 2>/dev/null || true
 cp "${SOURCE_DIR}/pyproject.toml" "${PROJECT_DIR}/" 2>/dev/null || true
-cp "${SOURCE_DIR}/poetry.lock" "${PROJECT_DIR}/" 2>/dev/null || true
+cp "${SOURCE_DIR}/uv.lock" "${PROJECT_DIR}/" 2>/dev/null || true
 cp "${SOURCE_DIR}/mgit.spec" "${PROJECT_DIR}/" 2>/dev/null || true
 cp "${SOURCE_DIR}/README.md" "${PROJECT_DIR}/" 2>/dev/null || true
 cp "${SOURCE_DIR}/LICENSE" "${PROJECT_DIR}/" 2>/dev/null || true
