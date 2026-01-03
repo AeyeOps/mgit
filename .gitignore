@@ -61,3 +61,4 @@ test-repos/
 .claude/settings.local.json
 .crush/
 .venv_build/
+.claude/audio/
