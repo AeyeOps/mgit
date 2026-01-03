@@ -204,6 +204,7 @@ console_handler = ConsoleFriendlyRichHandler(
     markup=True,
     show_path=False,  # Hide the file path in log messages
     show_time=False,  # Hide timestamp (already in the formatter)
+    console=Console(stderr=True),
 )
 console_handler.setLevel(get_config_value("CON_LEVEL"))
 
