@@ -49,4 +49,8 @@ clean:
 
 # Bump project version (use ARGS="--bump patch|minor|major")
 version:
-	@uv run python scripts/make.py version $(ARGS)
+	@if [ -z "$(ARGS)" ]; then \
+		echo "Usage: make version ARGS=\"--bump patch|minor|major\""; \
+	else \
+		uv run python scripts/make.py version $(ARGS); \
+	fi

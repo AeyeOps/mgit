@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-01-03
+
+### Added
+- **Sync Exact Match**: Full org/project/repo patterns with no wildcards now resolve as exact matches (case-insensitive fallback).
+- **Build & Test Tooling**: Makefile shortcuts for build/install and standalone binary tests.
+- **Repository Metadata**: Organization/project fields are now populated across providers and used in local path discovery.
+
+### Changed
+- **Windows Build Wrapper**: WSL build now uses mamba + uv and captures build logs.
+- **Change Discovery Output**: Remote/local discovery persists repository changesets consistently.
+- **Lint Configuration**: Suppressed noisy Ruff rules to keep CI focused on actionable issues.
+
+### Fixed
+- **Provider Resolution**: Avoids provider manager state mutation when resolving authenticated clone URLs for mixed providers.
+- **Sync Safety**: Force-mode confirmation checks when local directories already exist.
+- **Clean Command**: `make clean` now handles `.coverage` files safely.
+
 ## [0.7.2] - 2025-10-14
 
 ### Fixed

@@ -2,7 +2,7 @@
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](#)
 
 **One CLI for all your Git repositories across Azure DevOps, GitHub, and BitBucket.**
 
@@ -51,7 +51,7 @@ sudo mv mgit /usr/local/bin/mgit
 
 # Verify installation
 mgit --version
-# Should show: mgit version: 0.7.0
+# Should show: mgit version: 0.8.0
 ```
 
 **Option 2: Build from Source (uv preferred)**
@@ -158,6 +158,7 @@ These are the commands you'll use daily with mgit.
 - **GitHub/BitBucket**: Uses organization/repository (project part ignored)
 - **Wildcards** (`*`) work in any position
 - Case-insensitive matching with partial matches supported
+- Exact match: when all three segments are provided with no wildcards, mgit treats it as a precise repo lookup (case-insensitive fallback)
 
 #### Universal Patterns
 
@@ -469,6 +470,16 @@ uv run pyinstaller mgit.spec --clean
 # Or from WSL: bash scripts/build_windows_from_wsl.sh
 ```
 
+**Makefile shortcuts (recommended):**
+```bash
+make test
+make lint
+make build
+make build-install      # builds Linux binary + installs to /opt/bin/mgit
+make build-windows      # Windows build wrapper from WSL
+make test-binary        # Exercises the standalone binary (real provider calls)
+```
+
 ### For Contributors
 
 ```bash
@@ -749,10 +760,11 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 Development commands:
 ```bash
-poetry run poe test     # Run tests
-poetry run poe lint     # Check code quality
-poetry run poe format   # Format code
-poetry run poe build-all # Build binaries
+make test               # Run tests
+make lint               # Check code quality
+make format             # Format code
+make build              # Build Linux binary
+make build-windows       # Build Windows binary (WSL wrapper)
 ```
 
 ### Release Process
