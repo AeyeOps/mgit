@@ -142,57 +142,93 @@ class AsyncExecutor:
             # Run with progress tracking
             with Progress(console=self.console) as progress:
                 overall_task = progress.add_task(task_description, total=len(items))
+                compact_progress = self._should_use_compact_progress(len(items))
 
-                # Create individual task tracking
-                item_tasks: dict[int, TaskID] = {}
-                for idx, item in enumerate(items):
-                    desc = (
-                        item_description(item)
-                        if item_description
-                        else f"Item {idx + 1}"
-                    )
-                    task_id = progress.add_task(
-                        f"[grey50]Pending: {desc}[/grey50]", total=1
-                    )
-                    item_tasks[idx] = task_id
-
-                # Process items based on mode
-                if self.mode == ExecutionMode.CONCURRENT:
-                    tasks = [
-                        self._process_item_with_progress(
-                            idx,
-                            item,
-                            process_func,
-                            results,
-                            errors,
-                            progress,
-                            overall_task,
-                            item_tasks[idx],
-                            item_description,
-                            collect_errors,
-                            on_error,
-                            on_success,
-                        )
-                        for idx, item in enumerate(items)
-                    ]
-                    await asyncio.gather(*tasks)
+                if compact_progress:
+                    if self.mode == ExecutionMode.CONCURRENT:
+                        tasks = [
+                            self._process_item_with_compact_progress(
+                                idx,
+                                item,
+                                process_func,
+                                results,
+                                errors,
+                                progress,
+                                overall_task,
+                                item_description,
+                                collect_errors,
+                                on_error,
+                                on_success,
+                            )
+                            for idx, item in enumerate(items)
+                        ]
+                        await asyncio.gather(*tasks)
+                    else:
+                        for idx, item in enumerate(items):
+                            await self._process_item_with_compact_progress(
+                                idx,
+                                item,
+                                process_func,
+                                results,
+                                errors,
+                                progress,
+                                overall_task,
+                                item_description,
+                                collect_errors,
+                                on_error,
+                                on_success,
+                            )
                 else:
-                    # Sequential execution with progress
+                    # Create individual task tracking
+                    item_tasks: dict[int, TaskID] = {}
                     for idx, item in enumerate(items):
-                        await self._process_item_with_progress(
-                            idx,
-                            item,
-                            process_func,
-                            results,
-                            errors,
-                            progress,
-                            overall_task,
-                            item_tasks[idx],
-                            item_description,
-                            collect_errors,
-                            on_error,
-                            on_success,
+                        desc = (
+                            item_description(item)
+                            if item_description
+                            else f"Item {idx + 1}"
                         )
+                        task_id = progress.add_task(
+                            f"[grey50]Pending: {desc}[/grey50]", total=1
+                        )
+                        item_tasks[idx] = task_id
+
+                    # Process items based on mode
+                    if self.mode == ExecutionMode.CONCURRENT:
+                        tasks = [
+                            self._process_item_with_progress(
+                                idx,
+                                item,
+                                process_func,
+                                results,
+                                errors,
+                                progress,
+                                overall_task,
+                                item_tasks[idx],
+                                item_description,
+                                collect_errors,
+                                on_error,
+                                on_success,
+                            )
+                            for idx, item in enumerate(items)
+                        ]
+                        await asyncio.gather(*tasks)
+                    else:
+                        # Sequential execution with progress
+                        for idx, item in enumerate(items):
+                            await self._process_item_with_progress(
+                                idx,
+                                item,
+                                process_func,
+                                results,
+                                errors,
+                                progress,
+                                overall_task,
+                                item_tasks[idx],
+                                item_description,
+                                collect_errors,
+                                on_error,
+                                on_success,
+                            )
 
         return results, errors
 
@@ -338,6 +374,104 @@ class AsyncExecutor:
                 raise
 
         progress.advance(overall_task, 1)
+
+    def _should_use_compact_progress(self, item_count: int) -> bool:
+        try:
+            height = self.console.size.height
+        except Exception:
+            return False
+
+        if height <= 0:
+            return False
+
+        max_visible_tasks = max(height - 5, 5)
+        return item_count > max_visible_tasks
+
+    async def _process_item_with_compact_progress(
+        self,
+        idx: int,
+        item: T,
+        process_func: Callable[[T], Coroutine[Any, Any, Any]],
+        results: list[Any],
+        errors: list[tuple[T, Exception]],
+        progress: Progress,
+        overall_task: TaskID,
+        item_description: Callable[[T], str] | None,
+        collect_errors: bool,
+        on_error: Callable[[T, Exception], None] | None,
+        on_success: Callable[[T, Any], None] | None,
+    ):
+        """Process item with compact progress tracking."""
+        desc = item_description(item) if item_description else f"Item {idx + 1}"
+
+        if self.mode == ExecutionMode.CONCURRENT and self.semaphore:
+            async with self.semaphore:
+                await self._process_with_compact_progress_update(
+                    idx,
+                    item,
+                    process_func,
+                    results,
+                    errors,
+                    progress,
+                    overall_task,
+                    desc,
+                    collect_errors,
+                    on_error,
+                    on_success,
+                )
+        else:
+            await self._process_with_compact_progress_update(
+                idx,
+                item,
+                process_func,
+                results,
+                errors,
+                progress,
+                overall_task,
+                desc,
+                collect_errors,
+                on_error,
+                on_success,
+            )
+
+    async def _process_with_compact_progress_update(
+        self,
+        idx: int,
+        item: T,
+        process_func: Callable[[T], Coroutine[Any, Any, Any]],
+        results: list[Any],
+        errors: list[tuple[T, Exception]],
+        progress: Progress,
+        overall_task: TaskID,
+        desc: str,
+        collect_errors: bool,
+        on_error: Callable[[T, Exception], None] | None,
+        on_success: Callable[[T, Any], None] | None,
+    ):
+        progress.update(overall_task, description=f"[cyan]Processing: {desc}[/cyan]")
+
+        try:
+            result = await process_func(item)
+            results[idx] = result
+            progress.update(
+                overall_task,
+                advance=1,
+                description=f"[green]✓ Completed: {desc}[/green]",
+            )
+            if on_success:
+                on_success(item, result)
+        except Exception as e:
+            logger.warning(f"Error processing {desc}: {e}")
+            errors.append((item, e))
+            progress.update(
+                overall_task,
+                advance=1,
+                description=f"[red]✗ Failed: {desc}[/red]",
+            )
+            if on_error:
+                on_error(item, e)
+            if not collect_errors:
+                raise
 
     async def run_single(
         self, coro: Coroutine[Any, Any, T], timeout: float | None = None

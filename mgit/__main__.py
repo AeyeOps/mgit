@@ -207,10 +207,28 @@ console_handler = ConsoleFriendlyRichHandler(
 )
 console_handler.setLevel(get_config_value("CON_LEVEL"))
 
+
+def _has_mgit_handler(target_logger: logging.Logger, marker: str) -> bool:
+    for existing in target_logger.handlers:
+        if getattr(existing, "_mgit_handler", None) == marker:
+            return True
+    return False
+
+
+# Attach handlers to the "mgit" logger so all mgit.* modules are captured.
+mgit_logger = logging.getLogger("mgit")
+mgit_logger.setLevel(get_config_value("LOG_LEVEL"))
+mgit_logger.propagate = False
+
+if not _has_mgit_handler(mgit_logger, "file"):
+    file_handler._mgit_handler = "file"
+    mgit_logger.addHandler(file_handler)
+
+if not _has_mgit_handler(mgit_logger, "console"):
+    console_handler._mgit_handler = "console"
+    mgit_logger.addHandler(console_handler)
+
 logger = logging.getLogger(__name__)
-logger.setLevel(get_config_value("LOG_LEVEL"))
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
 
 console = Console()
 app = typer.Typer(

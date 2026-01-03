@@ -30,7 +30,7 @@ build:
 
 # Build Linux standalone binary
 build-linux:
-	@uv run python scripts/make_build.py --target linux
+	@uv run python scripts/make_build.py --target linux --install
 
 # Build Windows standalone binary
 build-windows:
