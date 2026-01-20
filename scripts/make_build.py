@@ -21,7 +21,7 @@ def main():
     parser.add_argument(
         "--install",
         action="store_true",
-        help="Install to /opt/bin/mgit after Linux build",
+        help="Install to /usr/local/bin/mgit after Linux build",
     )
     args = parser.parse_args()
 

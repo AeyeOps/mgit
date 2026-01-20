@@ -37,7 +37,7 @@ uv run pyright mgit/                                  # Type checking
 # Linux binary
 uv run python scripts/make_build.py --target linux
 
-# Linux binary + install to /opt/bin/mgit
+# Linux binary + install to /usr/local/bin/mgit
 uv run python scripts/make_build.py --target linux --install
 
 # Windows (from WSL)
@@ -49,7 +49,7 @@ uv run python scripts/make_build.py --target all
 # Clean build artifacts
 uv run python scripts/make_clean.py
 
-# Test standalone binary (uses /opt/bin/mgit)
+# Test standalone binary (uses /usr/local/bin/mgit)
 uv run python scripts/test_binary.py
 uv run python scripts/test_binary.py --verbose
 uv run python scripts/test_binary.py --binary /path/to/mgit
