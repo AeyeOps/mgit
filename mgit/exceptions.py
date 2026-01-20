@@ -392,7 +392,7 @@ def error_context(
     suppress: tuple[type[Exception], ...] | None = None,
     transform: dict[type[Exception], type[MgitError]] | None = None,
     details: dict[str, Any] | None = None,
-) -> Generator[None, None, None]:
+) -> Generator[None]:
     """Context manager for consistent error handling and transformation.
 
     Args:
@@ -457,7 +457,7 @@ def temporary_error_handler(
     *,
     show_traceback: bool = False,
     exit_on_error: bool = True,
-) -> Generator[None, None, None]:
+) -> Generator[None]:
     """Temporary error handler for specific code blocks.
 
     Args:

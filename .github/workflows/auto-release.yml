@@ -74,7 +74,7 @@ jobs:
         version: "latest"
 
     - name: Set up Python
-      run: uv python install 3.12
+      run: uv python install 3.13
 
     - name: Install dependencies
       run: uv sync
@@ -84,6 +84,9 @@ jobs:
 
     - name: Run Ruff linting
       run: uv run ruff check mgit/
+
+    - name: Run ty type checking
+      run: uv run ty check mgit/
 
     - name: Run Bandit security scan
       run: uv run bandit -r mgit/ -lll
@@ -107,7 +110,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: '3.13'
 
     - name: Generate AI Release Notes
       id: generate
@@ -267,7 +270,7 @@ jobs:
         version: "latest"
 
     - name: Set up Python
-      run: uv python install 3.12
+      run: uv python install 3.13
 
     - name: Build packages
       run: uv build
@@ -338,7 +341,7 @@ jobs:
         version: "latest"
 
     - name: Set up Python
-      run: uv python install 3.12
+      run: uv python install 3.13
 
     - name: Build packages
       run: uv build

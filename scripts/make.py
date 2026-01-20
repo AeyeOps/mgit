@@ -27,7 +27,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 MAKEFILE = REPO_ROOT / "Makefile"
 
 # Targets to hide from help (internal/alias targets)
-HIDDEN_TARGETS = {"help", "install"}
+HIDDEN_TARGETS = {"help"}
 
 
 def parse_makefile() -> dict[str, str]:
@@ -98,7 +98,7 @@ def show_help_rich(targets: dict[str, str]):
         border_style="dim",
         padding=(0, 1),
     )
-    table.add_column("Target", style="bold green", width=14)
+    table.add_column("Target", style="bold green", width=22)
     table.add_column("Description", style="white")
 
     for name, description in targets.items():
@@ -131,7 +131,7 @@ def show_help_plain(targets: dict[str, str]):
     print("Targets:")
     print("-" * 50)
     for name, description in targets.items():
-        print(f"  {name:<14} {description}")
+        print(f"  {name:<22} {description}")
     print()
     print('Usage: make <target>  or  make <target> ARGS="..."')
     print()
@@ -146,17 +146,13 @@ def run_command(command: str, args: list[str], targets: dict[str, str]) -> int:
 
     # Map commands to their scripts
     script_map = {
+        "validate": "make_validate.py",
         "test": "make_test.py",
-        "test-e2e": "make_test.py",  # Same script, different marker
-        "lint": "make_lint.py",
-        "format": "make_format.py",
-        "build": "make_build.py",
-        "build-linux": "make_build.py",
-        "build-windows": "make_build.py",
-        "build-install": "make_build.py",
+        "test-standalone-linux": "test_binary.py",
+        "build-standalone-linux": "make_build.py",
+        "build-standalone-windows": "make_build.py",
         "clean": "make_clean.py",
         "version": "make_version.py",
-        "test-binary": "test_binary.py",
     }
 
     script = script_map.get(command)
@@ -171,17 +167,11 @@ def run_command(command: str, args: list[str], targets: dict[str, str]) -> int:
         print(f"Error: Script not found: {script_path}")
         return 1
 
-    # Special handling for test-e2e
-    if command == "test-e2e":
-        args = ["-m", "e2e", *args]
-
     # Special handling for build targets
-    if command == "build-linux":
-        args = ["--target", "linux", *args]
-    elif command == "build-windows":
-        args = ["--target", "windows", *args]
-    elif command == "build-install":
+    if command == "build-standalone-linux":
         args = ["--target", "linux", "--install", *args]
+    elif command == "build-standalone-windows":
+        args = ["--target", "windows", *args]
 
     # Run the script with passed arguments
     result = subprocess.run(

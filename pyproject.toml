@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mgit"
-version = "0.9.0"
+version = "0.10.0"
 description = "Multi-provider Git management tool"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -40,7 +40,7 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-asyncio>=0.21.0",
     "ruff>=0.8.0",
-    "pyright>=1.1.390",
+    "ty",
     "pyinstaller>=6.0",
     "bandit[toml]>=1.8.0",
     "pip-audit>=2.9.0",
@@ -56,7 +56,7 @@ packages = ["mgit"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "UP", "B", "SIM", "I"]
@@ -66,10 +66,37 @@ ignore = ["E501", "B008", "B904", "UP012", "UP045", "SIM102", "SIM105", "SIM114"
 quote-style = "double"
 indent-style = "space"
 
-[tool.pyright]
-pythonVersion = "3.12"
-typeCheckingMode = "basic"
-reportMissingTypeStubs = false
+[tool.ty.environment]
+python-version = "3.13"
+
+[tool.ty.src]
+include = ["mgit", "tests"]
+respect-ignore-files = true
+
+[tool.ty.terminal]
+output-format = "concise"
+error-on-warning = false
+
+[tool.ty.rules]
+# Start lenient, tighten over time
+# Suppress noisy categories until codebase is cleaned up
+possibly-unresolved-reference = "warn"
+possibly-missing-attribute = "warn"
+invalid-argument-type = "warn"
+invalid-parameter-default = "warn"
+unresolved-attribute = "warn"
+invalid-method-override = "warn"
+not-iterable = "warn"
+unsupported-operator = "warn"
+unknown-argument = "warn"
+invalid-return-type = "warn"
+invalid-assignment = "warn"
+unresolved-import = "warn"
+invalid-context-manager = "warn"
+call-non-callable = "warn"
+no-matching-overload = "warn"
+missing-argument = "warn"
+unused-ignore-comment = "ignore"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
