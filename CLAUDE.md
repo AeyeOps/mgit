@@ -25,11 +25,9 @@ uv run python scripts/make_test.py                    # All tests
 uv run python scripts/make_test.py tests/unit/ -v     # Unit tests only
 uv run python scripts/make_test.py -m unit            # By marker
 
-# Code quality
-uv run python scripts/make_lint.py                    # Ruff linting
-uv run python scripts/make_format.py                  # Ruff formatting
-uv run python scripts/make_format.py --check          # Check only
-uv run pyright mgit/                                  # Type checking
+# Code quality (unified validation)
+uv run python scripts/make_validate.py                # All checks: format + lint + ty + bandit
+uv run python scripts/make_validate.py --fix          # Auto-fix, then check
 ```
 
 ### Build
