@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-01-20
+
+### Changed
+- **Install Location**: Build install now uses `/usr/local/bin/mgit` instead of `/opt/bin/mgit`
+- **Shell Detection**: Installer detects user's shell (bash/zsh) and updates appropriate rc file
+- **PATH Management**: Automatically adds `/usr/local/bin` to PATH in `.bashrc` or `.zshrc` if not present
+  - Idempotent: won't add duplicate entries
+  - Creates rc file if it doesn't exist
+
 ## [0.8.1] - 2026-01-03
 
 ### Added

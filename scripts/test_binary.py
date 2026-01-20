@@ -2,7 +2,7 @@
 """
 Standalone Linux binary test suite.
 
-Tests the compiled mgit binary at /opt/bin/mgit with REAL network operations.
+Tests the compiled mgit binary at /usr/local/bin/mgit with REAL network operations.
 Uses /tmp/ for test artifacts. Requires configured providers for network tests.
 
 Usage:
@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # Default binary location - explicit to avoid PATH conflicts
-DEFAULT_BINARY = "/opt/bin/mgit"
+DEFAULT_BINARY = "/usr/local/bin/mgit"
 
 
 @dataclass
