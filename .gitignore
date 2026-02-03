@@ -59,6 +59,7 @@ review-for-deletion/
 test-binary-run/
 test-repos/
 .claude/settings.local.json
+.claude/nous/
+.claude/audio/
 .crush/
 .venv_build/
-.claude/audio/

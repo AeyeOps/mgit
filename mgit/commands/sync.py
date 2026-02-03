@@ -38,7 +38,7 @@ from mgit.config.yaml_manager import (
     list_provider_names,
 )
 from mgit.git import GitManager
-from mgit.git.utils import build_repo_path, get_git_remote_url
+from mgit.git.utils import get_git_remote_url, resolve_local_repo_path
 from mgit.providers import detect_provider_by_url
 from mgit.providers.base import Repository
 from mgit.providers.exceptions import RepositoryNotFoundError
@@ -525,7 +525,12 @@ async def resolve_repositories_for_sync(
         raise typer.Exit(code=1)
 
 
-async def analyze_repository_states(repositories: list[Repository], target_path: Path):
+async def analyze_repository_states(
+    repositories: list[Repository],
+    target_path: Path,
+    flat_layout: bool = True,
+    resolved_names: dict[str, str] | None = None,
+):
     """Analyze current state of repositories in target path."""
     from dataclasses import dataclass
 
@@ -542,7 +547,7 @@ async def analyze_repository_states(repositories: list[Repository], target_path:
     non_git_dirs = []
 
     for repo in repositories:
-        repo_path = build_repo_path(repo.clone_url)
+        repo_path = resolve_local_repo_path(repo.clone_url, flat_layout, resolved_names)
         local_path = target_path / repo_path
 
         if not local_path.exists():
@@ -567,10 +572,17 @@ async def analyze_repository_states(repositories: list[Repository], target_path:
 
 
 async def show_sync_preview(
-    repositories: list[Repository], target_path: Path, force: bool, detailed: bool
+    repositories: list[Repository],
+    target_path: Path,
+    force: bool,
+    detailed: bool,
+    flat_layout: bool = True,
+    resolved_names: dict[str, str] | None = None,
 ):
     """Show detailed preview of sync operations."""
-    repo_analysis = await analyze_repository_states(repositories, target_path)
+    repo_analysis = await analyze_repository_states(
+        repositories, target_path, flat_layout, resolved_names
+    )
 
     # Create summary table
     table = Table(title="Sync Preview")
@@ -580,9 +592,12 @@ async def show_sync_preview(
     table.add_column("Notes", style="dim")
 
     for repo in repositories:
-        repo_path = build_repo_path(repo.clone_url)
-        target_path / repo_path
-        repo_name = f"{repo_path.parts[-3]}/{repo_path.parts[-1]}"  # org/repo
+        repo_path = resolve_local_repo_path(repo.clone_url, flat_layout, resolved_names)
+        # Display name differs by layout mode
+        if flat_layout:
+            repo_name = str(repo_path)
+        else:
+            repo_name = f"{repo_path.parts[-3]}/{repo_path.parts[-1]}"
 
         if repo.name in repo_analysis.missing_repos:
             table.add_row(repo_name, "Missing", "🔄 Clone", "New repository")
@@ -808,26 +823,15 @@ async def sync_local_command(
 
 
 async def sync_command(
-    pattern: str = typer.Argument(..., help="Repository pattern (org/project/repo)"),
-    path: str = typer.Argument(".", help="Local path to synchronize repositories into"),
-    provider: str | None = typer.Option(
-        None, "--provider", "-p", help="Specific provider (otherwise search all)"
-    ),
-    force: bool = typer.Option(
-        False, "--force", "-f", help="Delete and re-clone all repositories"
-    ),
-    concurrency: int | None = typer.Option(
-        None, "--concurrency", "-c", help="Number of concurrent operations"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Show what would be done without making changes"
-    ),
-    progress: bool = typer.Option(
-        True, "--progress/--no-progress", help="Show progress bar"
-    ),
-    summary: bool = typer.Option(
-        True, "--summary/--no-summary", help="Show detailed summary"
-    ),
+    pattern: str,
+    path: str = ".",
+    provider: str | None = None,
+    force: bool = False,
+    concurrency: int | None = None,
+    dry_run: bool = False,
+    progress: bool = True,
+    summary: bool = True,
+    hierarchy: bool = False,
 ) -> None:
     """
     Synchronize repositories with remote providers.
@@ -892,9 +896,35 @@ async def sync_command(
         console.print(f"[yellow]No repositories found for pattern '{pattern}'[/yellow]")
         return
 
+    # Determine layout mode (flat by default, hierarchical with --hierarchy)
+    flat_layout = not hierarchy
+
+    # Resolve collision names for flat layout mode
+    resolved_names: dict[str, str] | None = None
+    if flat_layout:
+        from mgit.utils.collision_resolver import (
+            detect_repo_name_collisions,
+            resolve_collision_names,
+        )
+
+        name_groups = detect_repo_name_collisions(repositories)
+        collisions = {
+            name: repos for name, repos in name_groups.items() if len(repos) > 1
+        }
+        if collisions:
+            console.print(
+                f"[yellow]Note:[/yellow] {len(collisions)} name collision(s) detected, "
+                "directories will be disambiguated"
+            )
+            for name, repos in collisions.items():
+                console.print(f"  • {name}: {len(repos)} repos")
+        resolved_names = resolve_collision_names(repositories)
+
     # Analyze repositories before operation
     if not dry_run:
-        repo_analysis = await analyze_repository_states(repositories, target_path)
+        repo_analysis = await analyze_repository_states(
+            repositories, target_path, flat_layout, resolved_names
+        )
 
         if repo_analysis.dirty_repos and not force:
             console.print(
@@ -906,9 +936,29 @@ async def sync_command(
                 "\n[blue]These will be skipped. Use --force to override (will lose changes)[/blue]"
             )
 
+        if repo_analysis.non_git_dirs:
+            console.print(
+                "\n[yellow]⚠️  Directories that exist but are not git repositories:[/yellow]"
+            )
+            for dir_name in repo_analysis.non_git_dirs:
+                console.print(f"  • {dir_name}")
+            console.print(
+                "\n[blue]These will be skipped (folder exists but not a git repo)[/blue]"
+            )
+
+        # Filter out dirty repos and non-git dirs from processing (unless force mode)
+        if not force:
+            skip_names = set(repo_analysis.dirty_repos) | set(
+                repo_analysis.non_git_dirs
+            )
+            if skip_names:
+                repositories = [r for r in repositories if r.name not in skip_names]
+
     # Enhanced dry run with repository analysis
     if dry_run:
-        await show_sync_preview(repositories, target_path, force, summary)
+        await show_sync_preview(
+            repositories, target_path, force, summary, flat_layout, resolved_names
+        )
         return
 
     # Determine update mode based on force flag
@@ -918,7 +968,7 @@ async def sync_command(
     dirs_to_remove = []
     if force:
         confirmed_force_remove, dirs_to_remove = check_force_mode_confirmation(
-            repositories, target_path, update_mode
+            repositories, target_path, update_mode, flat_layout, resolved_names
         )
         if dirs_to_remove and not confirmed_force_remove:
             console.print("Sync cancelled.")
@@ -935,6 +985,7 @@ async def sync_command(
         git_manager=git_manager,
         provider_manager=processor_provider_manager,
         operation_type=OperationType.clone,  # Sync uses clone operation type but with pull update mode
+        flat_layout=flat_layout,
     )
 
     console.print(f"\n[blue]Synchronizing {len(repositories)} repositories...[/blue]")
@@ -949,6 +1000,7 @@ async def sync_command(
             update_mode,
             confirmed_force_remove,
             dirs_to_remove,
+            resolved_names,
         )
     else:
         await run_sync_quiet(
@@ -959,6 +1011,7 @@ async def sync_command(
             update_mode,
             confirmed_force_remove,
             dirs_to_remove,
+            resolved_names,
         )
 
 
@@ -970,6 +1023,7 @@ async def run_sync_with_progress(
     update_mode,
     confirmed_force_remove,
     dirs_to_remove,
+    resolved_names: dict[str, str] | None = None,
 ):
     """Run sync operation with rich progress reporting."""
 
@@ -1001,6 +1055,7 @@ async def run_sync_with_progress(
             confirmed_force_remove=confirmed_force_remove,
             dirs_to_remove=dirs_to_remove,
             show_progress=False,
+            resolved_names=resolved_names,
         )
 
     # Show final results
@@ -1039,6 +1094,7 @@ async def run_sync_quiet(
     update_mode,
     confirmed_force_remove,
     dirs_to_remove,
+    resolved_names: dict[str, str] | None = None,
 ):
     """Run sync operation without progress reporting."""
     failures = await processor.process_repositories(
@@ -1049,6 +1105,7 @@ async def run_sync_quiet(
         confirmed_force_remove=confirmed_force_remove,
         dirs_to_remove=dirs_to_remove,
         show_progress=False,
+        resolved_names=resolved_names,
     )
 
     success_count = len(repositories) - len(failures)

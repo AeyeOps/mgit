@@ -113,6 +113,7 @@ markers = [
     "requires_network: marks tests that require network access",
     "asyncio: marks tests as async tests",
     "e2e: marks tests as end-to-end tests against real APIs",
+    "docker: tests requiring Docker (deselect with '-m not docker')",
 ]
 addopts = [
     "-v",

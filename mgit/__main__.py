@@ -1255,6 +1255,11 @@ def sync(
     summary: bool = typer.Option(
         True, "--summary/--no-summary", help="Show detailed summary"
     ),
+    hierarchy: bool = typer.Option(
+        False,
+        "--hierarchy",
+        help="Use hierarchical directory structure (host/org/project/repo) instead of flat",
+    ),
 ):
     """
     Synchronize repositories locally or with remote providers.
@@ -1266,6 +1271,13 @@ def sync(
     - Pulls updates for repositories that already exist
     - Handles conflicts and errors gracefully
     - Provides detailed progress and summary reporting
+
+    DIRECTORY LAYOUT (default: flat):
+    - Flat (default): Repos cloned directly into target (./repo-name/)
+    - Hierarchical (--hierarchy): Full path structure (./host/org/project/repo/)
+
+    When using flat layout, repos with the same name from different orgs
+    are automatically disambiguated (e.g., repo_org-a, repo_org-b).
 
     Remote PATTERN can be:
     - Exact: myorg/myproject/myrepo
@@ -1281,8 +1293,11 @@ def sync(
         # Local walk mode (specific path)
         mgit sync ./workspace
 
-        # Daily workspace sync
+        # Daily workspace sync (flat layout - default)
         mgit sync "myorg/*/*" ./workspace
+
+        # Use hierarchical directory structure
+        mgit sync "myorg/*/*" ./workspace --hierarchy
 
         # Force remote sync even if pattern matches a path
         mgit sync --filter "myorg/*/*" ./workspace
@@ -1308,6 +1323,7 @@ def sync(
                 dry_run,
                 progress,
                 summary,
+                hierarchy,
             )
         )
         return
@@ -1320,7 +1336,15 @@ def sync(
             raise typer.Exit(code=1)
         asyncio.run(
             sync_command(
-                pattern, path, provider, force, concurrency, dry_run, progress, summary
+                pattern,
+                path,
+                provider,
+                force,
+                concurrency,
+                dry_run,
+                progress,
+                summary,
+                hierarchy,
             )
         )
         return
@@ -1342,7 +1366,15 @@ def sync(
 
     asyncio.run(
         sync_command(
-            pattern, ".", provider, force, concurrency, dry_run, progress, summary
+            pattern,
+            ".",
+            provider,
+            force,
+            concurrency,
+            dry_run,
+            progress,
+            summary,
+            hierarchy,
         )
     )
 

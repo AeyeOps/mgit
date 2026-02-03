@@ -17,8 +17,11 @@ uv run mgit --version
 mgit sync
 mgit sync ./workspace
 
-# Remote sync (explicit pattern)
+# Remote sync (explicit pattern, flat layout by default)
 mgit sync --filter "myorg/*/*" ./repos
+
+# Remote sync with hierarchical layout (host/org/project/repo)
+mgit sync --filter "myorg/*/*" ./repos --hierarchy
 
 # Run tests
 uv run python scripts/make_test.py                    # All tests
@@ -104,6 +107,27 @@ Commands in `mgit/commands/`:
 - `status.py` - Check repository status
 - `diff.py` / `diff_remote.py` - Change detection
 - `bulk_operations.py` - Shared bulk operation logic
+
+### Sync Directory Layout
+Default is **flat layout** - repos cloned directly into target directory:
+```
+./target/
+├── repo-a/
+├── repo-b/
+└── repo-c/
+```
+
+Use `--hierarchy` for hierarchical layout (original behavior):
+```
+./target/
+└── github.com/
+    └── myorg/
+        └── repos/
+            ├── repo-a/
+            └── repo-b/
+```
+
+**Collision resolution** (flat layout): When repos from different orgs share names, automatic disambiguation appends `_orgname` suffix (e.g., `auth_org-a/`, `auth_org-b/`). If orgs also collide, provider prefix is added (e.g., `auth_github_org/`, `auth_azure_org/`).
 
 ### Query Pattern System
 Pattern format: `organization/project/repository`

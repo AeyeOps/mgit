@@ -1,4 +1,4 @@
-.PHONY: help validate test test-standalone-linux build-standalone-linux build-standalone-windows clean version
+.PHONY: help validate test test-standalone-linux test-flat-layout-e2e build-standalone-linux build-standalone-windows clean version
 
 # Show this help menu
 help:
@@ -15,6 +15,11 @@ test:
 # Test the standalone Linux binary with real network calls
 test-standalone-linux:
 	@uv run python scripts/test_binary.py $(ARGS)
+	@uv run python scripts/make_test_flat_layout_e2e.py $(ARGS)
+
+# Test flat layout E2E with standalone binary
+test-flat-layout-e2e:
+	@uv run python scripts/make_test_flat_layout_e2e.py $(ARGS)
 
 # Build Linux standalone binary and install to /usr/local/bin
 build-standalone-linux:

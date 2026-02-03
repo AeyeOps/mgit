@@ -135,6 +135,10 @@ class ConfigurationManager:
         """Detect the provider type from the URL."""
         config = self.get_provider_config(provider_name)
 
+        # Explicit type override (for Gitea, custom GitHub Enterprise, etc.)
+        if "type" in config:
+            return config["type"]
+
         # Detect from URL - the only reliable way
         if "url" not in config:
             raise ValueError(

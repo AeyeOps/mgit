@@ -149,6 +149,7 @@ def run_command(command: str, args: list[str], targets: dict[str, str]) -> int:
         "validate": "make_validate.py",
         "test": "make_test.py",
         "test-standalone-linux": "test_binary.py",
+        "test-flat-layout-e2e": "make_test_flat_layout_e2e.py",
         "build-standalone-linux": "make_build.py",
         "build-standalone-windows": "make_build.py",
         "clean": "make_clean.py",

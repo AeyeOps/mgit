@@ -12,6 +12,7 @@ from mgit.config.yaml_manager import list_provider_names
 
 
 @pytest.mark.e2e
+@pytest.mark.requires_network
 def test_cli_authentication():
     """Test CLI authentication for all configured providers.
 

@@ -244,6 +244,48 @@ mgit sync "myorg/*/*" ./repos --concurrency 10
 mgit sync "myorg/*/*" ./repos --force
 ```
 
+#### Directory Layout
+
+By default, mgit uses **flat layout** - repositories are cloned directly into the target directory:
+
+```
+./repos/
+├── api-gateway/
+├── auth-service/
+└── web-frontend/
+```
+
+**Collision Resolution**: When repositories from different organizations share the same name, mgit automatically disambiguates by appending the organization name:
+
+```bash
+# Two orgs with repos named "auth"
+mgit sync "org-a/*/*" ./repos    # Creates: auth/
+mgit sync "org-b/*/*" ./repos    # Creates: auth_org-b/
+```
+
+If organizations also collide (same org name on different providers), the provider is added:
+```
+./repos/
+├── auth_github_myorg/
+└── auth_azure_myorg/
+```
+
+**Hierarchical Layout**: Use `--hierarchy` for the traditional nested structure:
+
+```bash
+mgit sync "myorg/*/*" ./repos --hierarchy
+```
+
+Creates:
+```
+./repos/
+└── github.com/
+    └── myorg/
+        └── repos/
+            ├── api-gateway/
+            └── auth-service/
+```
+
 ### Update Repositories
 
 ```bash
@@ -663,6 +705,7 @@ mgit sync --filter <pattern> [path]
 | `pattern` | Remote only | - | Pattern to match repositories (org/project/repo) | `"myorg/*/*"`, `"*/*/api-*"` |
 | `path` | No | - | Local scan root (local mode) or target directory (remote mode) | `./repos`, `/home/user/code` |
 | `--filter` | No | - | Explicit remote pattern (forces remote mode) | `--filter "myorg/*/*"` |
+| `--hierarchy` | No | - | Use hierarchical layout (host/org/project/repo) instead of flat | `--hierarchy` |
 | `--provider` | No | `-p` | Use specific provider configuration | `--provider github_work` |
 | `--concurrency` | No | `-c` | Number of parallel operations (default: 4) | `--concurrency 10` |
 | `--force` | No | `-f` | Force re-clone all repositories (requires confirmation) | `--force` |
@@ -682,6 +725,11 @@ mgit sync --filter <pattern> [path]
 **Local walk mode notes:**
 - Scans a directory tree for existing Git repositories and runs `git pull` on clean repos
 - Repositories without a remote or with uncommitted changes are skipped (unless `--force`)
+
+**Directory layout notes:**
+- **Flat layout (default)**: Repos cloned directly into target directory
+- **Collision resolution**: When multiple orgs have repos with the same name, `_orgname` suffix is added automatically; if org names also collide across providers, `_provider_orgname` suffix is used
+- **Hierarchical layout (`--hierarchy`)**: Traditional nested structure `host/org/project/repo`
 
 #### Real-World Examples
 

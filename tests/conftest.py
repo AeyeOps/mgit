@@ -17,6 +17,14 @@ from typer.testing import CliRunner
 
 from mgit.providers.base import Repository
 
+from tests.e2e.gitea_fixtures import (  # noqa: F401
+    gitea_container,
+    gitea_admin_token,
+    gitea_mgit_env,
+    gitea_collision_repos,
+    gitea_unique_repos,
+)
+
 # --- Pytest Configuration ---
 
 
@@ -24,6 +32,7 @@ def pytest_configure(config):
     """Configure pytest with custom settings."""
     # Set asyncio event loop scope
     config.option.asyncio_default_fixture_loop_scope = "function"
+    config.addinivalue_line("markers", "docker: tests requiring Docker")
 
 
 # --- Directory and File Fixtures ---
@@ -566,3 +575,56 @@ def pytest_addoption(parser):
         default=False,
         help="Run integration tests",
     )
+
+
+# --- E2E Binary Testing Fixtures ---
+
+
+@pytest.fixture
+def mgit_binary() -> str:
+    """
+    Get path to mgit binary for E2E tests.
+
+    Uses MGIT_BINARY environment variable if set,
+    otherwise defaults to /usr/local/bin/mgit.
+
+    Returns:
+        str: Path to mgit binary.
+    """
+    import os
+
+    return os.environ.get("MGIT_BINARY", "/usr/local/bin/mgit")
+
+
+@pytest.fixture
+def run_mgit(mgit_binary, temp_dir):
+    """
+    Fixture to run mgit commands with common setup.
+
+    Args:
+        mgit_binary: Path to mgit binary.
+        temp_dir: Temporary directory for test operations.
+
+    Returns:
+        Function that runs mgit and returns CompletedProcess.
+    """
+    import subprocess
+
+    def _run(
+        args: list[str],
+        timeout: int = 60,
+        input_text: str | None = None,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [mgit_binary] + args,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            input=input_text,
+            cwd=cwd or temp_dir,
+            env=env,
+        )
+
+    return _run

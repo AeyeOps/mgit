@@ -15,7 +15,7 @@ from rich.console import Console
 from rich.progress import Progress
 from rich.prompt import Confirm
 
-from ..git import GitManager, build_repo_path
+from ..git import GitManager, resolve_local_repo_path
 from ..providers.base import Repository
 from ..providers.manager import ProviderManager
 
@@ -46,10 +46,12 @@ class BulkOperationProcessor:
         git_manager: GitManager,
         provider_manager: ProviderManager,
         operation_type: OperationType,
+        flat_layout: bool = True,
     ):
         self.git_manager = git_manager
         self.provider_manager = provider_manager
         self.operation_type = operation_type
+        self.flat_layout = flat_layout
         self.failures: list[tuple[str, str]] = []
 
     async def process_repositories(
@@ -61,6 +63,7 @@ class BulkOperationProcessor:
         confirmed_force_remove: bool = False,
         dirs_to_remove: list[tuple[str, str, Path]] | None = None,
         show_progress: bool = True,
+        resolved_names: dict[str, str] | None = None,
     ) -> list[tuple[str, str]]:
         """
         Process repositories asynchronously with progress tracking.
@@ -72,6 +75,8 @@ class BulkOperationProcessor:
             update_mode: How to handle existing directories
             confirmed_force_remove: Whether user confirmed force removal
             dirs_to_remove: List of directories marked for removal in force mode
+            show_progress: Whether to show progress bar
+            resolved_names: Pre-resolved directory names for flat layout (handles collisions)
 
         Returns:
             List of (repo_name, error_reason) tuples for failed operations
@@ -118,7 +123,9 @@ class BulkOperationProcessor:
                         return
 
                     # Determine repository folder path
-                    repo_path = build_repo_path(repo_url)
+                    repo_path = resolve_local_repo_path(
+                        repo_url, self.flat_layout, resolved_names
+                    )
                     logger.debug(
                         f"Using path '{repo_path}' for repository '{repo_name}'"
                     )
@@ -340,9 +347,18 @@ def check_force_mode_confirmation(
     repositories: list[Repository],
     target_path: Path,
     update_mode: UpdateMode,
+    flat_layout: bool = True,
+    resolved_names: dict[str, str] | None = None,
 ) -> tuple[bool, list[tuple[str, str, Path]]]:
     """
     Check for existing directories in force mode and get user confirmation.
+
+    Args:
+        repositories: List of repositories to check
+        target_path: Target directory for operations
+        update_mode: Current update mode
+        flat_layout: If True, use flat directory layout
+        resolved_names: Pre-resolved names for collision handling in flat mode
 
     Returns:
         Tuple of (confirmed, dirs_to_remove)
@@ -353,8 +369,9 @@ def check_force_mode_confirmation(
     if update_mode == UpdateMode.force:
         logger.debug("Checking for existing directories to remove (force mode)...")
         for repo in repositories:
-            repo_url = repo.clone_url
-            repo_path = build_repo_path(repo_url)
+            repo_path = resolve_local_repo_path(
+                repo.clone_url, flat_layout, resolved_names
+            )
             repo_folder = target_path / repo_path
             if repo_folder.exists():
                 dirs_to_remove.append((repo.name, str(repo_path), repo_folder))

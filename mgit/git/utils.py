@@ -177,27 +177,25 @@ def sanitize_path_segment(segment: str) -> str:
     return segment
 
 
-def build_repo_path(clone_url: str) -> Path:
+def build_repo_path(clone_url: str, flat: bool = False) -> Path:
     """
-    Build hierarchical repository path from Git URL.
+    Build repository path from Git URL.
 
-    Always creates a 4-level hierarchical structure: host/org/project/repo
-    Handles URL encoding/decoding and provider-specific patterns.
-    Throws ValueError if URL cannot be parsed into the required structure.
+    Args:
+        clone_url: Git repository URL (HTTPS or SSH format)
+        flat: If True, return just the repo name (flat layout).
+              If False, return 4-level hierarchical structure (host/org/project/repo).
+
+    Returns:
+        Path object - either just repo name (flat) or 4-level hierarchy
+
+    Raises:
+        ValueError: If URL cannot be parsed or doesn't contain required components
 
     Supported providers:
     - Azure DevOps: Extracts org/project/repo from various URL formats
     - GitHub: Uses owner as org, "repos" as project placeholder
     - BitBucket: Handles workspace/project/repo or workspace/repo patterns
-
-    Args:
-        clone_url: Git repository URL (HTTPS or SSH format)
-
-    Returns:
-        Path object with exactly 4 levels: host/org/project/repo
-
-    Raises:
-        ValueError: If URL cannot be parsed or doesn't contain required components
     """
     if not clone_url or not isinstance(clone_url, str):
         raise ValueError("clone_url must be a non-empty string")
@@ -234,7 +232,56 @@ def build_repo_path(clone_url: str) -> Path:
             f"One or more path components became empty after sanitization: {clone_url}"
         )
 
+    if flat:
+        return Path(safe_repo)
+
     return Path(safe_host, safe_org, safe_project, safe_repo)
+
+
+def extract_repo_name(clone_url: str) -> str:
+    """
+    Extract just the repository name from a Git URL.
+
+    Convenience function for flat layout mode that returns
+    the sanitized repository name without any path hierarchy.
+
+    Args:
+        clone_url: Git repository URL (HTTPS or SSH format)
+
+    Returns:
+        Sanitized repository name string
+
+    Raises:
+        ValueError: If URL cannot be parsed
+    """
+    path = build_repo_path(clone_url, flat=True)
+    return str(path)
+
+
+def resolve_local_repo_path(
+    clone_url: str,
+    flat_layout: bool,
+    resolved_names: dict[str, str] | None = None,
+) -> Path:
+    """
+    Resolve the local path for a repository based on layout mode.
+
+    Consolidates the flat/hierarchical path resolution logic used throughout
+    sync and bulk operations.
+
+    Args:
+        clone_url: Git repository URL
+        flat_layout: If True, use flat layout (repo name only)
+        resolved_names: Pre-resolved names for collision handling in flat mode
+
+    Returns:
+        Path object for the repository's local directory (relative to target)
+    """
+    if flat_layout:
+        if resolved_names and clone_url in resolved_names:
+            return Path(resolved_names[clone_url])
+        return build_repo_path(clone_url, flat=True)
+    return build_repo_path(clone_url, flat=False)
 
 
 def get_repo_components(
