@@ -375,7 +375,7 @@ class BitBucketProvider(GitProvider):
         headers = self._get_auth_headers()
 
         # Use the configured workspace if organization doesn't match
-        # This handles cases where queries like "cstorepro/*/repo" are used
+        # This handles cases where queries like "myworkspace/*/repo" are used
         # but the provider is configured for a different workspace
         workspace_to_use = organization
         if organization != self.workspace:

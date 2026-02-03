@@ -2,6 +2,11 @@
 
 # mgit special characters regression test suite
 # Tests handling of spaces, dots, dashes, and other special characters in patterns
+#
+# NOTE: This script uses placeholder org/project names. Replace with your actual
+# provider configuration to run these tests:
+#   - ado_example: Azure DevOps provider
+#   - bitbucket_demo: BitBucket provider
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG_FILE="$SCRIPT_DIR/mgit_special_chars_test.log"
@@ -19,57 +24,57 @@ echo "--- SETUP COMPLETE ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 1: Repository names with dots ===" | tee -a "$LOG_FILE"
-echo "Testing pattern: cstorepro/*/CStoreProMobileApp.API" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "cstorepro/*/CStoreProMobileApp.API" --provider bitbucket_pdi 2>&1 | tee -a "$LOG_FILE"
+echo "Testing pattern: demo-workspace/*/MyApp.API" | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "demo-workspace/*/MyApp.API" --provider bitbucket_demo 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 1 ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 2: Repository names with dashes ===" | tee -a "$LOG_FILE"
-echo "Testing pattern: cstorepro/*/MobileApp-Server" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "cstorepro/*/MobileApp-Server" --provider bitbucket_pdi 2>&1 | tee -a "$LOG_FILE"
+echo "Testing pattern: demo-workspace/*/backend-server" | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "demo-workspace/*/backend-server" --provider bitbucket_demo 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 2 ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 3: Repository names with underscores ===" | tee -a "$LOG_FILE"
-echo "Testing pattern: pdidev/*/automation_smoke_signals" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "pdidev/*/automation_smoke_signals" --provider ado_pdidev 2>&1 | tee -a "$LOG_FILE"
+echo "Testing pattern: example-org/*/automation_tests" | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "example-org/*/automation_tests" --provider ado_example 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 3 ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 4: Project names with spaces (URL encoding test) ===" | tee -a "$LOG_FILE"
-echo "Testing pattern with space: pdidev/Blue Cow/*" | tee -a "$LOG_FILE"
+echo "Testing pattern with space: example-org/My Project/*" | tee -a "$LOG_FILE"
 echo "Note: Spaces in project names may require special API handling" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "pdidev/Blue Cow/*" --limit 3 --provider ado_pdidev 2>&1 | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "example-org/My Project/*" --limit 3 --provider ado_example 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE" | tee -a "$LOG_FILE"
 echo "--- END TEST 4 ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 5: Project names with dashes ===" | tee -a "$LOG_FILE"
-echo "Testing pattern: p97networks/Loyalty-Platform/*" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "p97networks/Loyalty-Platform/*" --limit 3 --provider ado_p97 2>&1 | tee -a "$LOG_FILE"
+echo "Testing pattern: sample-org/Platform-Services/*" | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "sample-org/Platform-Services/*" --limit 3 --provider ado_sample 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 5 ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 6: Repository names with mixed special chars ===" | tee -a "$LOG_FILE"
-echo "Testing pattern: cstorepro/*/CSP-Admin" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "cstorepro/*/CSP-Admin" --provider bitbucket_pdi 2>&1 | tee -a "$LOG_FILE"
+echo "Testing pattern: demo-workspace/*/admin-panel" | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "demo-workspace/*/admin-panel" --provider bitbucket_demo 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 6 ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 7: Complex pattern with dots and dashes ===" | tee -a "$LOG_FILE"
-echo "Testing: p97networks/*/Loyalty-*" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "p97networks/*/Loyalty-*" --provider ado_p97 2>&1 | tee -a "$LOG_FILE"
+echo "Testing: sample-org/*/Platform-*" | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "sample-org/*/Platform-*" --provider ado_sample 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 7 ---" >> "$LOG_FILE"
@@ -78,33 +83,33 @@ echo "" >> "$LOG_FILE"
 echo "=== TEST 8: Pattern with all wildcards (cross-provider) ===" | tee -a "$LOG_FILE"
 echo "Testing: */*/*-*" | tee -a "$LOG_FILE"
 echo "Looking for any repo with a dash in the name" | tee -a "$LOG_FILE"
-timeout 20s /opt/bin/mgit list "*/*/*-*" --provider bitbucket_pdi --limit 5 2>&1 | tee -a "$LOG_FILE"
+timeout 20s /opt/bin/mgit list "*/*/*-*" --provider bitbucket_demo --limit 5 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 8 ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 9: Testing numeric characters in patterns ===" | tee -a "$LOG_FILE"
-echo "Testing pattern: p97networks/*/*" | tee -a "$LOG_FILE"
-echo "Organization name contains numbers" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "p97networks/*/*" --limit 3 --provider ado_p97 2>&1 | tee -a "$LOG_FILE"
+echo "Testing pattern: sample-org/*/*" | tee -a "$LOG_FILE"
+echo "Organization name may contain numbers" | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "sample-org/*/*" --limit 3 --provider ado_sample 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 9 ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 10: BitBucket long project names with dashes ===" | tee -a "$LOG_FILE"
-echo "Testing: cstorepro/Rocket-To-Cosmos-Migration/*" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "cstorepro/Rocket-To-Cosmos-Migration/*" --provider bitbucket_pdi 2>&1 | tee -a "$LOG_FILE"
+echo "Testing: demo-workspace/Legacy-Migration/*" | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "demo-workspace/Legacy-Migration/*" --provider bitbucket_demo 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 10 ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 11: Pattern matching with dots in wildcards ===" | tee -a "$LOG_FILE"
-echo "Testing: */*/CStoreProMobileApp.*" | tee -a "$LOG_FILE"
-echo "Looking for repos starting with 'CStoreProMobileApp.'" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "*/*/CStoreProMobileApp.*" --provider bitbucket_pdi --limit 3 2>&1 | tee -a "$LOG_FILE"
+echo "Testing: */*/MyApp.*" | tee -a "$LOG_FILE"
+echo "Looking for repos starting with 'MyApp.'" | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "*/*/MyApp.*" --provider bitbucket_demo --limit 3 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 11 ---" >> "$LOG_FILE"
@@ -112,23 +117,23 @@ echo "" >> "$LOG_FILE"
 
 echo "=== TEST 12: Edge case - single character segments ===" | tee -a "$LOG_FILE"
 echo "Testing single char wildcard: */*/?" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "*/*/?" --provider bitbucket_pdi --limit 2 2>&1 | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "*/*/?" --provider bitbucket_demo --limit 2 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE" | tee -a "$LOG_FILE"
 echo "--- END TEST 12 ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 13: Sync operation with special chars (dry-run) ===" | tee -a "$LOG_FILE"
-echo "Testing sync with dots: p97networks/Loyalty-Platform/Loyalty-Settlement" | tee -a "$LOG_FILE"
-timeout 20s /opt/bin/mgit sync "p97networks/Loyalty-Platform/Loyalty-Settlement" "$TEST_DIR/sync_test" --dry-run --provider ado_p97 2>&1 | tee -a "$LOG_FILE"
+echo "Testing sync with dashes: sample-org/Platform-Services/Settlement-Service" | tee -a "$LOG_FILE"
+timeout 20s /opt/bin/mgit sync "sample-org/Platform-Services/Settlement-Service" "$TEST_DIR/sync_test" --dry-run --provider ado_sample 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 13 ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 14: Mixed case with special chars ===" | tee -a "$LOG_FILE"
-echo "Testing: cstorepro/*/QBMapping" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "cstorepro/*/QBMapping" --provider bitbucket_pdi 2>&1 | tee -a "$LOG_FILE"
+echo "Testing: demo-workspace/*/data-mapping" | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "demo-workspace/*/data-mapping" --provider bitbucket_demo 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 14 ---" >> "$LOG_FILE"
@@ -157,7 +162,7 @@ echo "" >> "$LOG_FILE"
 
 echo "=== TEST 16: Invalid characters that should still fail ===" | tee -a "$LOG_FILE"
 echo "Testing with invalid chars: org/proj/repo|invalid" | tee -a "$LOG_FILE"
-timeout 10s /opt/bin/mgit list "org/proj/repo|invalid" --provider ado_pdidev 2>&1 | tee -a "$LOG_FILE"
+timeout 10s /opt/bin/mgit list "org/proj/repo|invalid" --provider ado_example 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be non-zero)" | tee -a "$LOG_FILE"
 echo "--- END TEST 16 ---" >> "$LOG_FILE"
@@ -165,7 +170,7 @@ echo "" >> "$LOG_FILE"
 
 echo "=== TEST 17: URL special characters in clone URLs ===" | tee -a "$LOG_FILE"
 echo "Testing if special chars in URLs are handled correctly" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "p97networks/Card Present/Card Present Payment Host" --provider ado_p97 2>&1 | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "sample-org/Payment Gateway/Payment Host Service" --provider ado_sample 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE" | tee -a "$LOG_FILE"
 echo "--- END TEST 17 ---" >> "$LOG_FILE"
@@ -173,15 +178,15 @@ echo "" >> "$LOG_FILE"
 
 echo "=== TEST 18: Consecutive special characters ===" | tee -a "$LOG_FILE"
 echo "Looking for repos with multiple consecutive special chars" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "*/*/*.*.*" --provider bitbucket_pdi --limit 2 2>&1 | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "*/*/*.*.*" --provider bitbucket_demo --limit 2 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE" | tee -a "$LOG_FILE"
 echo "--- END TEST 18 ---" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 echo "=== TEST 19: Special chars in all three segments ===" | tee -a "$LOG_FILE"
-echo "Testing: p97networks/Loyalty-Platform/Loyalty-Settlement" | tee -a "$LOG_FILE"
-timeout 15s /opt/bin/mgit list "p97networks/Loyalty-Platform/Loyalty-Settlement" --provider ado_p97 2>&1 | tee -a "$LOG_FILE"
+echo "Testing: sample-org/Platform-Services/Settlement-Service" | tee -a "$LOG_FILE"
+timeout 15s /opt/bin/mgit list "sample-org/Platform-Services/Settlement-Service" --provider ado_sample 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 echo "Exit code: $EXIT_CODE (should be 0)" | tee -a "$LOG_FILE"
 echo "--- END TEST 19 ---" >> "$LOG_FILE"
@@ -191,7 +196,7 @@ echo "=== TEST 20: Performance test with complex patterns ===" | tee -a "$LOG_FI
 echo "Testing complex pattern across providers: */*-*/*-*" | tee -a "$LOG_FILE"
 echo "Looking for org-project-repo patterns with dashes" | tee -a "$LOG_FILE"
 START_TIME=$(date +%s)
-timeout 20s /opt/bin/mgit list "*/*-*/*-*" --provider bitbucket_pdi --limit 5 2>&1 | tee -a "$LOG_FILE"
+timeout 20s /opt/bin/mgit list "*/*-*/*-*" --provider bitbucket_demo --limit 5 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 END_TIME=$(date +%s)
 ELAPSED=$((END_TIME - START_TIME))

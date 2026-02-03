@@ -60,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.7.2] - 2025-10-14
 
 ### Fixed
-- **Sync Command**: Fixed AttributeError when using patterns with spaces (e.g., "pdidev/Cloud Engineering/*")
+- **Sync Command**: Fixed AttributeError when using patterns with spaces (e.g., "myorg/My Project/*")
   - Added missing `build_repo_path()` import to properly construct repository paths from URLs
   - Replaced direct access to non-existent `Repository.organization` field with URL-based path construction
 
