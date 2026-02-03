@@ -129,6 +129,8 @@ Use `--hierarchy` for hierarchical layout (original behavior):
 
 **Collision resolution** (flat layout): When repos from different orgs share names, automatic disambiguation appends `_orgname` suffix (e.g., `auth_org-a/`, `auth_org-b/`). If orgs also collide, provider prefix is added (e.g., `auth_github_org/`, `auth_azure_org/`).
 
+**Testing note**: Cross-provider collision resolution (e.g., GitHub vs Azure DevOps with same org name) cannot be E2E tested with local infrastructure—requires multiple real providers. This logic is covered by unit tests only (`tests/unit/test_flat_layout.py::TestCollisionResolution::test_cross_provider_collision`).
+
 ### Query Pattern System
 Pattern format: `organization/project/repository`
 - Azure DevOps uses all three parts

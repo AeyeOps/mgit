@@ -41,26 +41,19 @@ def pytest_configure(config):
 @pytest.fixture(scope="session", autouse=True)
 def configure_git_for_tests():
     """
-    Configure Git globally for all tests.
-    This runs once per test session.
+    Configure Git environment for all tests via environment variables.
+
+    Uses GIT_* environment variables to set test identity without modifying
+    the user's global git config. These env vars take precedence over config.
     """
     import os
-    import subprocess
 
-    # Set Git config for tests
-    subprocess.run(["git", "config", "--global", "user.name", "Test User"], check=False)
-    subprocess.run(
-        ["git", "config", "--global", "user.email", "test@mgit.dev"], check=False
-    )
-    subprocess.run(
-        ["git", "config", "--global", "init.defaultBranch", "main"], check=False
-    )
-
-    # Also set environment variables
+    # Set environment variables for test identity (overrides git config)
     os.environ["GIT_AUTHOR_NAME"] = "Test User"
     os.environ["GIT_AUTHOR_EMAIL"] = "test@mgit.dev"
     os.environ["GIT_COMMITTER_NAME"] = "Test User"
     os.environ["GIT_COMMITTER_EMAIL"] = "test@mgit.dev"
+    # Note: Do NOT modify global git config - that pollutes user's system
 
 
 @pytest.fixture
