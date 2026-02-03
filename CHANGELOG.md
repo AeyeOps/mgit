@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-02-03
+
+### Added
+- **Flat Layout (Default)**: Repositories are now cloned directly into the target directory by default, without nested `host/org/project/` structure.
+- **`--hierarchy` Flag**: Opt-in to the previous hierarchical layout with `mgit sync --hierarchy`.
+- **Collision Resolution**: Automatic disambiguation for repos with same name from different orgs/providers:
+  - Same name, different orgs: `repo_orgname/` suffix
+  - Same org name across providers: `repo_provider_orgname/` suffix
+- **Global Git Hook**: Added pre-commit hook infrastructure to prevent commits with test user identity.
+
+### Changed
+- **Default Sync Behavior**: Flat layout is now the default; use `--hierarchy` for nested structure.
+- **Test Infrastructure**: Tests now use environment variables for git identity instead of modifying global config.
+
+### Fixed
+- **Test Config Pollution**: Removed code that was overwriting user's global git config with test identity on every test run.
+
 ## [0.9.0] - 2026-01-20
 
 ### Changed
