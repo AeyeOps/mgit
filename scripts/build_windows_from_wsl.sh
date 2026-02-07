@@ -125,9 +125,12 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo Syncing environment with uv (including dev extras, Python 3.12.9)...
-call mamba run -n mgit-build uv python install 3.12.9
-call mamba run -n mgit-build uv sync --all-extras --dev --python 3.12.9
+echo Syncing environment with uv (including dev extras)...
+REM Remove stale .venv to avoid cached interpreter path issues
+if exist ".venv" rmdir /s /q .venv
+REM Activate mamba env then run uv directly to avoid path quoting issues
+call mamba activate mgit-build
+uv sync --all-extras --dev
 if %errorlevel% neq 0 (
     echo Error: uv sync failed
     exit /b 1
@@ -138,7 +141,7 @@ echo Building Windows executable with PyInstaller...
 echo Using existing mgit.spec (cross-platform compatible)...
 REM Create build directory structure (prevents PyInstaller race condition)
 if not exist "build\mgit" mkdir build\mgit
-call mamba run -n mgit-build uv run pyinstaller mgit.spec --clean
+uv run pyinstaller mgit.spec --clean
 if %errorlevel% neq 0 (
     echo Error: Build failed
     exit /b 1
