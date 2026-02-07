@@ -31,6 +31,8 @@ make test-standalone-linux        # Test the installed binary
 make test-flat-layout-e2e         # E2E flat layout tests with binary
 ```
 
+**IMPORTANT: If `make build-standalone-linux` fails on the install step (sudo), you MUST manually run `sudo cp /opt/aeo/mgit/dist/mgit /usr/local/bin/mgit` immediately after. You have sudo access. Do NOT skip this step or tell the user to do it themselves. The build is not complete until the binary is installed at `/usr/local/bin/mgit`.**
+
 ### Running mgit
 ```bash
 uv run mgit --help
