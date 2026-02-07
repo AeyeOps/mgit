@@ -150,6 +150,9 @@ async def _process_single_provider(
                                 org.name, project_name
                             ):
                                 if matches_pattern(repo.name, pattern.repo_pattern):
+                                    repo.metadata["provider_config_name"] = (
+                                        provider_name
+                                    )
                                     results.append(
                                         RepositoryResult(repo, org.name, project_name)
                                     )
@@ -163,6 +166,7 @@ async def _process_single_provider(
                         # Handle case with no projects (use None)
                         async for repo in provider.list_repositories(org.name, None):
                             if matches_pattern(repo.name, pattern.repo_pattern):
+                                repo.metadata["provider_config_name"] = provider_name
                                 results.append(RepositoryResult(repo, org.name, None))
 
                                 if limit and len(results) >= limit:
@@ -171,6 +175,7 @@ async def _process_single_provider(
                     # Provider doesn't support projects (GitHub, BitBucket)
                     async for repo in provider.list_repositories(org.name):
                         if matches_pattern(repo.name, pattern.repo_pattern):
+                            repo.metadata["provider_config_name"] = provider_name
                             results.append(RepositoryResult(repo, org.name))
 
                             if limit and len(results) >= limit:

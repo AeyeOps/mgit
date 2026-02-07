@@ -497,16 +497,15 @@ class BitBucketProvider(GitProvider):
         Returns:
             Clone URL with embedded authentication
         """
-        from urllib.parse import quote
+        from urllib.parse import quote, urlparse
 
-        # Extract repository path from clone URL
-        if repository.clone_url.startswith("https://bitbucket.org/"):
-            repo_path = repository.clone_url.replace("https://bitbucket.org/", "")
+        parsed = urlparse(repository.clone_url)
+        if parsed.hostname == "bitbucket.org" and parsed.scheme == "https":
             # URL encode credentials to handle special characters
             encoded_username = quote(self.user, safe="")
             encoded_token = quote(self.token, safe="")
             return (
-                f"https://{encoded_username}:{encoded_token}@bitbucket.org/{repo_path}"
+                f"https://{encoded_username}:{encoded_token}@bitbucket.org{parsed.path}"
             )
 
         # Fallback to original URL if we can't authenticate it

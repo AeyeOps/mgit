@@ -1,12 +1,25 @@
 """Git operations manager for mgit CLI tool."""
 
 import logging
+import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+# Pattern to strip credentials from URLs in log messages
+_CRED_URL_RE = re.compile(r"(https?://)([^@]+)@")
+
+
+def _sanitize_cmd_for_log(cmd: list[str]) -> str:
+    """Produce a log-safe representation of a command list, masking credentials in URLs."""
+    parts = []
+    for token in cmd:
+        parts.append(_CRED_URL_RE.sub(r"\1***@", token))
+    return " ".join(parts)
 
 
 class GitManager:
@@ -22,13 +35,12 @@ class GitManager:
         Raises typer.Exit if the command fails.
         """
         # Format the message for better display in the console
-        # Truncate long URLs to prevent log line truncation
-        display_url = repo_url
+        # Strip credentials and truncate long URLs to prevent log line truncation
+        display_url = _CRED_URL_RE.sub(r"\1", repo_url)
         if len(display_url) > 60:
             parsed = urlparse(display_url)
             path_parts = parsed.path.split("/")
             if len(path_parts) > 2:
-                # Show just the end of the path (organization/project/repo)
                 short_path = "/".join(path_parts[-3:])
                 display_url = f"{parsed.scheme}://{parsed.netloc}/.../{short_path}"
 
@@ -171,35 +183,46 @@ class GitManager:
         """
         Run a subprocess command with proper error handling.
 
+        Always captures stdout/stderr to prevent git from leaking credentials
+        directly to the terminal.  When *capture_output* is False the captured
+        streams are still logged at DEBUG level after sanitisation.
+
         Args:
             cmd: Command and arguments to run
             cwd: Working directory for the command
-            capture_output: Whether to capture stdout/stderr
+            capture_output: Whether to return captured stdout/stderr to caller
 
         Returns:
-            CompletedProcess result if capture_output=True
+            CompletedProcess result
         """
+        safe_cmd = _sanitize_cmd_for_log(cmd)
+
+        # Prevent git from prompting for credentials interactively
+        # (would hang since we capture stdout/stderr).
+        env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+
         try:
-            if capture_output:
-                result = subprocess.run(
-                    cmd, cwd=cwd, capture_output=True, text=True, check=True
-                )
-                return result
-            else:
-                # Original behavior for non-capturing calls
-                subprocess.run(cmd, cwd=cwd, check=True)
-                return None
+            result = subprocess.run(
+                cmd, cwd=cwd, capture_output=True, text=True, check=True, env=env
+            )
+            if not capture_output and result.stdout:
+                logger.debug(f"stdout: {result.stdout.rstrip()}")
+            return result
 
         except subprocess.CalledProcessError as e:
-            # Log the error with context
-            cmd_str = " ".join(cmd)
-            logger.error(f"Command '{cmd_str}' failed in {cwd}: {e}")
-            if capture_output and e.stdout:
-                logger.debug(f"stdout: {e.stdout}")
-            if capture_output and e.stderr:
-                logger.debug(f"stderr: {e.stderr}")
+            safe_stderr = (
+                _CRED_URL_RE.sub(r"\1***@", e.stderr.rstrip()) if e.stderr else ""
+            )
+            logger.error(
+                f"Command '{safe_cmd}' failed in {cwd}: exit code {e.returncode}"
+            )
+            if safe_stderr:
+                logger.error(f"  {safe_stderr}")
+            if e.stdout:
+                logger.debug(
+                    f"stdout: {_CRED_URL_RE.sub(r'\\1***@', e.stdout.rstrip())}"
+                )
             raise
         except Exception as e:
-            cmd_str = " ".join(cmd)
-            logger.error(f"Unexpected error running '{cmd_str}' in {cwd}: {e}")
+            logger.error(f"Unexpected error running '{safe_cmd}' in {cwd}: {e}")
             raise

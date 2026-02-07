@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2] - 2026-02-07
+
+### Fixed
+- **Multi-provider sync uses wrong token**: When syncing without `--provider`, repos discovered by one GitHub config (e.g., `github_work`) were cloned using a different config's token. Now stamps the discovering provider's config name into repo metadata at discovery and uses it at clone time.
+- **Credential leak in logs**: Git subprocess output now always captured and sanitized before logging, preventing PATs from appearing in terminal output, error messages, and log files.
+- **SecurityLogFilter not wired**: Wired the existing `SecurityLogFilter` (regex-based credential masking) onto the active `mgit` logger as defense-in-depth.
+- **CalledProcessError leak**: Clone/pull failure warnings no longer log `str(exception)` which contained the full authenticated URL.
+- **Bitbucket clone auth failure**: Clone URLs from Bitbucket API include existing username (e.g., `https://user@bitbucket.org/...`), which caused the auth URL builder to skip token injection. Now uses `urlparse` for robust host matching.
+
+### Added
+- **WSL NTFS detection**: Sync command now detects NTFS mounts under WSL that lack `metadata` support and fails fast with actionable fix instructions instead of silently failing every clone.
+- **Platform compatibility module**: New `mgit/utils/platform_compat.py` with `is_wsl_ntfs_without_metadata()` that probes actual `chmod` behavior (safe on all platforms).
+
 ## [0.11.0] - 2026-02-03
 
 ### Added

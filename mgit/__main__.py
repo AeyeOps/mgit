@@ -229,6 +229,14 @@ if not _has_mgit_handler(mgit_logger, "console"):
     console_handler._mgit_handler = "console"
     mgit_logger.addHandler(console_handler)
 
+# Install credential-masking filter on the mgit logger so that every handler
+# (console + file) automatically strips PATs and other secrets from messages.
+from mgit.security.logging import SecurityLogFilter  # noqa: E402
+
+_security_filter = SecurityLogFilter()
+if not any(isinstance(f, SecurityLogFilter) for f in mgit_logger.filters):
+    mgit_logger.addFilter(_security_filter)
+
 logger = logging.getLogger(__name__)
 
 console = Console()

@@ -885,6 +885,23 @@ async def sync_command(
     target_path = Path(path).resolve()
     target_path.mkdir(parents=True, exist_ok=True)
 
+    # Detect NTFS mounts under WSL where git clone will fail due to chmod
+    from mgit.utils.platform_compat import is_wsl_ntfs_without_metadata
+
+    if is_wsl_ntfs_without_metadata(target_path):
+        console.print(
+            "[bold red]Error:[/bold red] Target path is on an NTFS mount "
+            f"({target_path}). Git clone will fail because NTFS under WSL "
+            "does not support chmod.\n\n"
+            "[bold]Fix options:[/bold]\n"
+            '  1. Use a native Linux path: mgit sync "pattern" ~/repos\n'
+            "  2. Enable metadata in /etc/wsl.conf:\n"
+            "     [automount]\n"
+            '     options = "metadata"\n'
+            "     Then restart WSL: wsl --shutdown"
+        )
+        raise typer.Exit(1)
+
     console.print(f"[blue]Synchronizing to:[/blue] {target_path}")
 
     # Resolve repositories

@@ -5,62 +5,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ### Development
+**IMPORTANT: Always use `make` targets instead of invoking scripts directly. This ensures the Makefile stays validated and consistent.**
+
 ```bash
-# Install dependencies
-uv sync
+# Validation (format + lint + type check + bandit)
+make validate                     # All checks
+make validate ARGS="--fix"        # Auto-fix, then check
 
-# Run the application
-uv run mgit --help
-uv run mgit --version
+# Tests
+make test                         # All tests (including e2e)
+make test ARGS="tests/unit/ -v"   # Unit tests only
 
-# Local sync (walk current directory or a path)
-mgit sync
-mgit sync ./workspace
-
-# Remote sync (explicit pattern, flat layout by default)
-mgit sync --filter "myorg/*/*" ./repos
-
-# Remote sync with hierarchical layout (host/org/project/repo)
-mgit sync --filter "myorg/*/*" ./repos --hierarchy
-
-# Run tests
-uv run python scripts/make_test.py                    # All tests
-uv run python scripts/make_test.py tests/unit/ -v     # Unit tests only
-uv run python scripts/make_test.py -m unit            # By marker
-
-# Code quality (unified validation)
-uv run python scripts/make_validate.py                # All checks: format + lint + ty + bandit
-uv run python scripts/make_validate.py --fix          # Auto-fix, then check
+# Version bumps
+make version ARGS="--bump patch"  # 0.7.2 -> 0.7.3
+make version ARGS="--bump minor"  # 0.7.2 -> 0.8.0
+make version ARGS="--bump major"  # 0.7.2 -> 1.0.0
 ```
 
 ### Build
 ```bash
-# Linux binary
-uv run python scripts/make_build.py --target linux
-
-# Linux binary + install to /usr/local/bin/mgit
-uv run python scripts/make_build.py --target linux --install
-
-# Windows (from WSL)
-uv run python scripts/make_build.py --target windows
-
-# Both platforms
-uv run python scripts/make_build.py --target all
-
-# Clean build artifacts
-uv run python scripts/make_clean.py
-
-# Test standalone binary (uses /usr/local/bin/mgit)
-uv run python scripts/test_binary.py
-uv run python scripts/test_binary.py --verbose
-uv run python scripts/test_binary.py --binary /path/to/mgit
+make build-standalone-linux       # Linux binary + install to /usr/local/bin/mgit
+make build-standalone-windows     # Windows binary (from WSL)
+make clean                        # Remove build artifacts
+make test-standalone-linux        # Test the installed binary
+make test-flat-layout-e2e         # E2E flat layout tests with binary
 ```
 
-### Version Management
+### Running mgit
 ```bash
-uv run python scripts/make_version.py --bump patch    # 0.7.2 -> 0.7.3
-uv run python scripts/make_version.py --bump minor    # 0.7.2 -> 0.8.0
-uv run python scripts/make_version.py --bump major    # 0.7.2 -> 1.0.0
+uv run mgit --help
+uv run mgit --version
+mgit sync "myorg/*/*" ./repos                 # Flat layout (default)
+mgit sync "myorg/*/*" ./repos --hierarchy     # Hierarchical layout
 ```
 
 ## Architecture Decision Records (ADRs)

@@ -211,8 +211,8 @@ class BulkOperationProcessor:
                         description=f"[green]Pulled (update): {display_name}[/green]",
                         completed=1,
                     )
-                except subprocess.CalledProcessError as e:
-                    logger.warning(f"Pull failed for {repo_name}: {e}")
+                except subprocess.CalledProcessError:
+                    logger.warning(f"Pull failed for {repo_name} (exit code from git)")
                     self.failures.append((repo_name, "pull failed"))
                     progress.update(
                         repo_task_id,
@@ -304,8 +304,8 @@ class BulkOperationProcessor:
                     description=f"[green]Cloned: {display_name}[/green]",
                     completed=1,
                 )
-            except subprocess.CalledProcessError as e:
-                logger.warning(f"Clone failed for {repo_name}: {e}")
+            except subprocess.CalledProcessError:
+                logger.warning(f"Clone failed for {repo_name} (exit code from git)")
                 self.failures.append((repo_name, "clone failed"))
                 progress.update(
                     repo_task_id,
@@ -327,8 +327,8 @@ class BulkOperationProcessor:
                         description=f"[green]Pulled: {display_name}[/green]",
                         completed=1,
                     )
-                except subprocess.CalledProcessError as e:
-                    logger.warning(f"Pull failed for {repo_name}: {e}")
+                except subprocess.CalledProcessError:
+                    logger.warning(f"Pull failed for {repo_name} (exit code from git)")
                     self.failures.append((repo_name, "pull failed"))
                     progress.update(
                         repo_task_id,

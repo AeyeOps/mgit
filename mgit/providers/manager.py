@@ -385,8 +385,28 @@ class ProviderManager:
                 name = repository.get("name")
                 is_disabled = repository.get("is_disabled", False)
 
-            provider = self.get_provider()
-            if repo_provider_type and repo_provider_type != self._provider_type:
+            # Use the exact provider config that discovered this repo (if stamped)
+            config_name = getattr(repository, "metadata", {}).get(
+                "provider_config_name"
+            )
+            if not config_name and isinstance(repository, dict):
+                config_name = repository.get("metadata", {}).get("provider_config_name")
+
+            if config_name:
+                try:
+                    temp_config = get_provider_config(config_name)
+                    provider_type = repo_provider_type or detect_provider_type(
+                        config_name
+                    )
+                    provider = ProviderFactory.create_provider(
+                        provider_type, temp_config
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to load provider config '{config_name}': {e}"
+                    )
+                    provider = self.get_provider()
+            elif repo_provider_type and repo_provider_type != self._provider_type:
                 try:
                     _, temp_config = self._find_config_by_type(
                         repo_provider_type, set_name=False
@@ -396,6 +416,8 @@ class ProviderManager:
                     )
                 except Exception:
                     provider = self.get_provider()
+            else:
+                provider = self.get_provider()
 
             # Convert to Repository object if needed
             if isinstance(repository, dict):

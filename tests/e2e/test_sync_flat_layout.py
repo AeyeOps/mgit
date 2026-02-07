@@ -18,9 +18,12 @@ from pathlib import Path
 import pytest
 
 # Test repository for consistent tests (small public repo)
-# Using steveant's repos as specified in test plan
-TEST_REPO_PATTERN = "steveant/*/puray"
-TEST_MULTI_PATTERN = "steveant/*/*"
+# Override via E2E_TEST_ORG env var if needed
+import os
+
+_TEST_ORG = os.environ.get("E2E_TEST_ORG", "mgit-test")
+TEST_REPO_PATTERN = f"{_TEST_ORG}/*/puray"
+TEST_MULTI_PATTERN = f"{_TEST_ORG}/*/*"
 
 
 # --- Section A: Basic Functionality Tests ---
@@ -170,7 +173,7 @@ class TestSyncFlatLayoutBasic:
 
         Verifies that:
         - Repository is cloned with hierarchical path
-        - Path includes provider/org structure (github.com/steveant/...)
+        - Path includes provider/org structure (github.com/{org}/...)
         """
         target = temp_dir / "hier_test"
         target.mkdir(parents=True, exist_ok=True)
@@ -407,7 +410,7 @@ class TestErrorHandling:
         target.mkdir(parents=True, exist_ok=True)
 
         result = run_mgit(
-            ["sync", "steveant/*/nonexistent-repo-xyz-12345", str(target)],
+            ["sync", f"{_TEST_ORG}/*/nonexistent-repo-xyz-12345", str(target)],
             timeout=60,
         )
 
@@ -472,9 +475,9 @@ class TestErrorHandling:
         target = temp_dir / "provider_test"
         target.mkdir(parents=True, exist_ok=True)
 
-        # Try with a specific provider (github_steveant if configured, or fail gracefully)
+        # Try with a specific provider (github_test if configured, or fail gracefully)
         result = run_mgit(
-            ["sync", TEST_MULTI_PATTERN, str(target), "--provider", "github_steveant"],
+            ["sync", TEST_MULTI_PATTERN, str(target), "--provider", "github_test"],
             timeout=120,
         )
 
@@ -629,7 +632,7 @@ class TestIdempotency:
         # At minimum, the original repo should still be there
         assert (target / "puray" / ".git").exists(), "Original repo missing"
 
-        # If there are other repos in steveant/*, we should have more
+        # If there are other repos matching the pattern, we should have more
         # But at minimum we should have at least 1
         assert len(git_dirs) >= 1
 
