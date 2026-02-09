@@ -184,11 +184,18 @@ class GitManager:
             raise
 
     TRANSIENT_PATTERNS = [
-        "Connection reset", "Connection refused", "timed out",
-        "SSL", "Could not resolve host", "429", "rate limit",
+        "Connection reset",
+        "Connection refused",
+        "timed out",
+        "SSL",
+        "Could not resolve host",
+        "429",
+        "rate limit",
     ]
     PERMANENT_PATTERNS = [
-        "not found", "Permission denied", "couldn't find remote ref",
+        "not found",
+        "Permission denied",
+        "couldn't find remote ref",
     ]
 
     async def is_repo_empty(self, repo_dir: Path) -> bool:
@@ -244,8 +251,13 @@ class GitManager:
         for attempt in range(max_retries + 1):
             try:
                 result = subprocess.run(
-                    cmd, cwd=cwd, capture_output=True, text=True, check=True,
-                    env=env, timeout=timeout,
+                    cmd,
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    env=env,
+                    timeout=timeout,
                 )
                 if not capture_output and result.stdout:
                     logger.debug(f"stdout: {result.stdout.rstrip()}")
@@ -256,7 +268,9 @@ class GitManager:
                     f"Command '{safe_cmd}' timed out after {timeout}s in {cwd}"
                 )
                 raise subprocess.CalledProcessError(
-                    124, cmd, output="",
+                    124,
+                    cmd,
+                    output="",
                     stderr=f"Command timed out after {timeout}s",
                 ) from e
 
@@ -269,9 +283,11 @@ class GitManager:
                 if (
                     attempt < max_retries
                     and any(p.lower() in stderr_lower for p in self.TRANSIENT_PATTERNS)
-                    and not any(p.lower() in stderr_lower for p in self.PERMANENT_PATTERNS)
+                    and not any(
+                        p.lower() in stderr_lower for p in self.PERMANENT_PATTERNS
+                    )
                 ):
-                    delay = initial_delay * (backoff ** attempt)
+                    delay = initial_delay * (backoff**attempt)
                     logger.warning(
                         f"Transient failure (attempt {attempt + 1}/{max_retries + 1}) "
                         f"for '{safe_cmd}', retrying in {delay}s: {safe_stderr}"

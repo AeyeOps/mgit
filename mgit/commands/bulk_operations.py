@@ -222,9 +222,13 @@ class BulkOperationProcessor:
                             completed=1,
                         )
                     except subprocess.CalledProcessError as e:
-                        error_detail = sanitize_url((e.stderr or "").strip().split("\n")[0])
+                        error_detail = sanitize_url(
+                            (e.stderr or "").strip().split("\n")[0]
+                        )
                         logger.warning(f"Pull failed for {repo_name}: {error_detail}")
-                        self.failures.append((repo_name, f"pull failed: {error_detail}"))
+                        self.failures.append(
+                            (repo_name, f"pull failed: {error_detail}")
+                        )
                         progress.update(
                             repo_task_id,
                             description=f"[red]Pull Failed (update): {display_name}[/red]",
@@ -354,9 +358,13 @@ class BulkOperationProcessor:
                             completed=1,
                         )
                     except subprocess.CalledProcessError as e:
-                        error_detail = sanitize_url((e.stderr or "").strip().split("\n")[0])
+                        error_detail = sanitize_url(
+                            (e.stderr or "").strip().split("\n")[0]
+                        )
                         logger.warning(f"Pull failed for {repo_name}: {error_detail}")
-                        self.failures.append((repo_name, f"pull failed: {error_detail}"))
+                        self.failures.append(
+                            (repo_name, f"pull failed: {error_detail}")
+                        )
                         progress.update(
                             repo_task_id,
                             description=f"[red]Pull Failed: {display_name}[/red]",
