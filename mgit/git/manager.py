@@ -1,5 +1,6 @@
 """Git operations manager for mgit CLI tool."""
 
+import asyncio
 import logging
 import os
 import re
@@ -12,6 +13,11 @@ logger = logging.getLogger(__name__)
 
 # Pattern to strip credentials from URLs in log messages
 _CRED_URL_RE = re.compile(r"(https?://)([^@]+)@")
+
+
+def sanitize_url(text: str) -> str:
+    """Remove credentials from URLs in text."""
+    return _CRED_URL_RE.sub(r"\1***@", text)
 
 
 def _sanitize_cmd_for_log(cmd: list[str]) -> str:
@@ -177,8 +183,39 @@ class GitManager:
             logger.debug(f"Diff files operation failed in {repo_dir}: {e}")
             raise
 
+    TRANSIENT_PATTERNS = [
+        "Connection reset", "Connection refused", "timed out",
+        "SSL", "Could not resolve host", "429", "rate limit",
+    ]
+    PERMANENT_PATTERNS = [
+        "not found", "Permission denied", "couldn't find remote ref",
+    ]
+
+    async def is_repo_empty(self, repo_dir: Path) -> bool:
+        """Return True if the repo has no commits (empty repo)."""
+        try:
+            await self._run_subprocess(
+                [self.GIT_EXECUTABLE, "rev-parse", "HEAD"],
+                cwd=repo_dir,
+                capture_output=True,
+                log_level=logging.DEBUG,
+            )
+            return False
+        except subprocess.CalledProcessError:
+            return True
+        except Exception:
+            return True
+
     async def _run_subprocess(
-        self, cmd: list, cwd: Path, capture_output: bool = False
+        self,
+        cmd: list,
+        cwd: Path,
+        capture_output: bool = False,
+        log_level: int = logging.ERROR,
+        timeout: int = 300,
+        max_retries: int = 3,
+        initial_delay: float = 2.0,
+        backoff: float = 2.0,
     ) -> subprocess.CompletedProcess:
         """
         Run a subprocess command with proper error handling.
@@ -191,38 +228,71 @@ class GitManager:
             cmd: Command and arguments to run
             cwd: Working directory for the command
             capture_output: Whether to return captured stdout/stderr to caller
+            log_level: Log level for CalledProcessError messages (default ERROR)
+            timeout: Command timeout in seconds (default 300)
+            max_retries: Max retry attempts for transient failures (default 3)
+            initial_delay: Initial retry delay in seconds (default 2.0)
+            backoff: Backoff multiplier for retry delay (default 2.0)
 
         Returns:
             CompletedProcess result
         """
         safe_cmd = _sanitize_cmd_for_log(cmd)
 
-        # Prevent git from prompting for credentials interactively
-        # (would hang since we capture stdout/stderr).
         env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
 
-        try:
-            result = subprocess.run(
-                cmd, cwd=cwd, capture_output=True, text=True, check=True, env=env
-            )
-            if not capture_output and result.stdout:
-                logger.debug(f"stdout: {result.stdout.rstrip()}")
-            return result
-
-        except subprocess.CalledProcessError as e:
-            safe_stderr = (
-                _CRED_URL_RE.sub(r"\1***@", e.stderr.rstrip()) if e.stderr else ""
-            )
-            logger.error(
-                f"Command '{safe_cmd}' failed in {cwd}: exit code {e.returncode}"
-            )
-            if safe_stderr:
-                logger.error(f"  {safe_stderr}")
-            if e.stdout:
-                logger.debug(
-                    f"stdout: {_CRED_URL_RE.sub(r'\\1***@', e.stdout.rstrip())}"
+        for attempt in range(max_retries + 1):
+            try:
+                result = subprocess.run(
+                    cmd, cwd=cwd, capture_output=True, text=True, check=True,
+                    env=env, timeout=timeout,
                 )
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error running '{safe_cmd}' in {cwd}: {e}")
-            raise
+                if not capture_output and result.stdout:
+                    logger.debug(f"stdout: {result.stdout.rstrip()}")
+                return result
+
+            except subprocess.TimeoutExpired as e:
+                logger.error(
+                    f"Command '{safe_cmd}' timed out after {timeout}s in {cwd}"
+                )
+                raise subprocess.CalledProcessError(
+                    124, cmd, output="",
+                    stderr=f"Command timed out after {timeout}s",
+                ) from e
+
+            except subprocess.CalledProcessError as e:
+                safe_stderr = (
+                    _CRED_URL_RE.sub(r"\1***@", e.stderr.rstrip()) if e.stderr else ""
+                )
+                stderr_lower = (e.stderr or "").lower()
+
+                if (
+                    attempt < max_retries
+                    and any(p.lower() in stderr_lower for p in self.TRANSIENT_PATTERNS)
+                    and not any(p.lower() in stderr_lower for p in self.PERMANENT_PATTERNS)
+                ):
+                    delay = initial_delay * (backoff ** attempt)
+                    logger.warning(
+                        f"Transient failure (attempt {attempt + 1}/{max_retries + 1}) "
+                        f"for '{safe_cmd}', retrying in {delay}s: {safe_stderr}"
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+
+                logger.log(
+                    log_level,
+                    f"Command '{safe_cmd}' failed in {cwd}: exit code {e.returncode}",
+                )
+                if safe_stderr:
+                    logger.log(log_level, f"  {safe_stderr}")
+                if e.stdout:
+                    logger.debug(
+                        f"stdout: {_CRED_URL_RE.sub(r'\\1***@', e.stdout.rstrip())}"
+                    )
+                raise
+
+            except Exception as e:
+                logger.error(f"Unexpected error running '{safe_cmd}' in {cwd}: {e}")
+                raise
+
+        raise RuntimeError(f"Exhausted retries for '{safe_cmd}'")

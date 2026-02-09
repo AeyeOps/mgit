@@ -22,6 +22,7 @@ from tests.e2e.gitea_fixtures import (  # noqa: F401
     gitea_admin_token,
     gitea_mgit_env,
     gitea_collision_repos,
+    gitea_edge_case_repos,
     gitea_unique_repos,
 )
 

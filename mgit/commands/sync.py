@@ -1076,27 +1076,27 @@ async def run_sync_with_progress(
         )
 
     # Show final results
-    success_count = len(repositories) - len(failures)
+    skipped = processor.skipped
+    success_count = len(repositories) - len(failures) - len(skipped)
 
-    if failures:
+    if failures or skipped:
         console.print("\n[yellow]Sync completed with issues:[/yellow]")
         console.print(f"  [green]✅ Successful:[/green] {success_count}")
-        console.print(f"  [red]❌ Failed:[/red] {len(failures)}")
+        if skipped:
+            console.print(f"  [yellow]⏭ Skipped:[/yellow] {len(skipped)}")
+        if failures:
+            console.print(f"  [red]❌ Failed:[/red] {len(failures)}")
 
-        # Group failures by type for better reporting
-        failure_table = Table(title="Failed Operations")
-        failure_table.add_column("Repository", style="red")
-        failure_table.add_column("Error", style="yellow")
+        if failures:
+            failure_table = Table(title="Failed Operations")
+            failure_table.add_column("Repository", style="red")
+            failure_table.add_column("Error", style="yellow")
 
-        for failure in failures:
-            # Parse failure string to extract repo name and error
-            parts = str(failure).split(":", 1)
-            repo_name = parts[0] if len(parts) > 0 else "Unknown"
-            error_msg = parts[1].strip() if len(parts) > 1 else str(failure)
-            failure_table.add_row(repo_name, error_msg)
+            for repo_name, error_msg in failures:
+                failure_table.add_row(repo_name, error_msg)
 
-        console.print(failure_table)
-        raise typer.Exit(code=1)
+            console.print(failure_table)
+            raise typer.Exit(code=1)
     else:
         console.print(
             f"\n[green]✅ Successfully synchronized {success_count} repositories![/green]"
@@ -1125,14 +1125,20 @@ async def run_sync_quiet(
         resolved_names=resolved_names,
     )
 
-    success_count = len(repositories) - len(failures)
+    skipped = processor.skipped
+    success_count = len(repositories) - len(failures) - len(skipped)
+
+    if skipped:
+        logger.info(f"Skipped {len(skipped)} repositories")
+        for repo_name, reason in skipped:
+            logger.info(f"Skipped: {repo_name}: {reason}")
 
     if failures:
         logger.error(
             f"Sync completed with {len(failures)} failures out of {len(repositories)} repositories"
         )
-        for failure in failures:
-            logger.error(f"Failed: {failure}")
+        for repo_name, error_msg in failures:
+            logger.error(f"Failed: {repo_name}: {error_msg}")
         raise typer.Exit(code=1)
     else:
         logger.info(f"Successfully synchronized {success_count} repositories")

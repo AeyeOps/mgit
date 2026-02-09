@@ -15,7 +15,7 @@ from rich.console import Console
 from rich.progress import Progress
 from rich.prompt import Confirm
 
-from ..git import GitManager, resolve_local_repo_path
+from ..git import GitManager, resolve_local_repo_path, sanitize_url
 from ..providers.base import Repository
 from ..providers.manager import ProviderManager
 
@@ -53,6 +53,7 @@ class BulkOperationProcessor:
         self.operation_type = operation_type
         self.flat_layout = flat_layout
         self.failures: list[tuple[str, str]] = []
+        self.skipped: list[tuple[str, str]] = []
 
     async def process_repositories(
         self,
@@ -82,6 +83,7 @@ class BulkOperationProcessor:
             List of (repo_name, error_reason) tuples for failed operations
         """
         self.failures = []
+        self.skipped = []
         sem = asyncio.Semaphore(concurrency)
         repo_tasks = {}
 
@@ -113,7 +115,7 @@ class BulkOperationProcessor:
                     # Check if repository is disabled
                     if is_disabled:
                         logger.info(f"Skipping disabled repository: {repo_name}")
-                        self.failures.append((repo_name, "repository is disabled"))
+                        self.skipped.append((repo_name, "repository is disabled"))
                         progress.update(
                             repo_task_id,
                             description=f"[yellow]Disabled: {display_name}[/yellow]",
@@ -203,31 +205,45 @@ class BulkOperationProcessor:
                 visible=True,
             )
             if (repo_folder / ".git").exists():
-                # Attempt to pull
-                try:
-                    await self.git_manager.git_pull(repo_folder)
+                if await self.git_manager.is_repo_empty(repo_folder):
+                    logger.info(f"Skipping empty repo (no commits): {repo_name}")
+                    self.skipped.append((repo_name, "empty repo (no commits)"))
                     progress.update(
                         repo_task_id,
-                        description=f"[green]Pulled (update): {display_name}[/green]",
+                        description=f"[yellow]Skipped (empty): {display_name}[/yellow]",
                         completed=1,
                     )
-                except subprocess.CalledProcessError:
-                    logger.warning(f"Pull failed for {repo_name} (exit code from git)")
-                    self.failures.append((repo_name, "pull failed"))
-                    progress.update(
-                        repo_task_id,
-                        description=f"[red]Pull Failed (update): {display_name}[/red]",
-                        completed=1,
-                    )
+                else:
+                    try:
+                        await self.git_manager.git_pull(repo_folder)
+                        progress.update(
+                            repo_task_id,
+                            description=f"[green]Pulled (update): {display_name}[/green]",
+                            completed=1,
+                        )
+                    except subprocess.CalledProcessError as e:
+                        error_detail = sanitize_url((e.stderr or "").strip().split("\n")[0])
+                        logger.warning(f"Pull failed for {repo_name}: {error_detail}")
+                        self.failures.append((repo_name, f"pull failed: {error_detail}"))
+                        progress.update(
+                            repo_task_id,
+                            description=f"[red]Pull Failed (update): {display_name}[/red]",
+                            completed=1,
+                        )
             else:
-                msg = "Folder exists but is not a git repo."
-                logger.warning(f"{repo_name}: {msg}")
-                self.failures.append((repo_name, msg))
-                progress.update(
-                    repo_task_id,
-                    description=f"[yellow]Skipped (not repo): {display_name}[/yellow]",
-                    completed=1,
-                )
+                if not any(repo_folder.iterdir()):
+                    logger.info(f"Removing empty non-git directory: {repo_folder}")
+                    repo_folder.rmdir()
+                    return False
+                else:
+                    msg = "dir exists, not a git repo"
+                    logger.warning(f"{repo_name}: {msg}")
+                    self.skipped.append((repo_name, msg))
+                    progress.update(
+                        repo_task_id,
+                        description=f"[yellow]Skipped (not repo): {display_name}[/yellow]",
+                        completed=1,
+                    )
             progress.advance(overall_task_id, 1)
             return True
 
@@ -304,9 +320,10 @@ class BulkOperationProcessor:
                     description=f"[green]Cloned: {display_name}[/green]",
                     completed=1,
                 )
-            except subprocess.CalledProcessError:
-                logger.warning(f"Clone failed for {repo_name} (exit code from git)")
-                self.failures.append((repo_name, "clone failed"))
+            except subprocess.CalledProcessError as e:
+                error_detail = sanitize_url((e.stderr or "").strip().split("\n")[0])
+                logger.warning(f"Clone failed for {repo_name}: {error_detail}")
+                self.failures.append((repo_name, f"clone failed: {error_detail}"))
                 progress.update(
                     repo_task_id,
                     description=f"[red]Clone Failed: {display_name}[/red]",
@@ -315,26 +332,36 @@ class BulkOperationProcessor:
 
         elif self.operation_type == OperationType.pull:
             if repo_folder.exists() and (repo_folder / ".git").exists():
-                progress.update(
-                    repo_task_id,
-                    description=f"[cyan]Pulling: {display_name}...",
-                    visible=True,
-                )
-                try:
-                    await self.git_manager.git_pull(repo_folder)
+                if await self.git_manager.is_repo_empty(repo_folder):
+                    logger.info(f"Skipping empty repo (no commits): {repo_name}")
+                    self.skipped.append((repo_name, "empty repo (no commits)"))
                     progress.update(
                         repo_task_id,
-                        description=f"[green]Pulled: {display_name}[/green]",
+                        description=f"[yellow]Skipped (empty): {display_name}[/yellow]",
                         completed=1,
                     )
-                except subprocess.CalledProcessError:
-                    logger.warning(f"Pull failed for {repo_name} (exit code from git)")
-                    self.failures.append((repo_name, "pull failed"))
+                else:
                     progress.update(
                         repo_task_id,
-                        description=f"[red]Pull Failed: {display_name}[/red]",
-                        completed=1,
+                        description=f"[cyan]Pulling: {display_name}...",
+                        visible=True,
                     )
+                    try:
+                        await self.git_manager.git_pull(repo_folder)
+                        progress.update(
+                            repo_task_id,
+                            description=f"[green]Pulled: {display_name}[/green]",
+                            completed=1,
+                        )
+                    except subprocess.CalledProcessError as e:
+                        error_detail = sanitize_url((e.stderr or "").strip().split("\n")[0])
+                        logger.warning(f"Pull failed for {repo_name}: {error_detail}")
+                        self.failures.append((repo_name, f"pull failed: {error_detail}"))
+                        progress.update(
+                            repo_task_id,
+                            description=f"[red]Pull Failed: {display_name}[/red]",
+                            completed=1,
+                        )
             else:
                 progress.update(
                     repo_task_id,

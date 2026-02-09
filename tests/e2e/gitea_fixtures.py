@@ -63,6 +63,16 @@ def create_gitea_repo(token: str, org: str, repo_name: str) -> dict:
     )
 
 
+def create_gitea_repo_empty(token: str, org: str, repo_name: str) -> dict:
+    """POST /api/v1/orgs/{org}/repos with auto_init=false (empty, no commits)."""
+    return _gitea_api(
+        "POST",
+        f"/orgs/{org}/repos",
+        headers={"Authorization": f"token {token}", "Content-Type": "application/json"},
+        data={"name": repo_name, "auto_init": False},
+    )
+
+
 # --- Pytest Fixtures ---
 
 
@@ -147,4 +157,13 @@ def gitea_unique_repos(gitea_admin_token):
     create_gitea_org(gitea_admin_token, "unique-org-b")
     create_gitea_repo(gitea_admin_token, "unique-org-a", "repo-one")
     create_gitea_repo(gitea_admin_token, "unique-org-b", "repo-two")
+    yield
+
+
+@pytest.fixture
+def gitea_edge_case_repos(gitea_admin_token):
+    """Create repos for edge case testing: normal + empty (no commits)."""
+    create_gitea_org(gitea_admin_token, "edge-test-org")
+    create_gitea_repo(gitea_admin_token, "edge-test-org", "normal-repo")
+    create_gitea_repo_empty(gitea_admin_token, "edge-test-org", "empty-repo")
     yield

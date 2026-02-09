@@ -1,6 +1,6 @@
 """Git module for mgit CLI tool."""
 
-from mgit.git.manager import GitManager
+from mgit.git.manager import GitManager, sanitize_url
 from mgit.git.utils import (
     build_repo_path,
     embed_pat_in_url,
@@ -20,4 +20,5 @@ __all__ = [
     "resolve_local_repo_path",
     "sanitize_path_segment",
     "sanitize_repo_name",
+    "sanitize_url",
 ]

@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-02-09
+
+### Added
+- **Empty repo detection**: Repos with zero commits are now detected via `git rev-parse HEAD` and skipped gracefully instead of failing with "pull failed".
+- **Retry with backoff**: Transient git failures (connection reset, DNS, SSL, rate limit) now retry up to 3 times with exponential backoff.
+- **Git operation timeout**: All git subprocess calls now have a 300-second timeout, preventing indefinite hangs.
+- **Separate skip tracking**: Disabled repos, empty repos, and directory collisions are tracked as "skipped" (exit code 0) separately from real failures (exit code 1).
+
+### Fixed
+- **Enhanced error reporting**: All three clone/pull failure sites now capture and display the actual git stderr instead of generic "clone failed" / "pull failed" messages.
+- **Failure table rendering**: Fixed tuple-as-string rendering bug in sync failure table — repo name and error message now display in separate columns correctly.
+- **Directory collision handling**: Empty non-git directories at the target path are removed and cloned into; non-empty non-git directories are skipped with a clear message instead of counted as failures.
+- **Log noise reduction**: `is_repo_empty` checks use DEBUG log level to avoid spurious ERROR entries for expected `rev-parse` failures on empty repos.
+
 ## [0.11.2] - 2026-02-07
 
 ### Fixed
