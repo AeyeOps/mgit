@@ -1,4 +1,4 @@
-.PHONY: help validate test test-standalone-linux test-flat-layout-e2e build-standalone-linux build-standalone-windows clean version
+.PHONY: help validate test test-standalone-linux test-flat-layout-e2e build-standalone-linux build-standalone-windows clean version release
 
 # Show this help menu
 help:
@@ -33,10 +33,21 @@ build-standalone-windows:
 clean:
 	@uv run python scripts/make_clean.py
 
-# Bump project version (use ARGS="--bump patch|minor|major")
+# Bump project version (use ARGS="--bump patch|minor|major") — runs validate first
 version:
 	@if [ -z "$(ARGS)" ]; then \
 		echo "Usage: make version ARGS=\"--bump patch|minor|major\""; \
 	else \
 		uv run python scripts/make_version.py $(ARGS); \
+	fi
+
+# Validate, bump version, commit, and push (use ARGS="--bump patch|minor|major")
+release:
+	@if [ -z "$(ARGS)" ]; then \
+		echo "Usage: make release ARGS=\"--bump patch|minor|major\""; \
+	else \
+		uv run python scripts/make_version.py $(ARGS) && \
+		git add -A && \
+		git commit -m "chore(release): bump version to $$(grep -m1 '^version' pyproject.toml | sed 's/.*\"\(.*\)\".*/\1/')" && \
+		git push; \
 	fi
