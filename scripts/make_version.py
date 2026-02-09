@@ -21,6 +21,14 @@ def run_validate() -> bool:
         ["uv", "run", "python", "scripts/make_validate.py"],
         cwd=PROJECT_ROOT,
     )
+    if result.returncode != 0:
+        return False
+
+    print("[version] Running unit tests...")
+    result = subprocess.run(
+        ["uv", "run", "pytest", "tests/unit/", "-v", "--tb=short", "--no-cov", "-q"],
+        cwd=PROJECT_ROOT,
+    )
     return result.returncode == 0
 
 

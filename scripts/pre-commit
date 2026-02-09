@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Pre-commit hook: run ruff format and lint checks on staged Python files.
+# Catches formatting/lint issues before they reach CI.
+#
+# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -euo pipefail
+
+# Only check staged .py files under mgit/
+STAGED_PY=$(git diff --cached --name-only --diff-filter=ACM -- 'mgit/*.py' 'mgit/**/*.py' | head -50)
+
+if [ -z "$STAGED_PY" ]; then
+    exit 0
+fi
+
+echo "[pre-commit] Checking formatting..."
+if ! uv run ruff format --check $STAGED_PY 2>/dev/null; then
+    echo "[pre-commit] Formatting issues found. Run 'make validate ARGS=--fix' to auto-fix."
+    exit 1
+fi
+
+echo "[pre-commit] Checking lint..."
+if ! uv run ruff check $STAGED_PY 2>/dev/null; then
+    echo "[pre-commit] Lint issues found. Run 'make validate ARGS=--fix' to auto-fix."
+    exit 1
+fi
+
+echo "[pre-commit] All checks passed."

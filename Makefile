@@ -1,4 +1,4 @@
-.PHONY: help validate test test-standalone-linux test-flat-layout-e2e build-standalone-linux build-standalone-windows clean version release
+.PHONY: help validate test test-standalone-linux test-flat-layout-e2e build-standalone-linux build-standalone-windows clean version release install-hooks
 
 # Show this help menu
 help:
@@ -28,6 +28,12 @@ build-standalone-linux:
 # Build Windows standalone binary
 build-standalone-windows:
 	@uv run python scripts/make_build.py --target windows $(ARGS)
+
+# Install git pre-commit hook (ruff format + lint on staged files)
+install-hooks:
+	@cp scripts/pre-commit .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "Pre-commit hook installed."
 
 # Remove build artifacts and caches
 clean:

@@ -848,7 +848,7 @@ mgit uses an automated release process that triggers when the version changes:
 
 The automated workflow will:
 - Create a git tag
-- Build Python packages and Docker images
+- Build Python packages
 - Generate AI-powered release notes from CHANGELOG
 - Create GitHub release with binaries
 - Publish to PyPI (if configured)

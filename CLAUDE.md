@@ -39,11 +39,10 @@ make release ARGS="--bump major"  # 0.12.0 -> 1.0.0  (breaking changes)
 ```
 
 What `auto-release.yml` does on version change push to `main`:
-1. **Quality & Security Checks**: `ruff format --check`, `ruff check`, `ty check`, `bandit -lll`
+1. **Quality & Security Checks**: `ruff format --check`, `ruff check`, `ty check`, `bandit -lll`, unit tests
 2. **Generate Release Notes**: Extracts from CHANGELOG.md, optional AI generation
 3. **Build and Release**: `uv build`, creates git tag, GitHub Release with artifacts
-4. **Docker**: Builds and pushes `ghcr.io/aeyeops/mgit` image
-5. **PyPI**: Publishes package
+4. **PyPI**: Publishes package
 
 If the workflow fails after push, fix the issue and use `gh workflow run auto-release.yml --field force-release=true` to re-trigger.
 

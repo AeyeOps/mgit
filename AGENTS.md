@@ -18,7 +18,7 @@
 
 ## Release Process
 - **NEVER** manually edit the version in `pyproject.toml` and push. Use `make release ARGS="--bump patch|minor|major"` which validates, bumps, commits, and pushes.
-- Pushing a version change to `main` triggers `auto-release.yml` (quality checks → release notes → GitHub Release → Docker → PyPI).
+- Pushing a version change to `main` triggers `auto-release.yml` (quality checks + unit tests → release notes → GitHub Release → PyPI).
 - `make version` runs `make validate` as a gate — it will refuse to bump if any check fails.
 - If the release workflow fails after push, fix the code and re-trigger with `gh workflow run auto-release.yml --field force-release=true`.
 
