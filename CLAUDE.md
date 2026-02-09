@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ### Development
-**IMPORTANT: Always use `make` targets instead of invoking scripts directly. This ensures the Makefile stays validated and consistent.**
+Use `make` targets instead of invoking scripts directly, because this keeps the Makefile validated and consistent with CI.
 
 ```bash
 # Validation (format + lint + type check + bandit)
@@ -18,7 +18,7 @@ make test ARGS="tests/unit/ -v"   # Unit tests only
 ```
 
 ### Release Process
-**IMPORTANT: NEVER edit `pyproject.toml` version manually or push a version bump without running `make validate` first. Pushing a version change to `main` triggers the `auto-release.yml` GitHub Actions workflow which runs quality gates (ruff format, ruff check, ty, bandit). If those fail, the release is blocked.**
+Avoid editing `pyproject.toml` version manually or pushing a version bump without running `make validate` first, because pushing a version change to `main` triggers `auto-release.yml` which runs quality gates (ruff format, ruff check, ty, bandit). If those fail, the release is blocked.
 
 The safe release workflow:
 ```bash
@@ -56,7 +56,7 @@ make test-standalone-linux        # Test the installed binary
 make test-flat-layout-e2e         # E2E flat layout tests with binary
 ```
 
-**IMPORTANT: If `make build-standalone-linux` fails on the install step (sudo), you MUST manually run `sudo cp /opt/aeo/mgit/dist/mgit /usr/local/bin/mgit` immediately after. You have sudo access. Do NOT skip this step or tell the user to do it themselves. The build is not complete until the binary is installed at `/usr/local/bin/mgit`.**
+If `make build-standalone-linux` fails on the install step (sudo), run `cp /opt/aeo/mgit/dist/mgit /usr/local/bin/mgit` to complete the install, because the build isn't finished until the binary is at `/usr/local/bin/mgit`.
 
 ### Running mgit
 ```bash
