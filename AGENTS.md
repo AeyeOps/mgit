@@ -13,8 +13,14 @@
 - Setup (preferred): `uv sync --all-extras --dev` (Poetry alternative: `poetry install --with dev`).
 - Run locally: `uv run mgit --help` or `python -m mgit`.
 - Tests: `uv run pytest` (or `poetry run pytest`). Use markers like `-m unit` or `-m "not requires_network"`.
-- Lint/format/type-check: `uv run ruff check .`, `uv run black .`, `uv run mypy mgit/`.
-- Build binaries: `uv run pyinstaller mgit.spec --clean` (Linux) and `bash scripts/build_windows_from_wsl.sh` (Windows). `poetry run poe build-linux` also works.
+- Lint/format/type-check: `make validate` (runs ruff format, ruff check, ty, bandit). Use `make validate ARGS="--fix"` to auto-fix.
+- Build binaries: `make build-standalone-linux` (Linux + install) or `make build-standalone-windows` (Windows from WSL).
+
+## Release Process
+- **NEVER** manually edit the version in `pyproject.toml` and push. Use `make release ARGS="--bump patch|minor|major"` which validates, bumps, commits, and pushes.
+- Pushing a version change to `main` triggers `auto-release.yml` (quality checks → release notes → GitHub Release → Docker → PyPI).
+- `make version` runs `make validate` as a gate — it will refuse to bump if any check fails.
+- If the release workflow fails after push, fix the code and re-trigger with `gh workflow run auto-release.yml --field force-release=true`.
 
 ## Coding Style & Naming Conventions
 - PEP 8 with Black formatting (88-char lines). Ruff handles linting and import order (E/F/I).

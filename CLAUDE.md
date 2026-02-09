@@ -15,12 +15,37 @@ make validate ARGS="--fix"        # Auto-fix, then check
 # Tests
 make test                         # All tests (including e2e)
 make test ARGS="tests/unit/ -v"   # Unit tests only
-
-# Version bumps
-make version ARGS="--bump patch"  # 0.7.2 -> 0.7.3
-make version ARGS="--bump minor"  # 0.7.2 -> 0.8.0
-make version ARGS="--bump major"  # 0.7.2 -> 1.0.0
 ```
+
+### Release Process
+**IMPORTANT: NEVER edit `pyproject.toml` version manually or push a version bump without running `make validate` first. Pushing a version change to `main` triggers the `auto-release.yml` GitHub Actions workflow which runs quality gates (ruff format, ruff check, ty, bandit). If those fail, the release is blocked.**
+
+The safe release workflow:
+```bash
+# Option 1: Single command (recommended) — validates, bumps, commits, pushes
+make release ARGS="--bump minor"  # or patch|major
+
+# Option 2: Step by step
+make validate                          # Run CI checks locally first
+make version ARGS="--bump minor"       # Bumps version (runs validate again as gate)
+# Then manually: git add, commit, push
+```
+
+Version bump levels:
+```bash
+make release ARGS="--bump patch"  # 0.12.0 -> 0.12.1 (bug fixes)
+make release ARGS="--bump minor"  # 0.12.0 -> 0.13.0 (new features)
+make release ARGS="--bump major"  # 0.12.0 -> 1.0.0  (breaking changes)
+```
+
+What `auto-release.yml` does on version change push to `main`:
+1. **Quality & Security Checks**: `ruff format --check`, `ruff check`, `ty check`, `bandit -lll`
+2. **Generate Release Notes**: Extracts from CHANGELOG.md, optional AI generation
+3. **Build and Release**: `uv build`, creates git tag, GitHub Release with artifacts
+4. **Docker**: Builds and pushes `ghcr.io/aeyeops/mgit` image
+5. **PyPI**: Publishes package
+
+If the workflow fails after push, fix the issue and use `gh workflow run auto-release.yml --field force-release=true` to re-trigger.
 
 ### Build
 ```bash
