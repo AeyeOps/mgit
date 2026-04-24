@@ -5,10 +5,13 @@ metadata stamp to select the correct provider config, rather than falling
 back to the default or first-matching config.
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from mgit.commands.sync import _load_provider_auth_configs
+from mgit.config import yaml_manager
 from mgit.providers.base import Repository
 from mgit.providers.manager import ProviderManager
 
@@ -57,9 +60,7 @@ class TestProviderConfigRouting:
         url = manager.get_authenticated_clone_url(repo)
 
         mock_get_config.assert_called_once_with("github_secondary")
-        mock_factory.create_provider.assert_called_once_with(
-            "github", secondary_config
-        )
+        mock_factory.create_provider.assert_called_once_with("github", secondary_config)
         mock_provider.get_authenticated_clone_url.assert_called_once_with(repo)
         assert url == "https://secondary_user:secondary_tok@github.com/org/repo"
 
@@ -174,3 +175,52 @@ class TestProviderConfigRouting:
         mock_factory.create_provider.assert_called_once_with("azuredevops", ado_config)
         manager._find_config_by_type.assert_not_called()
         assert url == "https://u:t@dev.azure.com/org/_git/repo"
+
+
+@pytest.mark.unit
+class TestEnvExpansionThroughSyncAuthLoader:
+    """End-to-end: `${VAR}` in config.yaml reaches `_load_provider_auth_configs`."""
+
+    def test_token_expansion_reaches_load_provider_auth_configs(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A `${TEST_PAT_XYZ}` token in config.yaml resolves through the sync
+        auth loader, exercising the load-time expansion hook in the real
+        config code path (no mocks of the yaml manager).
+        """
+        # Point the module-level CONFIG_FILE at a temp file.
+        config_dir = tmp_path / "mgit"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_file = config_dir / "config.yaml"
+        monkeypatch.setattr(yaml_manager, "CONFIG_DIR", config_dir)
+        monkeypatch.setattr(yaml_manager, "CONFIG_FILE", config_file)
+
+        # Replace the module-level singleton with a fresh instance whose cache
+        # is empty, so it reads our temp file rather than anything pre-loaded.
+        fresh_manager = yaml_manager.ConfigurationManager()
+        monkeypatch.setattr(yaml_manager, "config_manager", fresh_manager)
+
+        # Ensure the env var is resolvable for this test.
+        monkeypatch.setenv("TEST_PAT_XYZ", "ghp_test")
+
+        config_file.write_text(
+            "providers:\n"
+            "  github_env_demo:\n"
+            "    url: https://github.com\n"
+            "    user: aeyeopsdev\n"
+            "    token: ${TEST_PAT_XYZ}\n"
+            "global:\n"
+            "  default_provider: github_env_demo\n",
+            encoding="utf-8",
+        )
+
+        auth_configs = _load_provider_auth_configs()
+
+        assert len(auth_configs) == 1
+        cfg = auth_configs[0]
+        assert cfg.name == "github_env_demo"
+        assert cfg.provider_type == "github"
+        assert cfg.token == "ghp_test"
+        assert cfg.user == "aeyeopsdev"

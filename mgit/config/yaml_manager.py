@@ -6,10 +6,13 @@ This module provides a clean YAML-based configuration system that uses
 
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any
 
 from ruamel.yaml import YAML
+
+from mgit.exceptions import ConfigurationError
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +24,50 @@ CONFIG_FILE = CONFIG_DIR / "config.yaml"
 
 # Ensure config directory exists
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# Matches ${VAR_NAME} where VAR_NAME starts with letter/underscore.
+# Bare $VAR and malformed ${... are deliberately left alone.
+_ENV_PLACEHOLDER_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def _expand_env_placeholders(value: Any, path: str = "") -> Any:
+    """Recursively expand ``${VAR}`` placeholders in string leaves from os.environ.
+
+    Walks dicts and lists; leaves non-string scalars untouched. Supports partial
+    strings and multiple placeholders per string. Raises ``ConfigurationError``
+    when a referenced variable is not set, naming both the YAML dotted path and
+    the missing variable.
+
+    The helper is pure: the only side effect is raising on unresolved vars.
+    """
+    if isinstance(value, dict):
+        return {
+            k: _expand_env_placeholders(v, f"{path}.{k}" if path else str(k))
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _expand_env_placeholders(item, f"{path}[{i}]")
+            for i, item in enumerate(value)
+        ]
+    if isinstance(value, str):
+
+        def _substitute(match: re.Match[str]) -> str:
+            var_name = match.group(1)
+            if var_name not in os.environ:
+                location = path or "<root>"
+                raise ConfigurationError(
+                    f"Unresolved env placeholder ${{{var_name}}} in {location}",
+                    details=(
+                        f"Set the environment variable {var_name}, or change the "
+                        f"value in {CONFIG_FILE}."
+                    ),
+                )
+            return os.environ[var_name]
+
+        return _ENV_PLACEHOLDER_RE.sub(_substitute, value)
+    return value
 
 
 class ConfigurationManager:
@@ -68,6 +115,11 @@ class ConfigurationManager:
                 if "global" not in config:
                     config["global"] = {}
                     self._raw_config_cache["global"] = self._yaml.map()
+
+                # Expand ${VAR} placeholders on the plain-dict copy only.
+                # The raw CommentedMap keeps the literals so save_config is
+                # round-trip-safe.
+                config = _expand_env_placeholders(config)
 
                 logger.debug(
                     f"Loaded config with {len(config.get('providers', {}))} providers"
@@ -159,6 +211,71 @@ class ConfigurationManager:
                 f"URL must contain: dev.azure.com, visualstudio.com, github.com, or bitbucket.org"
             )
 
+    def _merge_preserving_placeholders(self, raw: Any, new: Any, path: str = "") -> Any:
+        """Merge ``new`` (plain Python) into ``raw`` (ruamel node) in place.
+
+        Placeholders are a view concern, not a storage concern: ``raw`` holds
+        the on-disk literals (including ``${VAR}`` placeholders) and ``new`` is
+        the expanded view the caller round-tripped through in-memory edits. For
+        each leaf, we keep the raw literal only if it is a placeholder that
+        still expands to the caller's value; otherwise we overwrite with the
+        caller's value. Unknown keys in ``raw`` are removed to mirror the
+        caller's intent.
+
+        Returns the (mutated) ``raw`` node so the scalar branch can replace
+        parent-slot values; callers that already hold the container can ignore
+        the return.
+        """
+        # Both sides are dict-shaped: walk key-by-key on ``raw`` in place so
+        # comments, anchors, and key ordering survive.
+        if isinstance(raw, dict) and isinstance(new, dict):
+            # Drop keys the caller removed.
+            for stale_key in [k for k in list(raw.keys()) if k not in new]:
+                del raw[stale_key]
+            for key, new_val in new.items():
+                key_path = f"{path}.{key}" if path else str(key)
+                if (
+                    key in raw
+                    and isinstance(raw[key], (dict, list))
+                    and isinstance(new_val, (dict, list))
+                ):
+                    # Recurse into nested containers.
+                    self._merge_preserving_placeholders(raw[key], new_val, key_path)
+                else:
+                    # Scalar-or-shape-change slot: defer to the scalar branch,
+                    # which decides whether to keep the placeholder or overwrite.
+                    raw[key] = self._merge_scalar_slot(raw.get(key), new_val, key_path)
+            return raw
+
+        # List-into-list: v1 replaces element-by-element replacement. Preserving
+        # placeholders inside lists would require tracking identity across
+        # reorderings, which has no current caller. Wholesale replace instead.
+        if isinstance(raw, list) and isinstance(new, list):
+            raw.clear()
+            raw.extend(new)
+            return raw
+
+        # Type mismatch at this level: caller changed shape, so overwrite.
+        return new
+
+    def _merge_scalar_slot(self, raw_val: Any, new_val: Any, path: str) -> Any:
+        """Decide the stored value for a single leaf slot.
+
+        If ``raw_val`` is a ``${VAR}``-style placeholder string whose expansion
+        equals ``new_val``, keep the placeholder; otherwise return ``new_val``.
+        Expansion failure (``ConfigurationError`` from an unset variable) is
+        treated as a non-match and overwritten.
+        """
+        if isinstance(raw_val, str) and _ENV_PLACEHOLDER_RE.search(raw_val):
+            try:
+                expanded = _expand_env_placeholders(raw_val, path)
+            except ConfigurationError:
+                # Placeholder points at an unset var; caller's literal wins.
+                return new_val
+            if expanded == new_val:
+                return raw_val
+        return new_val
+
     def save_config(self, config: dict[str, Any]) -> None:
         """Save configuration to YAML file with comment preservation."""
         try:
@@ -167,15 +284,11 @@ class ConfigurationManager:
 
             # Update the raw config to preserve comments
             if self._raw_config_cache is not None:
-                # Update existing structure while preserving comments
-                for section, data in config.items():
-                    if section not in self._raw_config_cache:
-                        self._raw_config_cache[section] = self._yaml.map()
-
-                    # Clear and update the section
-                    self._raw_config_cache[section].clear()
-                    for key, value in data.items():
-                        self._raw_config_cache[section][key] = value
+                # Merge caller's expanded view back onto the raw node so that
+                # ${VAR} placeholders survive when their expansion still
+                # matches, and are overwritten only when the caller changed
+                # the underlying value.
+                self._merge_preserving_placeholders(self._raw_config_cache, config)
 
                 # Write the preserved structure
                 with CONFIG_FILE.open("w", encoding="utf-8") as f:
