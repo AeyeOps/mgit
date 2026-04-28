@@ -88,6 +88,24 @@ async def _process_single_provider(
         return []
 
     results = []
+    seen_repositories: set[tuple[str | None, str | None, str]] = set()
+
+    def add_result(
+        repo: Repository, org_name: str, project_name: str | None = None
+    ) -> bool:
+        """Add a repository result if it has not already been discovered."""
+        repo_key = (
+            repo.clone_url,
+            repo.metadata.get("full_name"),
+            f"{org_name}/{repo.name}",
+        )
+        if repo_key in seen_repositories:
+            return False
+
+        seen_repositories.add(repo_key)
+        repo.metadata["provider_config_name"] = provider_name
+        results.append(RepositoryResult(repo, org_name, project_name))
+        return True
 
     try:
         accessible_repo_lister = getattr(provider, "list_accessible_repositories", None)
@@ -112,8 +130,7 @@ async def _process_single_provider(
                 if matches_pattern(org_name, pattern.org_pattern) and matches_pattern(
                     repo.name, pattern.repo_pattern
                 ):
-                    repo.metadata["provider_config_name"] = provider_name
-                    results.append(RepositoryResult(repo, org_name))
+                    add_result(repo, org_name)
 
                     if limit and len(results) >= limit:
                         break
@@ -121,16 +138,17 @@ async def _process_single_provider(
             logger.debug(
                 f"Provider {provider_name}: Found {len(results)} repositories from accessible inventory"
             )
-            if progress and provider_task_id is not None:
-                progress.update(
-                    provider_task_id,
-                    total=1,
-                    completed=1,
-                    description=(
-                        f"  └─ {provider_name}: Found {len(results)} repositories"
-                    ),
-                )
-            return results
+            if limit and len(results) >= limit:
+                if progress and provider_task_id is not None:
+                    progress.update(
+                        provider_task_id,
+                        total=1,
+                        completed=1,
+                        description=(
+                            f"  └─ {provider_name}: Found {len(results)} repositories"
+                        ),
+                    )
+                return results
 
         # Step 1: List organizations
         organizations = await provider.list_organizations()
@@ -192,12 +210,7 @@ async def _process_single_provider(
                                 org.name, project_name
                             ):
                                 if matches_pattern(repo.name, pattern.repo_pattern):
-                                    repo.metadata["provider_config_name"] = (
-                                        provider_name
-                                    )
-                                    results.append(
-                                        RepositoryResult(repo, org.name, project_name)
-                                    )
+                                    add_result(repo, org.name, project_name)
 
                                     if limit and len(results) >= limit:
                                         break
@@ -208,8 +221,7 @@ async def _process_single_provider(
                         # Handle case with no projects (use None)
                         async for repo in provider.list_repositories(org.name, None):
                             if matches_pattern(repo.name, pattern.repo_pattern):
-                                repo.metadata["provider_config_name"] = provider_name
-                                results.append(RepositoryResult(repo, org.name, None))
+                                add_result(repo, org.name, None)
 
                                 if limit and len(results) >= limit:
                                     break
@@ -217,8 +229,7 @@ async def _process_single_provider(
                     # Provider doesn't support projects (GitHub, BitBucket)
                     async for repo in provider.list_repositories(org.name):
                         if matches_pattern(repo.name, pattern.repo_pattern):
-                            repo.metadata["provider_config_name"] = provider_name
-                            results.append(RepositoryResult(repo, org.name))
+                            add_result(repo, org.name)
 
                             if limit and len(results) >= limit:
                                 break

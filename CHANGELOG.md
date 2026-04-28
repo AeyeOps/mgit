@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.3] - 2026-04-28
+
+### Fixed
+- Fixed the GitHub wildcard listing regression from 0.12.2 by unioning the
+  authenticated `/user/repos` inventory with per-organization repository scans,
+  then deduplicating results. The exact reproducer
+  `mgit list "*/*/*" --provider github_mm` now returns the full accessible org
+  repository set again.
+- Auto-release now skips PyPI publishing with an explicit warning when
+  `PYPI_API_TOKEN` is not configured, instead of failing after the GitHub
+  Release has already been created.
+
 ## [0.12.2] - 2026-04-28
 
 ### Changed

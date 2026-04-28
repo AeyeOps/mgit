@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 import pytest
 
 from mgit.commands import listing
-from mgit.providers.base import Repository
+from mgit.providers.base import Organization, Repository
 
 
 class _FakeGitHubProvider:
@@ -15,15 +15,30 @@ class _FakeGitHubProvider:
         return True
 
     async def list_organizations(self):
-        # Simulate the reported failure mode: organization discovery sees only
-        # one owner even though the token can read repositories from another.
-        return []
+        return [
+            Organization(
+                name="visible-org",
+                url="https://api.github.com/orgs/visible-org",
+                provider="github",
+            )
+        ]
 
     async def list_repositories(
         self, organization: str, project: str | None = None, filters=None
     ) -> AsyncIterator[Repository]:
-        if False:
-            yield
+        if organization == "visible-org":
+            yield Repository(
+                name="visible-repo",
+                clone_url="https://github.com/visible-org/visible-repo.git",
+                organization="visible-org",
+                provider="github",
+            )
+            yield Repository(
+                name="org-only-repo",
+                clone_url="https://github.com/visible-org/org-only-repo.git",
+                organization="visible-org",
+                provider="github",
+            )
 
     async def list_accessible_repositories(
         self, filters=None
@@ -60,7 +75,7 @@ class _FakeProviderManager:
 async def test_github_wildcard_list_uses_authenticated_repo_inventory(
     monkeypatch,
 ):
-    """Wildcard GitHub listing must include all repos the token can access."""
+    """Wildcard GitHub listing unions authenticated and org inventories."""
     monkeypatch.setattr(listing, "ProviderManager", _FakeProviderManager)
 
     results = await listing._process_single_provider("github_mm", "*/*/*")
@@ -68,4 +83,5 @@ async def test_github_wildcard_list_uses_authenticated_repo_inventory(
     assert [result.full_path for result in results] == [
         "visible-org/visible-repo",
         "hidden-org/hidden-repo",
+        "visible-org/org-only-repo",
     ]
