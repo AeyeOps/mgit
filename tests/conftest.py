@@ -16,13 +16,12 @@ import pytest
 from typer.testing import CliRunner
 
 from mgit.providers.base import Repository
-
 from tests.e2e.gitea_fixtures import (  # noqa: F401
-    gitea_container,
     gitea_admin_token,
-    gitea_mgit_env,
     gitea_collision_repos,
+    gitea_container,
     gitea_edge_case_repos,
+    gitea_mgit_env,
     gitea_unique_repos,
 )
 
@@ -58,7 +57,7 @@ def configure_git_for_tests():
 
 
 @pytest.fixture
-def temp_dir() -> Generator[Path, None, None]:
+def temp_dir() -> Generator[Path]:
     """
     Create a temporary directory for testing.
 

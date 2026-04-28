@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.2] - 2026-04-28
+
+### Changed
+- `make validate` now covers `mgit/`, `scripts/`, and `tests/`, runs Bandit across those paths, and audits the locked dependency set with `pip-audit`.
+- `make test-standalone-linux` now validates, builds a fresh `dist/mgit`, and tests that binary instead of relying on a potentially stale `/usr/local/bin/mgit`.
+- `make build-standalone-linux` now validates and builds `dist/mgit`; use `make install-standalone-linux` to run validate → build → standalone test → install to `/usr/local/bin/mgit`.
+- `make release` now runs the standalone build/test/install chain after bumping the version and before committing/pushing.
+- Linux standalone installation now copies to `/usr/local/bin/mgit` without `sudo`; local permissions are expected to permit the copy.
+- Auto-release quality checks now call the unified validation script so local and CI validation gates stay aligned.
+
+### Fixed
+- GitHub wildcard listing now uses the authenticated `/user/repos` inventory so
+  `mgit list "*/*/*" --provider <github-config>` includes repositories the
+  token can access across personal, collaborator, and organization-member
+  scopes instead of depending only on organization discovery.
+- Refreshed `uv.lock` to resolve the dependency vulnerabilities surfaced by `pip-audit`.
+
 ## [0.12.1] - 2026-04-28
 
 ### Added

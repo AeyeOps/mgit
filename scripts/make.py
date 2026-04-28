@@ -7,6 +7,7 @@ Usage: make [target] or uv run python scripts/make.py [command]
 """
 
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -144,6 +145,21 @@ def run_command(command: str, args: list[str], targets: dict[str, str]) -> int:
         print(f"Available targets: {', '.join(targets.keys())}")
         return 1
 
+    # Build/test targets intentionally rely on Makefile prerequisites.
+    # Delegate through make so chains like
+    # test-standalone-linux -> build-standalone-linux -> validate are honored.
+    if command in {
+        "build-standalone-linux",
+        "test-standalone-linux",
+        "install-standalone-linux",
+        "release",
+    }:
+        make_cmd = ["make", command]
+        if args:
+            make_cmd.append(f"ARGS={shlex.join(args)}")
+        result = subprocess.run(make_cmd, cwd=REPO_ROOT)
+        return result.returncode
+
     # Map commands to their scripts
     script_map = {
         "validate": "make_validate.py",
@@ -159,7 +175,10 @@ def run_command(command: str, args: list[str], targets: dict[str, str]) -> int:
     script = script_map.get(command)
     if not script:
         # Fall back to running via make
-        result = subprocess.run(["make", command], cwd=REPO_ROOT)
+        make_cmd = ["make", command]
+        if args:
+            make_cmd.append(f"ARGS={shlex.join(args)}")
+        result = subprocess.run(make_cmd, cwd=REPO_ROOT)
         return result.returncode
 
     script_path = SCRIPT_DIR / script

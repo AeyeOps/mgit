@@ -144,6 +144,88 @@ class TestGitHubProvider:
                 }
             )
 
+    @pytest.mark.asyncio
+    async def test_github_accessible_repositories_use_authenticated_user_endpoint(
+        self,
+    ):
+        """GitHub all-access listing must use /user/repos, not org discovery."""
+
+        class FakeResponse:
+            def __init__(self, data):
+                self.status = 200
+                self.headers = {}
+                self._data = data
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return None
+
+            async def json(self):
+                return self._data
+
+        class FakeSession:
+            closed = False
+
+            def __init__(self):
+                self.calls = []
+
+            def get(self, url, headers=None, params=None):
+                self.calls.append((url, dict(params or {})))
+                return FakeResponse(
+                    [
+                        {
+                            "id": 1,
+                            "name": "visible-repo",
+                            "full_name": "visible-org/visible-repo",
+                            "html_url": "https://github.com/visible-org/visible-repo",
+                            "clone_url": (
+                                "https://github.com/visible-org/visible-repo.git"
+                            ),
+                            "owner": {"login": "visible-org"},
+                            "private": True,
+                        },
+                        {
+                            "id": 2,
+                            "name": "hidden-repo",
+                            "full_name": "hidden-org/hidden-repo",
+                            "html_url": "https://github.com/hidden-org/hidden-repo",
+                            "clone_url": (
+                                "https://github.com/hidden-org/hidden-repo.git"
+                            ),
+                            "owner": {"login": "hidden-org"},
+                            "private": True,
+                        },
+                    ]
+                )
+
+        provider = GitHubProvider.from_config(
+            {
+                "url": "https://github.com",
+                "user": "test-user",
+                "token": "ghp_test",
+            }
+        )
+        fake_session = FakeSession()
+        provider._authenticated = True
+        provider._session = fake_session
+
+        repos = [repo async for repo in provider.list_accessible_repositories()]
+
+        assert [repo.organization for repo in repos] == ["visible-org", "hidden-org"]
+        assert fake_session.calls == [
+            (
+                "https://api.github.com/user/repos",
+                {
+                    "per_page": 100,
+                    "page": 1,
+                    "visibility": "all",
+                    "affiliation": "owner,collaborator,organization_member",
+                },
+            )
+        ]
+
 
 class TestBitbucketProvider:
     """Test Bitbucket provider implementation."""

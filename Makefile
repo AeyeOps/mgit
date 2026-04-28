@@ -1,10 +1,12 @@
-.PHONY: help validate test test-standalone-linux test-flat-layout-e2e build-standalone-linux build-standalone-windows clean version release install-hooks
+.PHONY: help validate test test-standalone-linux test-flat-layout-e2e build-standalone-linux install-standalone-linux build-standalone-windows clean version release install-hooks
+
+BUILD_ARGS ?= $(ARGS)
 
 # Show this help menu
 help:
 	@uv run python scripts/make.py
 
-# Run all validation: format + lint + ty + bandit
+# Run all validation: format + lint + ty + bandit + dependency audit
 validate:
 	@uv run python scripts/make_validate.py $(ARGS)
 
@@ -12,17 +14,22 @@ validate:
 test:
 	@uv run python scripts/make_test.py $(ARGS)
 
-# Test the standalone Linux binary with real network calls
-test-standalone-linux:
-	@uv run python scripts/test_binary.py $(ARGS)
+test-standalone-linux: BUILD_ARGS :=
+# Validate, build, and test a fresh standalone Linux binary
+test-standalone-linux: build-standalone-linux
+	@uv run python scripts/test_binary.py --binary dist/mgit $(ARGS)
 
 # Test flat layout E2E with standalone binary
 test-flat-layout-e2e:
 	@uv run python scripts/make_test_flat_layout_e2e.py $(ARGS)
 
-# Build Linux standalone binary and install to /usr/local/bin
-build-standalone-linux:
-	@uv run python scripts/make_build.py --target linux --install $(ARGS)
+# Validate and build Linux standalone binary
+build-standalone-linux: validate
+	@uv run python scripts/make_build.py --target linux $(BUILD_ARGS)
+
+# Validate, build, test, and install Linux standalone binary to /usr/local/bin
+install-standalone-linux: test-standalone-linux
+	@INSTALL_TO_OPT_BIN=1 SKIP_BUILD=1 bash scripts/build_ubuntu.sh
 
 # Build Windows standalone binary
 build-standalone-windows:
@@ -46,12 +53,13 @@ version:
 		uv run python scripts/make_version.py $(ARGS); \
 	fi
 
-# Validate, bump version, commit, and push (use ARGS="--bump patch|minor|major")
+# Validate, bump version, run standalone build/test/install chain, commit, and push (use ARGS="--bump patch|minor|major")
 release:
 	@if [ -z "$(ARGS)" ]; then \
 		echo "Usage: make release ARGS=\"--bump patch|minor|major\""; \
 	else \
 		uv run python scripts/make_version.py $(ARGS) && \
+		$(MAKE) install-standalone-linux ARGS= && \
 		git add -A && \
 		git commit -m "chore(release): bump version to $$(grep -m1 '^version' pyproject.toml | sed 's/.*\"\(.*\)\".*/\1/')" && \
 		git push; \

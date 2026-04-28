@@ -61,7 +61,12 @@ git clone https://github.com/AeyeOps/mgit && cd mgit
 # Linux (Ubuntu/WSL) with uv
 uv sync --all-extras --dev
 uv run pyinstaller mgit.spec --clean
-sudo cp dist/mgit /usr/local/bin/mgit
+install -m 755 dist/mgit /usr/local/bin/mgit  # requires write permission
+
+# Or use the Make targets
+make build-standalone-linux       # validates + builds dist/mgit
+make install-standalone-linux     # validates + builds + tests + installs without sudo
+make test-standalone-linux        # validates + builds + tests dist/mgit
 
 # Windows exe (two options)
 # 1) From Windows PowerShell in the repo
@@ -505,7 +510,10 @@ cd mgit
 # Linux
 uv sync --all-extras --dev
 uv run pyinstaller mgit.spec --clean
-sudo cp dist/mgit /usr/local/bin/
+install -m 755 dist/mgit /usr/local/bin/mgit  # requires write permission
+
+# Make target equivalent
+make install-standalone-linux
 
 # Windows (run in Windows PowerShell)
 uv sync --all-extras --dev

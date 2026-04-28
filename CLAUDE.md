@@ -48,14 +48,13 @@ If the workflow fails after push, fix the issue and use `gh workflow run auto-re
 
 ### Build
 ```bash
-make build-standalone-linux       # Linux binary + install to /usr/local/bin/mgit
+make build-standalone-linux       # Validate + build Linux binary at dist/mgit
+make install-standalone-linux     # Validate + build + test + install to /usr/local/bin/mgit without sudo
 make build-standalone-windows     # Windows binary (from WSL)
 make clean                        # Remove build artifacts
-make test-standalone-linux        # Test the installed binary
+make test-standalone-linux        # Validate + build + test dist/mgit
 make test-flat-layout-e2e         # E2E flat layout tests with binary
 ```
-
-If `make build-standalone-linux` fails on the install step (sudo), run `cp /opt/aeo/mgit/dist/mgit /usr/local/bin/mgit` to complete the install, because the build isn't finished until the binary is at `/usr/local/bin/mgit`.
 
 ### Running mgit
 ```bash

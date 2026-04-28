@@ -90,6 +90,48 @@ async def _process_single_provider(
     results = []
 
     try:
+        accessible_repo_lister = getattr(provider, "list_accessible_repositories", None)
+        org_pattern_has_wildcards = (
+            "*" in pattern.org_pattern or "?" in pattern.org_pattern
+        )
+        if (
+            not provider.supports_projects()
+            and org_pattern_has_wildcards
+            and callable(accessible_repo_lister)
+        ):
+            async for repo in accessible_repo_lister(filters={"visibility": "all"}):
+                org_name = repo.organization
+                if not org_name:
+                    full_name = repo.metadata.get("full_name")
+                    if isinstance(full_name, str) and "/" in full_name:
+                        org_name = full_name.split("/", 1)[0]
+
+                if not org_name:
+                    continue
+
+                if matches_pattern(org_name, pattern.org_pattern) and matches_pattern(
+                    repo.name, pattern.repo_pattern
+                ):
+                    repo.metadata["provider_config_name"] = provider_name
+                    results.append(RepositoryResult(repo, org_name))
+
+                    if limit and len(results) >= limit:
+                        break
+
+            logger.debug(
+                f"Provider {provider_name}: Found {len(results)} repositories from accessible inventory"
+            )
+            if progress and provider_task_id is not None:
+                progress.update(
+                    provider_task_id,
+                    total=1,
+                    completed=1,
+                    description=(
+                        f"  └─ {provider_name}: Found {len(results)} repositories"
+                    ),
+                )
+            return results
+
         # Step 1: List organizations
         organizations = await provider.list_organizations()
 

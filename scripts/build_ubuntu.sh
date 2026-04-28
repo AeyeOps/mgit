@@ -2,31 +2,41 @@
 # Build mgit Linux binary using uv and PyInstaller
 # Usage:
 #   bash scripts/build_ubuntu.sh
-#   INSTALL_TO_OPT_BIN=1 bash scripts/build_ubuntu.sh   # optionally install to /usr/local/bin/mgit
+#   INSTALL_TO_OPT_BIN=1 bash scripts/build_ubuntu.sh              # build and install to /usr/local/bin/mgit
+#   INSTALL_TO_OPT_BIN=1 SKIP_BUILD=1 bash scripts/build_ubuntu.sh # install existing dist/mgit
 
 set -euo pipefail
 
-echo "[build_ubuntu] Using uv to build Linux binary…"
-uv --version >/dev/null || { echo "uv is required. Install from https://astral.sh/uv"; exit 1; }
+if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
+  echo "[build_ubuntu] Using uv to build Linux binary…"
+  uv --version >/dev/null || { echo "uv is required. Install from https://astral.sh/uv"; exit 1; }
 
-echo "[build_ubuntu] Syncing environment (dev extras)…"
-uv sync --all-extras --dev
+  echo "[build_ubuntu] Syncing environment (dev extras)…"
+  uv sync --all-extras --dev
 
-echo "[build_ubuntu] Building with PyInstaller (using mgit.spec)…"
-uv run -- pyinstaller mgit.spec --clean
+  echo "[build_ubuntu] Building with PyInstaller (using mgit.spec)…"
+  uv run -- pyinstaller mgit.spec --clean
 
-echo "[build_ubuntu] Build complete: dist/mgit"
+  echo "[build_ubuntu] Build complete: dist/mgit"
+else
+  echo "[build_ubuntu] Skipping build; using existing dist/mgit"
+fi
 
 if [[ "${INSTALL_TO_OPT_BIN:-0}" == "1" ]]; then
   INSTALL_DIR="/usr/local/bin"
   BINARY_PATH="${INSTALL_DIR}/mgit"
 
+  if [[ ! -f "dist/mgit" ]]; then
+    echo "[build_ubuntu] dist/mgit does not exist; run make build-standalone-linux first"
+    exit 1
+  fi
+
   echo "[build_ubuntu] Creating ${INSTALL_DIR} if needed…"
-  sudo mkdir -p "${INSTALL_DIR}"
+  mkdir -p "${INSTALL_DIR}"
 
   echo "[build_ubuntu] Installing to ${BINARY_PATH}…"
-  sudo cp -f dist/mgit "${BINARY_PATH}"
-  sudo chmod +x "${BINARY_PATH}"
+  cp -f dist/mgit "${BINARY_PATH}"
+  chmod +x "${BINARY_PATH}"
   echo "[build_ubuntu] Installed ${BINARY_PATH}"
 
   # Detect shell and set appropriate rc file
@@ -66,4 +76,3 @@ if [[ "${INSTALL_TO_OPT_BIN:-0}" == "1" ]]; then
     echo "[build_ubuntu] /usr/local/bin already in PATH"
   fi
 fi
-

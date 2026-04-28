@@ -13,13 +13,12 @@ Test markers:
 Tests use the installed binary at /usr/local/bin/mgit (or MGIT_BINARY env var).
 """
 
-from pathlib import Path
-
-import pytest
-
 # Test repository for consistent tests (small public repo)
 # Override via E2E_TEST_ORG env var if needed
 import os
+from pathlib import Path
+
+import pytest
 
 _TEST_ORG = os.environ.get("E2E_TEST_ORG", "mgit-test")
 TEST_REPO_PATTERN = f"{_TEST_ORG}/*/puray"
@@ -267,9 +266,11 @@ class TestSyncFlatLayoutBasic:
 
         # Check for warning in output
         output = result2.stdout + result2.stderr
-        assert "uncommitted" in output.lower() or "dirty" in output.lower() or "skipped" in output.lower(), (
-            f"Expected dirty repo warning in output: {output}"
-        )
+        assert (
+            "uncommitted" in output.lower()
+            or "dirty" in output.lower()
+            or "skipped" in output.lower()
+        ), f"Expected dirty repo warning in output: {output}"
 
 
 # --- Section B/C: Collision Resolution Tests ---
@@ -285,10 +286,19 @@ class TestCollisionResolution:
     """
 
     @pytest.mark.docker
-    def test_10_collision_detection_message(self, run_mgit, temp_dir, gitea_collision_repos, gitea_mgit_env):
+    def test_10_collision_detection_message(
+        self, run_mgit, temp_dir, gitea_collision_repos, gitea_mgit_env
+    ):
         """Test 10: Collision detection identifies repos with same name via binary."""
         result = run_mgit(
-            ["sync", "test-org-*/*/*", str(temp_dir), "--dry-run", "--provider", "gitea_test"],
+            [
+                "sync",
+                "test-org-*/*/*",
+                str(temp_dir),
+                "--dry-run",
+                "--provider",
+                "gitea_test",
+            ],
             env=gitea_mgit_env,
         )
         assert result.returncode == 0, f"Sync failed: {result.stderr}"
@@ -296,15 +306,21 @@ class TestCollisionResolution:
         assert "collision" in output.lower() or "common-repo" in output
 
     @pytest.mark.docker
-    def test_11_orgname_suffix_resolution(self, run_mgit, temp_dir, gitea_collision_repos, gitea_mgit_env):
+    def test_11_orgname_suffix_resolution(
+        self, run_mgit, temp_dir, gitea_collision_repos, gitea_mgit_env
+    ):
         """Test 11: Sync repos, verify directories: common-repo_test-org-a/, common-repo_test-org-b/"""
         result = run_mgit(
             ["sync", "test-org-*/*/*", str(temp_dir), "--provider", "gitea_test"],
             env=gitea_mgit_env,
         )
         assert result.returncode == 0, f"Sync failed: {result.stderr}"
-        assert (temp_dir / "common-repo_test-org-a").exists(), "Missing collision-resolved dir for org-a"
-        assert (temp_dir / "common-repo_test-org-b").exists(), "Missing collision-resolved dir for org-b"
+        assert (temp_dir / "common-repo_test-org-a").exists(), (
+            "Missing collision-resolved dir for org-a"
+        )
+        assert (temp_dir / "common-repo_test-org-b").exists(), (
+            "Missing collision-resolved dir for org-b"
+        )
 
     def test_12_provider_orgname_suffix_resolution(self):
         """Test 12: Collision resolution adds _provider_orgname suffix.
@@ -348,7 +364,9 @@ class TestCollisionResolution:
         print(f"Resolved: GitHub -> {name_github}, Azure -> {name_azure}")
 
     @pytest.mark.docker
-    def test_13_no_collision_uses_base_name(self, run_mgit, temp_dir, gitea_unique_repos, gitea_mgit_env):
+    def test_13_no_collision_uses_base_name(
+        self, run_mgit, temp_dir, gitea_unique_repos, gitea_mgit_env
+    ):
         """Test 13: Sync unique repos, verify no suffix: repo-one/, repo-two/"""
         result = run_mgit(
             ["sync", "unique-org-*/*/*", str(temp_dir), "--provider", "gitea_test"],

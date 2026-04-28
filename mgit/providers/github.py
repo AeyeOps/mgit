@@ -514,6 +514,122 @@ class GitHubProvider(GitProvider):
             logger.error("Error listing GitHub repositories: %s", e)
             raise APIError(f"Failed to list repositories: {e}", self.PROVIDER_NAME)
 
+    async def list_accessible_repositories(
+        self,
+        filters: dict[str, Any] | None = None,
+    ) -> AsyncIterator[Repository]:
+        """List repositories the authenticated user can access.
+
+        GitHub's ``/user/repos`` endpoint is the authoritative inventory for
+        repositories the token can read across personal, collaborator, and
+        organization-member access. This avoids relying on organization
+        discovery, which can be incomplete for fine-grained tokens, private org
+        memberships, and outside-collaborator access.
+
+        Args:
+            filters: Optional filters:
+                - language: Filter by primary language
+                - archived: Include/exclude archived repos
+                - visibility: public, private, or all
+                - affiliation: owner, collaborator, organization_member
+
+        Yields:
+            Repository objects
+
+        Raises:
+            APIError: If API call fails
+            RateLimitError: If rate limit exceeded
+        """
+        if not await self.authenticate():
+            return
+
+        await self._ensure_session()
+        try:
+            url = f"{self.url}/user/repos"
+            params = {
+                "per_page": 100,
+                "page": 1,
+                "visibility": "all",
+                "affiliation": "owner,collaborator,organization_member",
+            }
+
+            if filters:
+                if "visibility" in filters:
+                    params["visibility"] = filters["visibility"]
+                if "affiliation" in filters:
+                    params["affiliation"] = filters["affiliation"]
+                if "sort" in filters:
+                    params["sort"] = filters["sort"]
+                if "direction" in filters:
+                    params["direction"] = filters["direction"]
+
+            while True:
+                async with self._session.get(
+                    url, headers=self._headers, params=params
+                ) as response:
+                    await self._check_rate_limit(response)
+
+                    if response.status == 200:
+                        repos_data = await response.json()
+
+                        if not repos_data:
+                            break
+
+                        for repo in repos_data:
+                            if filters:
+                                if (
+                                    "language" in filters
+                                    and repo.get("language") != filters["language"]
+                                ):
+                                    continue
+                                if "archived" in filters:
+                                    if (
+                                        filters["archived"] is False
+                                        and repo.get("archived", False)
+                                        or filters["archived"] is True
+                                        and not repo.get("archived", False)
+                                    ):
+                                        continue
+
+                            yield self._convert_repo_data(repo)
+
+                        params["page"] += 1
+
+                        link_header = response.headers.get("Link", "")
+                        if 'rel="next"' not in link_header:
+                            break
+
+                    elif response.status == 403:
+                        error_data = await response.json()
+                        if "rate limit" in error_data.get("message", "").lower():
+                            raise RateLimitError(
+                                "GitHub API rate limit exceeded", self.PROVIDER_NAME
+                            )
+                        logger.error("Access denied to authenticated repositories")
+                        break
+                    else:
+                        error_text = await response.text()
+                        logger.error(
+                            "Failed to list authenticated repositories: status %d, response: %s",
+                            response.status,
+                            error_text,
+                        )
+                        raise APIError(
+                            "Failed to list authenticated repositories: "
+                            f"status {response.status}",
+                            self.PROVIDER_NAME,
+                            response.status,
+                        )
+
+        except RateLimitError:
+            raise
+        except Exception as e:
+            logger.error("Error listing GitHub authenticated repositories: %s", e)
+            raise APIError(
+                f"Failed to list authenticated repositories: {e}",
+                self.PROVIDER_NAME,
+            )
+
     async def get_repository(
         self, organization: str, repository: str, project: str | None = None
     ) -> Repository | None:

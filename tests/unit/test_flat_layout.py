@@ -1,14 +1,15 @@
 """Unit tests for flat layout feature in sync command."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from mgit.git.utils import build_repo_path, extract_repo_name
 from mgit.providers.base import Repository
 from mgit.utils.collision_resolver import (
+    _simplify_host,
     detect_repo_name_collisions,
     resolve_collision_names,
-    _simplify_host,
 )
 
 
@@ -95,9 +96,21 @@ class TestCollisionDetection:
     def test_no_collisions(self):
         """Test detection with no collisions."""
         repos = [
-            Repository(name="repo-a", clone_url="https://github.com/org1/repo-a", is_disabled=False),
-            Repository(name="repo-b", clone_url="https://github.com/org1/repo-b", is_disabled=False),
-            Repository(name="repo-c", clone_url="https://github.com/org2/repo-c", is_disabled=False),
+            Repository(
+                name="repo-a",
+                clone_url="https://github.com/org1/repo-a",
+                is_disabled=False,
+            ),
+            Repository(
+                name="repo-b",
+                clone_url="https://github.com/org1/repo-b",
+                is_disabled=False,
+            ),
+            Repository(
+                name="repo-c",
+                clone_url="https://github.com/org2/repo-c",
+                is_disabled=False,
+            ),
         ]
         groups = detect_repo_name_collisions(repos)
         # Each repo should be in its own group
@@ -106,8 +119,16 @@ class TestCollisionDetection:
     def test_detects_same_name_collision(self):
         """Test detection of repos with same name from different orgs."""
         repos = [
-            Repository(name="auth", clone_url="https://github.com/org-a/auth", is_disabled=False),
-            Repository(name="auth", clone_url="https://github.com/org-b/auth", is_disabled=False),
+            Repository(
+                name="auth",
+                clone_url="https://github.com/org-a/auth",
+                is_disabled=False,
+            ),
+            Repository(
+                name="auth",
+                clone_url="https://github.com/org-b/auth",
+                is_disabled=False,
+            ),
         ]
         groups = detect_repo_name_collisions(repos)
         assert "auth" in groups
@@ -116,11 +137,27 @@ class TestCollisionDetection:
     def test_detects_multiple_collisions(self):
         """Test detection of multiple collision groups."""
         repos = [
-            Repository(name="auth", clone_url="https://github.com/org-a/auth", is_disabled=False),
-            Repository(name="auth", clone_url="https://github.com/org-b/auth", is_disabled=False),
-            Repository(name="api", clone_url="https://github.com/org-a/api", is_disabled=False),
-            Repository(name="api", clone_url="https://github.com/org-b/api", is_disabled=False),
-            Repository(name="unique", clone_url="https://github.com/org-a/unique", is_disabled=False),
+            Repository(
+                name="auth",
+                clone_url="https://github.com/org-a/auth",
+                is_disabled=False,
+            ),
+            Repository(
+                name="auth",
+                clone_url="https://github.com/org-b/auth",
+                is_disabled=False,
+            ),
+            Repository(
+                name="api", clone_url="https://github.com/org-a/api", is_disabled=False
+            ),
+            Repository(
+                name="api", clone_url="https://github.com/org-b/api", is_disabled=False
+            ),
+            Repository(
+                name="unique",
+                clone_url="https://github.com/org-a/unique",
+                is_disabled=False,
+            ),
         ]
         groups = detect_repo_name_collisions(repos)
         assert len(groups["auth"]) == 2
@@ -134,8 +171,16 @@ class TestCollisionResolution:
     def test_unique_names_unchanged(self):
         """Test that unique repo names are not modified."""
         repos = [
-            Repository(name="repo-a", clone_url="https://github.com/org1/repo-a", is_disabled=False),
-            Repository(name="repo-b", clone_url="https://github.com/org1/repo-b", is_disabled=False),
+            Repository(
+                name="repo-a",
+                clone_url="https://github.com/org1/repo-a",
+                is_disabled=False,
+            ),
+            Repository(
+                name="repo-b",
+                clone_url="https://github.com/org1/repo-b",
+                is_disabled=False,
+            ),
         ]
         resolved = resolve_collision_names(repos)
         assert resolved["https://github.com/org1/repo-a"] == "repo-a"
@@ -144,8 +189,16 @@ class TestCollisionResolution:
     def test_colliding_names_get_org_suffix(self):
         """Test that colliding repos get org name as suffix."""
         repos = [
-            Repository(name="auth", clone_url="https://github.com/org-a/auth", is_disabled=False),
-            Repository(name="auth", clone_url="https://github.com/org-b/auth", is_disabled=False),
+            Repository(
+                name="auth",
+                clone_url="https://github.com/org-a/auth",
+                is_disabled=False,
+            ),
+            Repository(
+                name="auth",
+                clone_url="https://github.com/org-b/auth",
+                is_disabled=False,
+            ),
         ]
         resolved = resolve_collision_names(repos)
         assert resolved["https://github.com/org-a/auth"] == "auth_org-a"
@@ -159,7 +212,11 @@ class TestCollisionResolution:
     def test_single_repo(self):
         """Test resolution with single repo."""
         repos = [
-            Repository(name="single", clone_url="https://github.com/org/single", is_disabled=False),
+            Repository(
+                name="single",
+                clone_url="https://github.com/org/single",
+                is_disabled=False,
+            ),
         ]
         resolved = resolve_collision_names(repos)
         assert resolved["https://github.com/org/single"] == "single"
@@ -167,8 +224,16 @@ class TestCollisionResolution:
     def test_cross_provider_collision(self):
         """Test resolution of collisions across providers."""
         repos = [
-            Repository(name="auth", clone_url="https://github.com/myorg/auth", is_disabled=False),
-            Repository(name="auth", clone_url="https://dev.azure.com/myorg/proj/_git/auth", is_disabled=False),
+            Repository(
+                name="auth",
+                clone_url="https://github.com/myorg/auth",
+                is_disabled=False,
+            ),
+            Repository(
+                name="auth",
+                clone_url="https://dev.azure.com/myorg/proj/_git/auth",
+                is_disabled=False,
+            ),
         ]
         resolved = resolve_collision_names(repos)
         # Both have 'myorg' so should get provider prefix
@@ -215,10 +280,26 @@ class TestIntegration:
     def test_full_workflow(self):
         """Test complete workflow from repos to resolved names."""
         repos = [
-            Repository(name="auth-service", clone_url="https://github.com/org-a/auth-service", is_disabled=False),
-            Repository(name="auth-service", clone_url="https://github.com/org-b/auth-service", is_disabled=False),
-            Repository(name="api-gateway", clone_url="https://github.com/org-a/api-gateway", is_disabled=False),
-            Repository(name="web-app", clone_url="https://dev.azure.com/org-a/proj/_git/web-app", is_disabled=False),
+            Repository(
+                name="auth-service",
+                clone_url="https://github.com/org-a/auth-service",
+                is_disabled=False,
+            ),
+            Repository(
+                name="auth-service",
+                clone_url="https://github.com/org-b/auth-service",
+                is_disabled=False,
+            ),
+            Repository(
+                name="api-gateway",
+                clone_url="https://github.com/org-a/api-gateway",
+                is_disabled=False,
+            ),
+            Repository(
+                name="web-app",
+                clone_url="https://dev.azure.com/org-a/proj/_git/web-app",
+                is_disabled=False,
+            ),
         ]
 
         # Detect collisions
