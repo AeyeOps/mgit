@@ -12,11 +12,6 @@ Usage:
     uv run python scripts/test_binary.py --skip-network  # Skip network tests
 """
 
-# Force unbuffered output so test progress is visible even when piped
-import sys
-sys.stdout.reconfigure(line_buffering=True)
-sys.stderr.reconfigure(line_buffering=True)
-
 import argparse
 import os
 import random
@@ -27,6 +22,10 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
+# Force unbuffered output so test progress is visible even when piped
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
 
 # Default binary location - explicit to avoid PATH conflicts
 DEFAULT_BINARY = "/usr/local/bin/mgit"
@@ -154,7 +153,7 @@ class StandaloneTestSuite:
                 ["git", "init"], cwd=repo_dir, capture_output=True, check=True
             )
             subprocess.run(
-                ["git", "config", "user.email", "test@test.com"],
+                ["git", "config", "user.email", "mgit-ci@mgit.dev"],
                 cwd=repo_dir,
                 capture_output=True,
             )
@@ -193,7 +192,7 @@ class StandaloneTestSuite:
                 ["git", "init"], cwd=repo_dir, capture_output=True, check=True
             )
             subprocess.run(
-                ["git", "config", "user.email", "test@test.com"],
+                ["git", "config", "user.email", "mgit-ci@mgit.dev"],
                 cwd=repo_dir,
                 capture_output=True,
             )
@@ -237,7 +236,7 @@ class StandaloneTestSuite:
                     ["git", "init"], cwd=repo, capture_output=True, check=True
                 )
                 subprocess.run(
-                    ["git", "config", "user.email", "test@test.com"],
+                    ["git", "config", "user.email", "mgit-ci@mgit.dev"],
                     cwd=repo,
                     capture_output=True,
                 )
@@ -274,7 +273,7 @@ class StandaloneTestSuite:
                 ["git", "init"], cwd=repo_dir, capture_output=True, check=True
             )
             subprocess.run(
-                ["git", "config", "user.email", "test@test.com"],
+                ["git", "config", "user.email", "mgit-ci@mgit.dev"],
                 cwd=repo_dir,
                 capture_output=True,
             )
@@ -317,7 +316,7 @@ class StandaloneTestSuite:
                 ["git", "init"], cwd=repo_dir, capture_output=True, check=True
             )
             subprocess.run(
-                ["git", "config", "user.email", "test@test.com"],
+                ["git", "config", "user.email", "mgit-ci@mgit.dev"],
                 cwd=repo_dir,
                 capture_output=True,
             )
@@ -371,7 +370,7 @@ class StandaloneTestSuite:
                 ["git", "init"], cwd=repo_dir, capture_output=True, check=True
             )
             subprocess.run(
-                ["git", "config", "user.email", "test@test.com"],
+                ["git", "config", "user.email", "mgit-ci@mgit.dev"],
                 cwd=repo_dir,
                 capture_output=True,
             )

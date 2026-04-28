@@ -737,7 +737,7 @@ class GitHubProvider(GitProvider):
         github_config = {
             "url": config.get("url", "https://api.github.com"),
             "user": config.get("user", ""),
-            "token": config.get("token", config.get("GITHUB_TOKEN", "")),
+            "token": config.get("token", ""),
             "workspace": config.get("workspace", ""),
             "api_version": config.get("api_version", cls.DEFAULT_API_VERSION),
         }

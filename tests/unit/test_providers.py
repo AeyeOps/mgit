@@ -8,6 +8,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from mgit.providers.exceptions import ConfigurationError
+from mgit.providers.github import GitHubProvider
+
 # Note: These imports will need to be updated once the providers module is extracted
 
 
@@ -129,6 +132,17 @@ class TestGitHubProvider:
         # repos = github_provider.list_all_repositories("test-org")
         # assert len(repos) == 150
         pass
+
+    def test_from_config_requires_unified_token_field(self):
+        """Legacy provider-specific token keys must not satisfy GitHub config."""
+        with pytest.raises(ConfigurationError, match="GitHub token is required"):
+            GitHubProvider.from_config(
+                {
+                    "url": "https://github.com",
+                    "user": "test-user",
+                    "GITHUB_TOKEN": "ghp_static_legacy_key",
+                }
+            )
 
 
 class TestBitbucketProvider:

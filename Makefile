@@ -15,7 +15,6 @@ test:
 # Test the standalone Linux binary with real network calls
 test-standalone-linux:
 	@uv run python scripts/test_binary.py $(ARGS)
-	@uv run python scripts/make_test_flat_layout_e2e.py $(ARGS)
 
 # Test flat layout E2E with standalone binary
 test-flat-layout-e2e:

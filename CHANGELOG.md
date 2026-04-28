@@ -6,8 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-04-28
+
 ### Added
 - Support `${VAR}` environment-variable placeholders in `config.yaml`. Placeholders are expanded from `os.environ` at load time; unresolved placeholders raise a `ConfigurationError` naming the offending YAML path and missing variable. Round-trip-safe: `save_config` preserves placeholders when their expansion still matches the caller's value.
+
+### Fixed
+- Removed the legacy `GITHUB_TOKEN` config-key fallback from GitHub provider construction. GitHub configs now use the unified `token` field consistently, while `token: ${GITHUB_TOKEN}` remains supported through config placeholder expansion.
+- Hardened the standalone Linux binary test target by using a non-blocked synthetic Git author email and removing a stale reference to a missing flat-layout E2E wrapper script.
 
 ## [0.12.0] - 2026-02-09
 
