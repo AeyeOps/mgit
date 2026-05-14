@@ -331,3 +331,113 @@ class TestRunSubprocessLogLevel:
         assert result is True
         error_records = [r for r in caplog.records if r.levelno >= logging.ERROR]
         assert len(error_records) == 0, f"Expected no ERROR logs, got: {error_records}"
+
+
+class TestGitFetchResetUpstream:
+    """Test git_fetch, get_upstream_ref, git_reset_hard against real repos."""
+
+    @pytest.fixture
+    def git_manager(self):
+        return GitManager()
+
+    @staticmethod
+    def _make_origin_and_clone(tmp_path):
+        """Create an origin repo with one commit and a clone tracking it."""
+        origin = tmp_path / "origin"
+        origin.mkdir()
+        subprocess.run(
+            ["git", "init", "-b", "main", str(origin)],
+            check=True,
+            capture_output=True,
+        )
+        (origin / "file.txt").write_text("v1\n")
+        subprocess.run(
+            ["git", "add", "."], cwd=str(origin), check=True, capture_output=True
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "v1"],
+            cwd=str(origin),
+            check=True,
+            capture_output=True,
+        )
+        clone = tmp_path / "clone"
+        subprocess.run(
+            ["git", "clone", str(origin), str(clone)],
+            check=True,
+            capture_output=True,
+        )
+        return origin, clone
+
+    @pytest.mark.asyncio
+    async def test_get_upstream_ref_returns_tracking_branch(
+        self, tmp_path, git_manager
+    ):
+        """A cloned repo's current branch tracks origin/<branch>."""
+        _, clone = self._make_origin_and_clone(tmp_path)
+        assert await git_manager.get_upstream_ref(clone) == "origin/main"
+
+    @pytest.mark.asyncio
+    async def test_get_upstream_ref_none_without_upstream(self, tmp_path, git_manager):
+        """A standalone repo with no remote tracking returns None."""
+        repo = tmp_path / "solo"
+        subprocess.run(
+            ["git", "init", "-b", "main", str(repo)], check=True, capture_output=True
+        )
+        (repo / "f.txt").write_text("x\n")
+        subprocess.run(
+            ["git", "add", "."], cwd=str(repo), check=True, capture_output=True
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "c"],
+            cwd=str(repo),
+            check=True,
+            capture_output=True,
+        )
+        assert await git_manager.get_upstream_ref(repo) is None
+
+    @pytest.mark.asyncio
+    async def test_git_fetch_updates_remote_tracking(self, tmp_path, git_manager):
+        """git_fetch advances the remote-tracking ref without touching HEAD."""
+        origin, clone = self._make_origin_and_clone(tmp_path)
+        (origin / "file.txt").write_text("v2\n")
+        subprocess.run(
+            ["git", "commit", "-am", "v2"],
+            cwd=str(origin),
+            check=True,
+            capture_output=True,
+        )
+        await git_manager.git_fetch(clone)
+        count = subprocess.run(
+            ["git", "rev-list", "--count", "origin/main"],
+            cwd=str(clone),
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        assert count == "2", "origin/main should have the fetched second commit"
+
+    @pytest.mark.asyncio
+    async def test_git_reset_hard_moves_to_ref_and_discards_changes(
+        self, tmp_path, git_manager
+    ):
+        """git_reset_hard moves the branch to the ref and discards local changes."""
+        origin, clone = self._make_origin_and_clone(tmp_path)
+        (origin / "file.txt").write_text("v2\n")
+        subprocess.run(
+            ["git", "commit", "-am", "v2"],
+            cwd=str(origin),
+            check=True,
+            capture_output=True,
+        )
+        await git_manager.git_fetch(clone)
+        (clone / "file.txt").write_text("local junk\n")
+        await git_manager.git_reset_hard(clone, "origin/main")
+        assert (clone / "file.txt").read_text() == "v2\n"
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(clone),
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        assert status == "", "working tree should be clean after hard reset"

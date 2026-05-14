@@ -80,6 +80,54 @@ class GitManager:
         cmd = [self.GIT_EXECUTABLE, "pull"]
         await self._run_subprocess(cmd, cwd=repo_dir)
 
+    async def git_fetch(self, repo_dir: Path):
+        """Run 'git fetch' for the existing repo in repo_dir.
+
+        Unlike pull, fetch never touches the working tree, so it succeeds even
+        when the checkout is in a state git cannot cleanly update (e.g. a
+        case-collision artifact on a case-insensitive filesystem).
+        """
+        cmd = [self.GIT_EXECUTABLE, "fetch"]
+        await self._run_subprocess(cmd, cwd=repo_dir)
+
+    async def get_upstream_ref(self, repo_dir: Path) -> str | None:
+        """Return the upstream tracking ref of the current branch.
+
+        Returns a name like ``origin/main``, or None if the current branch has
+        no upstream configured (or HEAD is detached).
+        """
+        try:
+            result = await self._run_subprocess(
+                [
+                    self.GIT_EXECUTABLE,
+                    "rev-parse",
+                    "--abbrev-ref",
+                    "--symbolic-full-name",
+                    "@{u}",
+                ],
+                cwd=repo_dir,
+                capture_output=True,
+                log_level=logging.DEBUG,
+            )
+            ref = result.stdout.strip()
+            return ref or None
+        except subprocess.CalledProcessError:
+            logger.debug(f"No upstream ref for current branch in {repo_dir}")
+            return None
+        except Exception as e:
+            logger.debug(f"Get upstream ref failed in {repo_dir}: {e}")
+            return None
+
+    async def git_reset_hard(self, repo_dir: Path, ref: str):
+        """Run 'git reset --hard <ref>' in repo_dir.
+
+        Discards all working-tree and index state, moving the branch to *ref*.
+        Callers are responsible for confirming this is safe (no real local work
+        to lose).
+        """
+        cmd = [self.GIT_EXECUTABLE, "reset", "--hard", ref]
+        await self._run_subprocess(cmd, cwd=repo_dir)
+
     async def get_current_branch(self, repo_dir: Path) -> str | None:
         """
         Get the current branch name for the repository.

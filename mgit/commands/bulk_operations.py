@@ -16,6 +16,7 @@ from rich.progress import Progress
 from rich.prompt import Confirm
 
 from ..git import GitManager, resolve_local_repo_path, sanitize_url
+from ..git.utils import classify_dirty_repo, find_case_collisions, parse_porcelain_z
 from ..providers.base import Repository
 from ..providers.manager import ProviderManager
 
@@ -54,6 +55,11 @@ class BulkOperationProcessor:
         self.flat_layout = flat_layout
         self.failures: list[tuple[str, str]] = []
         self.skipped: list[tuple[str, str]] = []
+        # Repos whose dirtiness is purely a case-collision checkout artifact;
+        # force-synced to origin instead of pulled. Tracked separately so the
+        # summary can report them distinctly from ordinary pulls.
+        self.case_collision_repos: set[str] = set()
+        self.case_collision_synced: list[str] = []
 
     async def process_repositories(
         self,
@@ -65,6 +71,7 @@ class BulkOperationProcessor:
         dirs_to_remove: list[tuple[str, str, Path]] | None = None,
         show_progress: bool = True,
         resolved_names: dict[str, str] | None = None,
+        case_collision_repos: set[str] | None = None,
     ) -> list[tuple[str, str]]:
         """
         Process repositories asynchronously with progress tracking.
@@ -78,12 +85,17 @@ class BulkOperationProcessor:
             dirs_to_remove: List of directories marked for removal in force mode
             show_progress: Whether to show progress bar
             resolved_names: Pre-resolved directory names for flat layout (handles collisions)
+            case_collision_repos: Names of repos whose dirtiness is purely a
+                case-collision checkout artifact — force-synced to origin
+                (fetch + reset) instead of pulled, in pull update mode.
 
         Returns:
             List of (repo_name, error_reason) tuples for failed operations
         """
         self.failures = []
         self.skipped = []
+        self.case_collision_repos = case_collision_repos or set()
+        self.case_collision_synced = []
         sem = asyncio.Semaphore(concurrency)
         repo_tasks = {}
 
@@ -213,6 +225,10 @@ class BulkOperationProcessor:
                         description=f"[yellow]Skipped (empty): {display_name}[/yellow]",
                         completed=1,
                     )
+                elif repo_name in self.case_collision_repos:
+                    await self._force_sync_case_collision(
+                        repo_folder, repo_name, progress, repo_task_id, display_name
+                    )
                 else:
                     try:
                         await self.git_manager.git_pull(repo_folder)
@@ -291,6 +307,91 @@ class BulkOperationProcessor:
                 return True
 
         return False
+
+    async def _is_pure_case_collision(self, repo_folder: Path) -> bool:
+        """True if the repo is dirty solely because of case-colliding paths.
+
+        Re-checked at sync time because the classification done during analysis
+        can be stale: every changed path must also be a case-colliding tracked
+        path, meaning there is no real local work that ``git reset --hard``
+        would lose.
+        """
+        proc = await asyncio.create_subprocess_exec(
+            "git",
+            "status",
+            "--porcelain",
+            "-z",
+            cwd=str(repo_folder),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode != 0:
+            return False
+        dirty_paths = parse_porcelain_z(stdout.decode("utf-8", errors="ignore"))
+        collisions = find_case_collisions(repo_folder)
+        return classify_dirty_repo(dirty_paths, collisions) == "case_collision"
+
+    async def _force_sync_case_collision(
+        self,
+        repo_folder: Path,
+        repo_name: str,
+        progress: Progress,
+        repo_task_id: int,
+        display_name: str,
+    ) -> None:
+        """Bring a case-collision repo current with origin via fetch + reset.
+
+        A verified case-collision repo has no real local changes — every dirty
+        path is a case-colliding tracked path the filesystem cannot represent.
+        That makes ``git reset --hard`` safe: it only discards the unavoidable
+        checkout artifact, which reappears on checkout anyway. The repo is
+        re-verified first, so one that gained genuine edits since analysis is
+        skipped rather than reset.
+        """
+        progress.update(
+            repo_task_id,
+            description=f"[cyan]Syncing (case-collision): {display_name}...",
+            visible=True,
+        )
+        if not await self._is_pure_case_collision(repo_folder):
+            msg = "case-colliding paths plus genuine local edits"
+            logger.warning(f"Skipping force-sync for {repo_name}: {msg}")
+            self.skipped.append((repo_name, msg))
+            progress.update(
+                repo_task_id,
+                description=f"[yellow]Skipped (local edits): {display_name}[/yellow]",
+                completed=1,
+            )
+            return
+        try:
+            await self.git_manager.git_fetch(repo_folder)
+            upstream = await self.git_manager.get_upstream_ref(repo_folder)
+            if upstream:
+                await self.git_manager.git_reset_hard(repo_folder, upstream)
+            else:
+                # No upstream branch to reset to — fetch still advanced the
+                # repo's history, the best that can be done without one.
+                logger.info(f"{repo_name}: no upstream branch; fetched without reset")
+            self.case_collision_synced.append(repo_name)
+            progress.update(
+                repo_task_id,
+                description=f"[green]Synced (case-collision): {display_name}[/green]",
+                completed=1,
+            )
+        except subprocess.CalledProcessError as e:
+            error_detail = sanitize_url((e.stderr or "").strip().split("\n")[0])
+            logger.warning(
+                f"Case-collision sync failed for {repo_name}: {error_detail}"
+            )
+            self.failures.append(
+                (repo_name, f"case-collision sync failed: {error_detail}")
+            )
+            progress.update(
+                repo_task_id,
+                description=f"[red]Sync Failed: {display_name}[/red]",
+                completed=1,
+            )
 
     async def _perform_operation(
         self,

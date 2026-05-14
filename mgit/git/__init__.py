@@ -3,10 +3,12 @@
 from mgit.git.manager import GitManager, sanitize_url
 from mgit.git.utils import (
     build_repo_path,
+    classify_dirty_repo,
     embed_pat_in_url,
     extract_repo_name,
     find_case_collisions,
     get_repo_components,
+    parse_porcelain_z,
     resolve_local_repo_path,
     sanitize_path_segment,
     sanitize_repo_name,
@@ -15,10 +17,12 @@ from mgit.git.utils import (
 __all__ = [
     "GitManager",
     "build_repo_path",
+    "classify_dirty_repo",
     "embed_pat_in_url",
     "extract_repo_name",
     "find_case_collisions",
     "get_repo_components",
+    "parse_porcelain_z",
     "resolve_local_repo_path",
     "sanitize_path_segment",
     "sanitize_repo_name",

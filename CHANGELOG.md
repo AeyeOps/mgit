@@ -21,12 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   development platform.
 - `test-standalone-macos` runs a Mach-O architecture check on `dist/mgit` to
   catch wrong-arch builds early.
-- `mgit sync` now classifies repositories that cannot check out cleanly on a
+- `mgit sync` now keeps repositories that cannot check out cleanly on a
   case-insensitive filesystem — those containing paths differing only in case
-  (e.g. `dir/STATE.sql` and `dir/State.sql`) — as a distinct skip category with
-  its own warning, instead of mislabeling them as having uncommitted changes.
-  Classification is symptom-based: a repo is flagged only when every changed
-  path is also a case-colliding tracked path.
+  (e.g. `dir/STATE.sql` and `dir/State.sql`) — fully in sync instead of
+  abandoning them. Rather than skipping such a repo, mgit force-syncs it to
+  origin (`git fetch` + `git reset --hard @{u}`); this is safe because the
+  repo's only "changes" are an unavoidable checkout artifact, never real local
+  work. Classification is symptom-based: a repo is treated this way only when
+  every changed path is also a case-colliding tracked path, and the state is
+  re-verified immediately before the reset so a repo that gained genuine edits
+  is skipped instead. The sync summary reports these as a distinct outcome.
 - `mgit sync` detects an unquoted wildcard pattern that the shell expanded into
   multiple positional arguments (e.g. `mgit sync */*/*` without quotes) and
   exits with an actionable "quote the pattern" message instead of a confusing
@@ -41,10 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   clear "set the environment variable" error surfaces only when the caller
   actually uses that provider.
 - The `mgit sync` summary now reconciles to the resolved repository count.
-  Repositories filtered out before the sync runs (uncommitted changes,
-  case-collision, non-git directories) are folded into the final tally with a
-  per-reason breakdown and a `Total:` line, instead of silently vanishing from
-  the count.
+  Repositories filtered out before the sync runs (uncommitted changes, non-git
+  directories) are folded into the final tally with a per-reason breakdown and
+  a `Total:` line, instead of silently vanishing from the count.
 - Empty non-git directories at the sync target path are now removed and cloned
   into, matching the bulk processor's existing capability, instead of being
   silently skipped.

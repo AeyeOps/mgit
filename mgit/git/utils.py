@@ -147,6 +147,45 @@ def find_case_collisions(repo_path: Path) -> set[str]:
     return collisions
 
 
+def parse_porcelain_z(stdout: str) -> set[str]:
+    """Parse `git status --porcelain -z` output into the set of changed paths.
+
+    Records are NUL-terminated. Rename/copy records ("R"/"C" status) are
+    followed by an extra NUL-delimited token carrying the source path, which is
+    consumed but not included — only the current working-tree path matters.
+    """
+    tokens = stdout.split("\0")
+    paths: set[str] = set()
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        if not token:
+            i += 1
+            continue
+        # Format: two status chars + space + path.
+        status = token[:2]
+        path = token[3:]
+        if path:
+            paths.add(path)
+        # Rename/copy records carry the source path in the following token.
+        i += 2 if status[:1] in ("R", "C") else 1
+    return paths
+
+
+def classify_dirty_repo(dirty_paths: set[str], collisions: set[str]) -> str:
+    """Classify a dirty repo as 'case_collision' or 'dirty'.
+
+    A repo is 'case_collision' only when every changed path is also a
+    case-colliding tracked path — i.e. the dirtiness is entirely a checkout
+    artifact of a case-insensitive filesystem, not a real edit. Any changed
+    path outside the collision set means genuine local changes, so it stays
+    'dirty'.
+    """
+    if dirty_paths and collisions and dirty_paths <= collisions:
+        return "case_collision"
+    return "dirty"
+
+
 def normalize_path(path_str: str) -> Path:
     """Normalize a path string, expanding user and environment variables."""
     return Path(os.path.expanduser(os.path.expandvars(path_str)))

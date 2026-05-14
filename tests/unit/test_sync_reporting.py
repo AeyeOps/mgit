@@ -1,7 +1,7 @@
 """Unit tests for sync reporting helpers and unquoted-glob detection."""
 
 from mgit.__main__ import app, build_unquoted_glob_error
-from mgit.commands.sync import classify_dirty_repo, parse_porcelain_z
+from mgit.git.utils import classify_dirty_repo, parse_porcelain_z
 
 
 class TestParsePorcelainZ:

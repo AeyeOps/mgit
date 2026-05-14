@@ -39,8 +39,10 @@ from mgit.config.yaml_manager import (
 )
 from mgit.git import GitManager
 from mgit.git.utils import (
+    classify_dirty_repo,
     find_case_collisions,
     get_git_remote_url,
+    parse_porcelain_z,
     resolve_local_repo_path,
 )
 from mgit.providers import detect_provider_by_url
@@ -63,47 +65,7 @@ LOCAL_ACTION_FAILED = "failed"
 
 # Reasons recorded for repositories filtered out before the sync runs.
 SKIP_REASON_DIRTY = "uncommitted changes"
-SKIP_REASON_CASE_COLLISION = "case-collision (cannot check out cleanly)"
 SKIP_REASON_NON_GIT = "not a git repository"
-
-
-def parse_porcelain_z(stdout: str) -> set[str]:
-    """Parse `git status --porcelain -z` output into the set of changed paths.
-
-    Records are NUL-terminated. Rename/copy records ("R"/"C" status) are
-    followed by an extra NUL-delimited token carrying the source path, which is
-    consumed but not included — only the current working-tree path matters.
-    """
-    tokens = stdout.split("\0")
-    paths: set[str] = set()
-    i = 0
-    while i < len(tokens):
-        token = tokens[i]
-        if not token:
-            i += 1
-            continue
-        # Format: two status chars + space + path.
-        status = token[:2]
-        path = token[3:]
-        if path:
-            paths.add(path)
-        # Rename/copy records carry the source path in the following token.
-        i += 2 if status[:1] in ("R", "C") else 1
-    return paths
-
-
-def classify_dirty_repo(dirty_paths: set[str], collisions: set[str]) -> str:
-    """Classify a dirty repo as 'case_collision' or 'dirty'.
-
-    A repo is 'case_collision' only when every changed path is also a
-    case-colliding tracked path — i.e. the dirtiness is entirely a checkout
-    artifact of a case-insensitive filesystem, not a real edit. Any changed
-    path outside the collision set means genuine local changes, so it stays
-    'dirty'.
-    """
-    if dirty_paths and collisions and dirty_paths <= collisions:
-        return "case_collision"
-    return "dirty"
 
 
 def _count_skip_reasons(skipped: list[tuple[str, str]]) -> dict[str, int]:
@@ -683,12 +645,17 @@ async def show_sync_preview(
                 repo_name, "Non-Git", "⚠️ Skip", "Directory exists but not git repo"
             )
         elif repo.name in repo_analysis.case_collision_repos:
-            table.add_row(
-                repo_name,
-                "Case-collision",
-                "⏭️ Skip",
-                "Case-colliding paths; cannot check out cleanly",
-            )
+            if force:
+                table.add_row(
+                    repo_name, "Case-collision", "🗑️ Force Clone", "Will re-clone fresh"
+                )
+            else:
+                table.add_row(
+                    repo_name,
+                    "Case-collision",
+                    "↻ Sync to origin",
+                    "Case-colliding paths; fetch + reset to origin",
+                )
         elif repo.name in repo_analysis.dirty_repos:
             if force:
                 table.add_row(
@@ -716,12 +683,13 @@ async def show_sync_preview(
             len(repositories) if force else 0
         )
         pull_count = len(repo_analysis.clean_repos) if not force else 0
-        skip_count = (
-            len(repo_analysis.dirty_repos)
-            + len(repo_analysis.non_git_dirs)
-            + len(repo_analysis.case_collision_repos)
-        )
-        if force:
+        if not force:
+            # Case-collision repos are force-synced to origin, not skipped.
+            pull_count += len(repo_analysis.case_collision_repos)
+            skip_count = len(repo_analysis.dirty_repos) + len(
+                repo_analysis.non_git_dirs
+            )
+        else:
             # Force re-clones dirty repos; non-git dirs and case-collision
             # repos still cannot be synced cleanly.
             skip_count = len(repo_analysis.non_git_dirs) + len(
@@ -1030,6 +998,9 @@ async def sync_command(
     # Repositories filtered out before the sync runs, with the reason for each.
     # Threaded into the final summary so nothing silently vanishes from the tally.
     pre_skipped: list[tuple[str, str]] = []
+    # Repos whose dirtiness is purely a case-collision checkout artifact. These
+    # stay in `repositories` and are force-synced to origin by the processor.
+    case_collision_names: set[str] = set()
 
     # Analyze repositories before operation
     if not dry_run:
@@ -1049,15 +1020,16 @@ async def sync_command(
 
         if repo_analysis.case_collision_repos and not force:
             console.print(
-                "\n[yellow]⚠️  Repositories that cannot check out cleanly "
-                "(case-colliding paths on this filesystem):[/yellow]"
+                "\n[cyan]ℹ️  Repositories with case-colliding paths "
+                "(will be synced to origin):[/cyan]"
             )
             for repo_name in repo_analysis.case_collision_repos:
                 console.print(f"  • {repo_name}")
             console.print(
-                "\n[blue]These will be skipped. The repo contains paths differing "
-                "only in case, which a case-insensitive filesystem cannot "
-                "represent — [bold]--force will not help[/bold].[/blue]"
+                "\n[blue]These contain paths differing only in case. mgit will "
+                "fetch and reset them to origin so they stay current; on a "
+                "case-insensitive filesystem a working-tree artifact remains, "
+                "but no real local changes are at risk.[/blue]"
             )
 
         if repo_analysis.non_git_dirs:
@@ -1073,17 +1045,19 @@ async def sync_command(
         # Filter out repos that cannot be synced from processing (unless force
         # mode, which nukes and re-clones existing directories). The reasons
         # are threaded into the final summary so the tally stays complete.
+        # Case-collision repos are NOT filtered: they stay in `repositories`
+        # and the processor force-syncs them to origin.
         if not force:
             for repo_name in repo_analysis.dirty_repos:
                 pre_skipped.append((repo_name, SKIP_REASON_DIRTY))
-            for repo_name in repo_analysis.case_collision_repos:
-                pre_skipped.append((repo_name, SKIP_REASON_CASE_COLLISION))
             for dir_name in repo_analysis.non_git_dirs:
                 pre_skipped.append((dir_name, SKIP_REASON_NON_GIT))
 
             skip_names = {name for name, _ in pre_skipped}
             if skip_names:
                 repositories = [r for r in repositories if r.name not in skip_names]
+
+            case_collision_names = set(repo_analysis.case_collision_repos)
 
     # Enhanced dry run with repository analysis
     if dry_run:
@@ -1133,6 +1107,7 @@ async def sync_command(
             dirs_to_remove,
             resolved_names,
             pre_skipped,
+            case_collision_names,
         )
     else:
         await run_sync_quiet(
@@ -1145,6 +1120,7 @@ async def sync_command(
             dirs_to_remove,
             resolved_names,
             pre_skipped,
+            case_collision_names,
         )
 
 
@@ -1158,6 +1134,7 @@ async def run_sync_with_progress(
     dirs_to_remove,
     resolved_names: dict[str, str] | None = None,
     pre_skipped: list[tuple[str, str]] | None = None,
+    case_collision_repos: set[str] | None = None,
 ):
     """Run sync operation with rich progress reporting."""
     pre_skipped = pre_skipped or []
@@ -1191,6 +1168,7 @@ async def run_sync_with_progress(
             dirs_to_remove=dirs_to_remove,
             show_progress=False,
             resolved_names=resolved_names,
+            case_collision_repos=case_collision_repos or set(),
         )
 
     # Show final results. The summary reconciles to the resolved repository
@@ -1198,12 +1176,18 @@ async def run_sync_with_progress(
     # skipped tally so nothing silently vanishes.
     skipped = processor.skipped
     all_skipped = list(skipped) + list(pre_skipped)
+    synced_cc = processor.case_collision_synced
     success_count = len(repositories) - len(failures) - len(skipped)
     total = len(repositories) + len(pre_skipped)
 
     if failures or all_skipped:
         console.print("\n[yellow]Sync completed with issues:[/yellow]")
         console.print(f"  [green]✅ Successful:[/green] {success_count}")
+        if synced_cc:
+            console.print(
+                f"      [dim]• {len(synced_cc)} synced to origin despite "
+                "case-colliding paths[/dim]"
+            )
         if all_skipped:
             console.print(f"  [yellow]⏭ Skipped:[/yellow] {len(all_skipped)}")
             for reason, count in sorted(_count_skip_reasons(all_skipped).items()):
@@ -1226,6 +1210,11 @@ async def run_sync_with_progress(
         console.print(
             f"\n[green]✅ Successfully synchronized {success_count} repositories![/green]"
         )
+        if synced_cc:
+            console.print(
+                f"  [dim]({len(synced_cc)} had case-colliding paths, "
+                "synced to origin)[/dim]"
+            )
 
 
 async def run_sync_quiet(
@@ -1238,6 +1227,7 @@ async def run_sync_quiet(
     dirs_to_remove,
     resolved_names: dict[str, str] | None = None,
     pre_skipped: list[tuple[str, str]] | None = None,
+    case_collision_repos: set[str] | None = None,
 ):
     """Run sync operation without progress reporting."""
     pre_skipped = pre_skipped or []
@@ -1250,10 +1240,12 @@ async def run_sync_quiet(
         dirs_to_remove=dirs_to_remove,
         show_progress=False,
         resolved_names=resolved_names,
+        case_collision_repos=case_collision_repos or set(),
     )
 
     skipped = processor.skipped
     all_skipped = list(skipped) + list(pre_skipped)
+    synced_cc = processor.case_collision_synced
     success_count = len(repositories) - len(failures) - len(skipped)
     total = len(repositories) + len(pre_skipped)
 
@@ -1261,6 +1253,11 @@ async def run_sync_quiet(
         logger.info(f"Skipped {len(all_skipped)} of {total} repositories")
         for repo_name, reason in all_skipped:
             logger.info(f"Skipped: {repo_name}: {reason}")
+
+    if synced_cc:
+        logger.info(
+            f"Force-synced {len(synced_cc)} case-collision repositories to origin"
+        )
 
     if failures:
         logger.error(

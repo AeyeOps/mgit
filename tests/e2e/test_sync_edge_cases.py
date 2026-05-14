@@ -185,7 +185,7 @@ class TestErrorReporting:
 @pytest.mark.e2e
 @pytest.mark.docker
 class TestCaseCollisionReporting:
-    """Tests for case-collision classification and complete summary reporting."""
+    """Tests for case-collision force-sync and complete summary reporting."""
 
     def _make_collision_dirty(self, temp_dir):
         """Make collide-repo dirty in a collision-only way.
@@ -197,10 +197,10 @@ class TestCaseCollisionReporting:
         target = temp_dir / "collide-repo" / "teamcov5db" / "STATE.sql"
         target.write_text("-- locally changed\n")
 
-    def test_case_collision_labeled_distinctly(
+    def test_case_collision_synced_to_origin(
         self, run_mgit, temp_dir, gitea_reporting_repos, gitea_mgit_env
     ):
-        """A case-colliding repo is labeled as such, not 'uncommitted changes'."""
+        """A case-colliding repo is force-synced to origin, not abandoned."""
         org = gitea_reporting_repos["org"]
         run_mgit(
             ["sync", f"{org}/*/*", str(temp_dir), "--provider", "gitea_test"],
@@ -220,11 +220,17 @@ class TestCaseCollisionReporting:
         assert "uncommitted changes" not in output, (
             f"Case-collision repo mislabeled as uncommitted changes: {output}"
         )
+        # The local artifact was discarded by the fetch + reset to origin: the
+        # colliding file is back to its committed content, not the local edit.
+        synced = (temp_dir / "collide-repo" / "teamcov5db" / "STATE.sql").read_text()
+        assert synced != "-- locally changed\n", (
+            f"Case-collision repo was not synced to origin: STATE.sql still {synced!r}"
+        )
 
-    def test_summary_reconciles_to_resolved_total(
+    def test_summary_counts_collision_repo_as_successful(
         self, run_mgit, temp_dir, gitea_reporting_repos, gitea_mgit_env
     ):
-        """Final summary tally accounts for every resolved repo (nothing vanishes)."""
+        """Summary reconciles and the collision repo lands in the successful tally."""
         org = gitea_reporting_repos["org"]
         run_mgit(
             ["sync", f"{org}/*/*", str(temp_dir), "--provider", "gitea_test"],
@@ -250,6 +256,12 @@ class TestCaseCollisionReporting:
         assert successful + skipped + failed == total, (
             f"Summary does not reconcile: {successful}+{skipped}+{failed} != {total}"
         )
+        # normal-repo (pull) + collide-repo (force-sync) both succeed; only the
+        # empty repo is skipped.
+        assert successful == 2, (
+            f"Expected collide-repo counted as successful, got {successful}: {output}"
+        )
+        assert skipped == 1, f"Only the empty repo should be skipped: {output}"
 
 
 @pytest.mark.e2e
