@@ -1,4 +1,4 @@
-.PHONY: help validate test test-standalone-linux test-flat-layout-e2e build-standalone-linux install-standalone-linux build-standalone-windows clean version release install-hooks
+.PHONY: help validate test test-standalone-linux test-standalone-macos test-flat-layout-e2e build-standalone-linux build-standalone-macos install-standalone-linux install-standalone-macos build-standalone-windows clean version release install-hooks
 
 BUILD_ARGS ?= $(ARGS)
 
@@ -29,7 +29,21 @@ build-standalone-linux: validate
 
 # Validate, build, test, and install Linux standalone binary to /usr/local/bin
 install-standalone-linux: test-standalone-linux
-	@INSTALL_TO_OPT_BIN=1 SKIP_BUILD=1 bash scripts/build_ubuntu.sh
+	@INSTALL_TO_OPT_BIN=1 SKIP_BUILD=1 bash scripts/build_mac_and_linux.sh
+
+test-standalone-macos: BUILD_ARGS :=
+# Validate, build, and test a fresh standalone macOS binary
+test-standalone-macos: build-standalone-macos
+	@uv run python scripts/test_binary.py --binary dist/mgit $(ARGS)
+	@file dist/mgit | grep -qE 'Mach-O.*(arm64|x86_64)' || (echo "ERROR: dist/mgit is not a Mach-O binary"; exit 1)
+
+# Validate and build macOS standalone binary
+build-standalone-macos: validate
+	@uv run python scripts/make_build.py --target macos $(BUILD_ARGS)
+
+# Validate, build, test, and install macOS standalone binary to ~/.local/bin
+install-standalone-macos: test-standalone-macos
+	@INSTALL_TO_OPT_BIN=1 INSTALL_DIR="$$HOME/.local/bin" SKIP_BUILD=1 bash scripts/build_mac_and_linux.sh
 
 # Build Windows standalone binary
 build-standalone-windows:
@@ -59,7 +73,11 @@ release:
 		echo "Usage: make release ARGS=\"--bump patch|minor|major\""; \
 	else \
 		uv run python scripts/make_version.py $(ARGS) && \
-		$(MAKE) install-standalone-linux ARGS= && \
+		if [ "$$(uname -s)" = "Darwin" ]; then \
+			$(MAKE) install-standalone-macos ARGS=; \
+		else \
+			$(MAKE) install-standalone-linux ARGS=; \
+		fi && \
 		git add -A && \
 		git commit -m "chore(release): bump version to $$(grep -m1 '^version' pyproject.toml | sed 's/.*\"\(.*\)\".*/\1/')" && \
 		git push; \

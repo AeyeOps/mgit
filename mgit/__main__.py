@@ -1234,6 +1234,25 @@ def status_command(
 # -----------------------------------------------------------------------------
 # sync Command
 # -----------------------------------------------------------------------------
+def build_unquoted_glob_error(
+    pattern: Optional[str], path: Optional[str], extra: list[str]
+) -> str:
+    """Build the actionable error for an unquoted wildcard pattern.
+
+    `mgit sync` accepts at most two positional arguments (pattern + path).
+    Receiving three or more means the shell expanded an unquoted wildcard
+    (e.g. `*/*/*`) against the working directory before mgit ever ran — the
+    original pattern is unrecoverable, so detect it and tell the user to quote.
+    """
+    positional = [a for a in (pattern, path, *extra) if a is not None]
+    return (
+        f"Received {len(positional)} positional arguments. Your shell most "
+        "likely expanded an unquoted wildcard pattern before mgit ran.\n"
+        "Quote the pattern so the shell passes it through literally:\n"
+        "    mgit sync '*/*/*' --provider <name>"
+    )
+
+
 @app.command()
 def sync(
     pattern: Optional[str] = typer.Argument(
@@ -1242,6 +1261,7 @@ def sync(
     path: Optional[str] = typer.Argument(
         None, help="Target path for remote sync (default: .)"
     ),
+    extra: Optional[list[str]] = typer.Argument(None, hidden=True),
     filter_pattern: Optional[str] = typer.Option(
         None, "--filter", help="Explicit remote pattern (forces remote mode)"
     ),
@@ -1319,6 +1339,14 @@ def sync(
         # Quiet sync for scripts
         mgit sync "myorg/*/*" ./workspace --no-progress --no-summary
     """
+    # Detect an unquoted wildcard pattern: the shell expanded it into many
+    # positional args before mgit ran. A legitimate call has at most two.
+    if extra:
+        console.print(
+            f"[red]Error:[/red] {build_unquoted_glob_error(pattern, path, extra)}"
+        )
+        raise typer.Exit(code=2)
+
     if filter_pattern:
         target_path = path or pattern or "."
         asyncio.run(

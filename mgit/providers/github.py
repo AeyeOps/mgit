@@ -331,8 +331,11 @@ class GitHubProvider(GitProvider):
                     for org in orgs_data:
                         organizations.append(
                             Organization(
-                                name=org["login"],
-                                url=org["url"],
+                                # GitHub returns "login"; GitHub-compatible
+                                # APIs (e.g. Gitea) return "username" and may
+                                # omit "url" entirely.
+                                name=org.get("login") or org["username"],
+                                url=org.get("url", ""),
                                 provider=self.PROVIDER_NAME,
                                 metadata={
                                     "id": org["id"],
@@ -358,7 +361,7 @@ class GitHubProvider(GitProvider):
                     organizations.append(
                         Organization(
                             name=user_data["login"],
-                            url=user_data["url"],
+                            url=user_data.get("url", ""),
                             provider=self.PROVIDER_NAME,
                             metadata={
                                 "id": user_data["id"],

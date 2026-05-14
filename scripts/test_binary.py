@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Standalone Linux binary test suite.
+Standalone mgit binary test suite (Linux/macOS).
 
 Tests the compiled mgit binary at /usr/local/bin/mgit with REAL network operations.
 Uses /tmp/ for test artifacts. Requires configured providers for network tests.
@@ -775,7 +775,7 @@ class StandaloneTestSuite:
     def run_all(self) -> bool:
         """Run all tests and return True if all passed."""
         print(f"\n{'=' * 60}")
-        print("mgit Standalone Linux Binary Test Suite")
+        print("mgit Standalone Binary Test Suite")
         print(f"Binary: {self.binary}")
         print(f"Test dir: {self.test_dir}")
         print(f"{'=' * 60}\n")
@@ -785,7 +785,9 @@ class StandaloneTestSuite:
         self.test_binary_exists()
         if not self.results[-1].passed:
             print("\n❌ Binary not found. Build first with:")
-            print("   uv run python scripts/make_build.py --target linux --install")
+            print(
+                "   uv run python scripts/make_build.py --target linux|macos --install"
+            )
             return False
 
         self.test_version()

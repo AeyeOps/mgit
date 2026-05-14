@@ -6,6 +6,75 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from mgit.git.manager import GitManager, sanitize_url
+from mgit.git.utils import find_case_collisions
+
+
+def _init_repo(path):
+    """Init a git repo with one committed file."""
+    subprocess.run(["git", "init", str(path)], check=True, capture_output=True)
+    (path / "keep.txt").write_text("keep\n")
+    subprocess.run(
+        ["git", "add", "keep.txt"], cwd=str(path), check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "init"],
+        cwd=str(path),
+        check=True,
+        capture_output=True,
+    )
+
+
+def _add_index_entry(path, rel_path, content):
+    """Add a tracked path to the index via plumbing (no working-tree file).
+
+    Lets us create case-colliding tracked paths on any filesystem, including
+    case-insensitive ones where both files cannot coexist on disk.
+    """
+    blob = (
+        subprocess.run(
+            ["git", "hash-object", "-w", "--stdin"],
+            cwd=str(path),
+            input=content.encode(),
+            check=True,
+            capture_output=True,
+        )
+        .stdout.decode()
+        .strip()
+    )
+    subprocess.run(
+        ["git", "update-index", "--add", "--cacheinfo", f"100644,{blob},{rel_path}"],
+        cwd=str(path),
+        check=True,
+        capture_output=True,
+    )
+
+
+class TestFindCaseCollisions:
+    """Test find_case_collisions tracked-path collision detection."""
+
+    def test_detects_colliding_paths(self, tmp_path):
+        _init_repo(tmp_path)
+        _add_index_entry(tmp_path, "dir/STATE.sql", "upper\n")
+        _add_index_entry(tmp_path, "dir/State.sql", "mixed\n")
+        result = find_case_collisions(tmp_path)
+        assert result == {"dir/STATE.sql", "dir/State.sql"}
+
+    def test_no_collisions_returns_empty(self, tmp_path):
+        _init_repo(tmp_path)
+        _add_index_entry(tmp_path, "dir/alpha.sql", "a\n")
+        _add_index_entry(tmp_path, "dir/beta.sql", "b\n")
+        assert find_case_collisions(tmp_path) == set()
+
+    def test_non_git_dir_returns_empty(self, tmp_path):
+        assert find_case_collisions(tmp_path) == set()
+
+    def test_only_colliding_group_returned(self, tmp_path):
+        _init_repo(tmp_path)
+        _add_index_entry(tmp_path, "README.MD", "x\n")
+        _add_index_entry(tmp_path, "readme.md", "y\n")
+        _add_index_entry(tmp_path, "unique.txt", "z\n")
+        result = find_case_collisions(tmp_path)
+        assert result == {"README.MD", "readme.md"}
 
 
 class TestSanitizeUrl:

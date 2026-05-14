@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mgit"
-version = "0.12.3"
+version = "0.13.0"
 description = "Multi-provider Git management tool"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 license = {text = "MIT"}
-authors = [{ name = "Steve Antonakakis", email = "steve.antonakakis@gmail.com" }]
+authors = [{ name = "AeyeOps", email = "275853971+aeyeopsdev@users.noreply.github.com" }]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",

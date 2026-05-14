@@ -6,6 +6,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-05-14
+
+### Added
+- macOS standalone build support. New Make targets `build-standalone-macos`,
+  `test-standalone-macos`, and `install-standalone-macos` mirror the Linux trio
+  and install to `~/.local/bin/mgit` without sudo. `scripts/make_build.py` accepts
+  `--target macos`. Linux and macOS now share a single build script,
+  `scripts/build_mac_and_linux.sh` (renamed from `build_ubuntu.sh`), since
+  PyInstaller produces host-native binaries from the same `mgit.spec`. The macOS
+  binary is unsigned; first run may trigger Gatekeeper.
+- `make release` auto-routes to `install-standalone-macos` on Darwin hosts and
+  `install-standalone-linux` elsewhere, so the same command works on either
+  development platform.
+- `test-standalone-macos` runs a Mach-O architecture check on `dist/mgit` to
+  catch wrong-arch builds early.
+- `mgit sync` now classifies repositories that cannot check out cleanly on a
+  case-insensitive filesystem — those containing paths differing only in case
+  (e.g. `dir/STATE.sql` and `dir/State.sql`) — as a distinct skip category with
+  its own warning, instead of mislabeling them as having uncommitted changes.
+  Classification is symptom-based: a repo is flagged only when every changed
+  path is also a case-colliding tracked path.
+- `mgit sync` detects an unquoted wildcard pattern that the shell expanded into
+  multiple positional arguments (e.g. `mgit sync */*/*` without quotes) and
+  exits with an actionable "quote the pattern" message instead of a confusing
+  usage dump.
+
+### Fixed
+- Eager `${VAR}` placeholder expansion at config load time no longer crashes
+  trivial commands like `mgit --version` and `mgit config --list` when an
+  unrelated provider's token environment variable is missing. The bulk load is
+  now lenient (unresolved placeholders survive as literal `${VAR}`) and
+  `get_provider_config(name)` performs strict per-provider expansion so the
+  clear "set the environment variable" error surfaces only when the caller
+  actually uses that provider.
+- The `mgit sync` summary now reconciles to the resolved repository count.
+  Repositories filtered out before the sync runs (uncommitted changes,
+  case-collision, non-git directories) are folded into the final tally with a
+  per-reason breakdown and a `Total:` line, instead of silently vanishing from
+  the count.
+- Empty non-git directories at the sync target path are now removed and cloned
+  into, matching the bulk processor's existing capability, instead of being
+  silently skipped.
+- The GitHub provider's organization listing tolerates GitHub-compatible APIs
+  (e.g. Gitea) that return `username` instead of `login` and omit the `url`
+  field.
+
+### Changed
+- PyPI package author metadata now uses the AeyeOps bot identity
+  (`AeyeOps <…+aeyeopsdev@users.noreply.github.com>`) instead of a personal
+  email, aligning the public package with the maintainer convention for AeyeOps
+  repositories.
+- `.gitignore` now blocks common credential-data files (`*.key`, `*.pem`,
+  `*.p12`, `*.pfx`, `id_rsa*`, `credentials*.{json,yaml,yml}`,
+  `secrets*.{json,yaml,yml}`, `.credentials`, `.secrets`), scoped so the
+  patterns cannot shadow source modules such as `credentials.py`.
+
+### Removed
+- Deleted the unused `.github/actions/setup-poetry/` composite action. It was
+  never referenced by any workflow after the migration to `uv` and contained a
+  curl-pipe-to-python install pattern that scanners flag.
+
 ## [0.12.3] - 2026-04-28
 
 ### Fixed

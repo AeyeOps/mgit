@@ -38,7 +38,11 @@ from mgit.config.yaml_manager import (
     list_provider_names,
 )
 from mgit.git import GitManager
-from mgit.git.utils import get_git_remote_url, resolve_local_repo_path
+from mgit.git.utils import (
+    find_case_collisions,
+    get_git_remote_url,
+    resolve_local_repo_path,
+)
 from mgit.providers import detect_provider_by_url
 from mgit.providers.base import Repository
 from mgit.providers.exceptions import RepositoryNotFoundError
@@ -56,6 +60,58 @@ LOCAL_ACTION_PULLED = "pulled"
 LOCAL_ACTION_SKIP_DIRTY = "skipped_dirty"
 LOCAL_ACTION_SKIP_NO_REMOTE = "skipped_no_remote"
 LOCAL_ACTION_FAILED = "failed"
+
+# Reasons recorded for repositories filtered out before the sync runs.
+SKIP_REASON_DIRTY = "uncommitted changes"
+SKIP_REASON_CASE_COLLISION = "case-collision (cannot check out cleanly)"
+SKIP_REASON_NON_GIT = "not a git repository"
+
+
+def parse_porcelain_z(stdout: str) -> set[str]:
+    """Parse `git status --porcelain -z` output into the set of changed paths.
+
+    Records are NUL-terminated. Rename/copy records ("R"/"C" status) are
+    followed by an extra NUL-delimited token carrying the source path, which is
+    consumed but not included — only the current working-tree path matters.
+    """
+    tokens = stdout.split("\0")
+    paths: set[str] = set()
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        if not token:
+            i += 1
+            continue
+        # Format: two status chars + space + path.
+        status = token[:2]
+        path = token[3:]
+        if path:
+            paths.add(path)
+        # Rename/copy records carry the source path in the following token.
+        i += 2 if status[:1] in ("R", "C") else 1
+    return paths
+
+
+def classify_dirty_repo(dirty_paths: set[str], collisions: set[str]) -> str:
+    """Classify a dirty repo as 'case_collision' or 'dirty'.
+
+    A repo is 'case_collision' only when every changed path is also a
+    case-colliding tracked path — i.e. the dirtiness is entirely a checkout
+    artifact of a case-insensitive filesystem, not a real edit. Any changed
+    path outside the collision set means genuine local changes, so it stays
+    'dirty'.
+    """
+    if dirty_paths and collisions and dirty_paths <= collisions:
+        return "case_collision"
+    return "dirty"
+
+
+def _count_skip_reasons(skipped: list[tuple[str, str]]) -> dict[str, int]:
+    """Count skipped repositories grouped by reason for the summary breakdown."""
+    counts: dict[str, int] = {}
+    for _, reason in skipped:
+        counts[reason] = counts.get(reason, 0) + 1
+    return counts
 
 
 @dataclass
@@ -540,11 +596,13 @@ async def analyze_repository_states(
         dirty_repos: list[str]
         missing_repos: list[str]
         non_git_dirs: list[str]
+        case_collision_repos: list[str]
 
     clean_repos = []
     dirty_repos = []
     missing_repos = []
     non_git_dirs = []
+    case_collision_repos = []
 
     for repo in repositories:
         repo_path = resolve_local_repo_path(repo.clone_url, flat_layout, resolved_names)
@@ -553,22 +611,41 @@ async def analyze_repository_states(
         if not local_path.exists():
             missing_repos.append(repo.name)
         elif not (local_path / ".git").exists():
-            non_git_dirs.append(repo.name)
+            # An empty directory will be removed and cloned into by the
+            # processor, so treat it as cloneable; only a non-empty non-git
+            # directory is a genuine skip.
+            if any(local_path.iterdir()):
+                non_git_dirs.append(repo.name)
+            else:
+                missing_repos.append(repo.name)
         else:
             # Check if repo has uncommitted changes
             try:
                 returncode, stdout, stderr = await _run_git_command(
-                    local_path, ["status", "--porcelain"]
+                    local_path, ["status", "--porcelain", "-z"]
                 )
-                if returncode != 0 or stdout.strip():
+                if returncode != 0:
+                    # Could not determine state — treat as dirty for safety.
                     dirty_repos.append(repo.name)
+                elif stdout:
+                    # Distinguish a genuine dirty repo from one that only looks
+                    # dirty because it has case-colliding paths that cannot
+                    # check out cleanly on a case-insensitive filesystem.
+                    dirty_paths = parse_porcelain_z(stdout)
+                    collisions = find_case_collisions(local_path)
+                    if classify_dirty_repo(dirty_paths, collisions) == "case_collision":
+                        case_collision_repos.append(repo.name)
+                    else:
+                        dirty_repos.append(repo.name)
                 else:
                     clean_repos.append(repo.name)
             except Exception:
                 # If git status fails, consider it dirty for safety
                 dirty_repos.append(repo.name)
 
-    return RepoAnalysis(clean_repos, dirty_repos, missing_repos, non_git_dirs)
+    return RepoAnalysis(
+        clean_repos, dirty_repos, missing_repos, non_git_dirs, case_collision_repos
+    )
 
 
 async def show_sync_preview(
@@ -605,6 +682,13 @@ async def show_sync_preview(
             table.add_row(
                 repo_name, "Non-Git", "⚠️ Skip", "Directory exists but not git repo"
             )
+        elif repo.name in repo_analysis.case_collision_repos:
+            table.add_row(
+                repo_name,
+                "Case-collision",
+                "⏭️ Skip",
+                "Case-colliding paths; cannot check out cleanly",
+            )
         elif repo.name in repo_analysis.dirty_repos:
             if force:
                 table.add_row(
@@ -632,11 +716,17 @@ async def show_sync_preview(
             len(repositories) if force else 0
         )
         pull_count = len(repo_analysis.clean_repos) if not force else 0
-        skip_count = len(repo_analysis.dirty_repos) + len(repo_analysis.non_git_dirs)
+        skip_count = (
+            len(repo_analysis.dirty_repos)
+            + len(repo_analysis.non_git_dirs)
+            + len(repo_analysis.case_collision_repos)
+        )
         if force:
-            skip_count = len(
-                repo_analysis.non_git_dirs
-            )  # Only non-git dirs skipped in force mode
+            # Force re-clones dirty repos; non-git dirs and case-collision
+            # repos still cannot be synced cleanly.
+            skip_count = len(repo_analysis.non_git_dirs) + len(
+                repo_analysis.case_collision_repos
+            )
 
         summary_table.add_row("Clone", str(clone_count))
         summary_table.add_row("Pull", str(pull_count))
@@ -937,6 +1027,10 @@ async def sync_command(
                 console.print(f"  • {name}: {len(repos)} repos")
         resolved_names = resolve_collision_names(repositories)
 
+    # Repositories filtered out before the sync runs, with the reason for each.
+    # Threaded into the final summary so nothing silently vanishes from the tally.
+    pre_skipped: list[tuple[str, str]] = []
+
     # Analyze repositories before operation
     if not dry_run:
         repo_analysis = await analyze_repository_states(
@@ -953,6 +1047,19 @@ async def sync_command(
                 "\n[blue]These will be skipped. Use --force to override (will lose changes)[/blue]"
             )
 
+        if repo_analysis.case_collision_repos and not force:
+            console.print(
+                "\n[yellow]⚠️  Repositories that cannot check out cleanly "
+                "(case-colliding paths on this filesystem):[/yellow]"
+            )
+            for repo_name in repo_analysis.case_collision_repos:
+                console.print(f"  • {repo_name}")
+            console.print(
+                "\n[blue]These will be skipped. The repo contains paths differing "
+                "only in case, which a case-insensitive filesystem cannot "
+                "represent — [bold]--force will not help[/bold].[/blue]"
+            )
+
         if repo_analysis.non_git_dirs:
             console.print(
                 "\n[yellow]⚠️  Directories that exist but are not git repositories:[/yellow]"
@@ -963,11 +1070,18 @@ async def sync_command(
                 "\n[blue]These will be skipped (folder exists but not a git repo)[/blue]"
             )
 
-        # Filter out dirty repos and non-git dirs from processing (unless force mode)
+        # Filter out repos that cannot be synced from processing (unless force
+        # mode, which nukes and re-clones existing directories). The reasons
+        # are threaded into the final summary so the tally stays complete.
         if not force:
-            skip_names = set(repo_analysis.dirty_repos) | set(
-                repo_analysis.non_git_dirs
-            )
+            for repo_name in repo_analysis.dirty_repos:
+                pre_skipped.append((repo_name, SKIP_REASON_DIRTY))
+            for repo_name in repo_analysis.case_collision_repos:
+                pre_skipped.append((repo_name, SKIP_REASON_CASE_COLLISION))
+            for dir_name in repo_analysis.non_git_dirs:
+                pre_skipped.append((dir_name, SKIP_REASON_NON_GIT))
+
+            skip_names = {name for name, _ in pre_skipped}
             if skip_names:
                 repositories = [r for r in repositories if r.name not in skip_names]
 
@@ -1018,6 +1132,7 @@ async def sync_command(
             confirmed_force_remove,
             dirs_to_remove,
             resolved_names,
+            pre_skipped,
         )
     else:
         await run_sync_quiet(
@@ -1029,6 +1144,7 @@ async def sync_command(
             confirmed_force_remove,
             dirs_to_remove,
             resolved_names,
+            pre_skipped,
         )
 
 
@@ -1041,8 +1157,10 @@ async def run_sync_with_progress(
     confirmed_force_remove,
     dirs_to_remove,
     resolved_names: dict[str, str] | None = None,
+    pre_skipped: list[tuple[str, str]] | None = None,
 ):
     """Run sync operation with rich progress reporting."""
+    pre_skipped = pre_skipped or []
 
     with Progress(
         SpinnerColumn(),
@@ -1075,17 +1193,24 @@ async def run_sync_with_progress(
             resolved_names=resolved_names,
         )
 
-    # Show final results
+    # Show final results. The summary reconciles to the resolved repository
+    # count: pre-skipped repos (filtered before processing) are folded into the
+    # skipped tally so nothing silently vanishes.
     skipped = processor.skipped
+    all_skipped = list(skipped) + list(pre_skipped)
     success_count = len(repositories) - len(failures) - len(skipped)
+    total = len(repositories) + len(pre_skipped)
 
-    if failures or skipped:
+    if failures or all_skipped:
         console.print("\n[yellow]Sync completed with issues:[/yellow]")
         console.print(f"  [green]✅ Successful:[/green] {success_count}")
-        if skipped:
-            console.print(f"  [yellow]⏭ Skipped:[/yellow] {len(skipped)}")
+        if all_skipped:
+            console.print(f"  [yellow]⏭ Skipped:[/yellow] {len(all_skipped)}")
+            for reason, count in sorted(_count_skip_reasons(all_skipped).items()):
+                console.print(f"      [dim]• {count} {reason}[/dim]")
         if failures:
             console.print(f"  [red]❌ Failed:[/red] {len(failures)}")
+        console.print(f"  [dim]Total: {total}[/dim]")
 
         if failures:
             failure_table = Table(title="Failed Operations")
@@ -1112,8 +1237,10 @@ async def run_sync_quiet(
     confirmed_force_remove,
     dirs_to_remove,
     resolved_names: dict[str, str] | None = None,
+    pre_skipped: list[tuple[str, str]] | None = None,
 ):
     """Run sync operation without progress reporting."""
+    pre_skipped = pre_skipped or []
     failures = await processor.process_repositories(
         repositories=repositories,
         target_path=target_path,
@@ -1126,19 +1253,23 @@ async def run_sync_quiet(
     )
 
     skipped = processor.skipped
+    all_skipped = list(skipped) + list(pre_skipped)
     success_count = len(repositories) - len(failures) - len(skipped)
+    total = len(repositories) + len(pre_skipped)
 
-    if skipped:
-        logger.info(f"Skipped {len(skipped)} repositories")
-        for repo_name, reason in skipped:
+    if all_skipped:
+        logger.info(f"Skipped {len(all_skipped)} of {total} repositories")
+        for repo_name, reason in all_skipped:
             logger.info(f"Skipped: {repo_name}: {reason}")
 
     if failures:
         logger.error(
-            f"Sync completed with {len(failures)} failures out of {len(repositories)} repositories"
+            f"Sync completed with {len(failures)} failures out of {total} repositories"
         )
         for repo_name, error_msg in failures:
             logger.error(f"Failed: {repo_name}: {error_msg}")
         raise typer.Exit(code=1)
     else:
-        logger.info(f"Successfully synchronized {success_count} repositories")
+        logger.info(
+            f"Successfully synchronized {success_count} of {total} repositories"
+        )

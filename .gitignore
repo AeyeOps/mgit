@@ -50,6 +50,23 @@ tmp/
 # Keep the sample environment file
 !.env.sample
 
+# Secrets / credentials (never commit)
+# Scoped to credential *data* files — broad prefixes like "credentials*" are
+# avoided so they cannot silently shadow source modules (e.g. credentials.py).
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+.credentials
+.secrets
+credentials*.json
+credentials*.yaml
+credentials*.yml
+secrets*.json
+secrets*.yaml
+secrets*.yml
+
 # OS
 .DS_Store
 Thumbs.db

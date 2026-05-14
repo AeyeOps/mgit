@@ -112,6 +112,24 @@ class TestExpandEnvPlaceholdersHelper:
         # so they survive verbatim through the helper.
         assert result == data
 
+    def test_non_strict_preserves_unresolved(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With ``strict=False``, unset placeholders survive as the literal text."""
+        monkeypatch.delenv("MISSING_TOK", raising=False)
+        monkeypatch.setenv("PRESENT", "ok")
+        data = {
+            "providers": {
+                "a": {"token": "${MISSING_TOK}", "user": "alice"},
+                "b": {"token": "prefix-${PRESENT}-suffix"},
+            }
+        }
+        result = _expand_env_placeholders(data, strict=False)
+        assert result["providers"]["a"]["token"] == "${MISSING_TOK}"
+        assert result["providers"]["a"]["user"] == "alice"
+        # Present vars still resolve under lenient mode.
+        assert result["providers"]["b"]["token"] == "prefix-ok-suffix"
+
 
 @pytest.mark.unit
 class TestExpandEnvPlaceholdersLoadTime:
@@ -211,6 +229,102 @@ class TestExpandEnvPlaceholdersLoadTime:
         # Sibling fields survive unchanged.
         assert "user: aeyeopsdev" in disk
         assert "default_provider: demo" in disk
+
+    def test_load_config_tolerates_missing_env_var(
+        self,
+        isolated_config_file: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """``load_config`` no longer raises when an unrelated provider's env var is missing.
+
+        Regression guard: previously a missing ``${GITHUB_TOKEN}`` caused even
+        ``mgit --version`` to crash because module-level config reads triggered
+        bulk expansion. The lenient bulk-load now leaves the literal placeholder
+        in place; consumers that don't touch that provider proceed normally.
+        """
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        isolated_config_file.write_text(
+            "providers:\n"
+            "  github_aeyeops:\n"
+            "    url: https://github.com\n"
+            "    user: aeyeopsdev\n"
+            "    token: ${GITHUB_TOKEN}\n"
+            "global:\n"
+            "  log_filename: mgit.log\n"
+            "  default_provider: github_aeyeops\n",
+            encoding="utf-8",
+        )
+
+        manager = ConfigurationManager()
+        config = manager.load_config()  # must not raise
+
+        assert config["providers"]["github_aeyeops"]["token"] == "${GITHUB_TOKEN}"
+        # Non-secret global settings remain readable for ``mgit --version`` etc.
+        assert config["global"]["log_filename"] == "mgit.log"
+
+    def test_get_provider_config_raises_on_missing_env_var(
+        self,
+        isolated_config_file: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """``get_provider_config`` surfaces the missing-env error at point of use.
+
+        The deferred strict expansion ensures the user gets the same clear
+        "set GITHUB_TOKEN" guidance, but only when they actually try to use the
+        provider whose token is missing.
+        """
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        isolated_config_file.write_text(
+            "providers:\n"
+            "  github_aeyeops:\n"
+            "    url: https://github.com\n"
+            "    user: aeyeopsdev\n"
+            "    token: ${GITHUB_TOKEN}\n"
+            "global: {}\n",
+            encoding="utf-8",
+        )
+
+        manager = ConfigurationManager()
+        manager.load_config()  # succeeds (lenient)
+
+        with pytest.raises(ConfigurationError) as excinfo:
+            manager.get_provider_config("github_aeyeops")
+
+        msg = str(excinfo.value)
+        assert "providers.github_aeyeops.token" in msg
+        assert "GITHUB_TOKEN" in msg
+
+    def test_get_provider_config_does_not_mutate_cache(
+        self,
+        isolated_config_file: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Strict expansion in ``get_provider_config`` works on a fresh dict.
+
+        The cached in-memory config keeps the literal ``${VAR}`` from the
+        lenient load so repeated calls (with and without env present) behave
+        consistently.
+        """
+        monkeypatch.setenv("FOO", "ghp_real")
+        isolated_config_file.write_text(
+            "providers:\n"
+            "  demo:\n"
+            "    url: https://github.com\n"
+            "    token: ${FOO}\n"
+            "global: {}\n",
+            encoding="utf-8",
+        )
+
+        manager = ConfigurationManager()
+        loaded = manager.load_config()
+        # Lenient load with env present resolves the placeholder in the cache.
+        assert loaded["providers"]["demo"]["token"] == "ghp_real"
+
+        resolved = manager.get_provider_config("demo")
+        assert resolved["token"] == "ghp_real"
+        # Mutating the returned dict must not poison the cache.
+        resolved["token"] = "tampered"
+        assert manager.load_config()["providers"]["demo"]["token"] == "ghp_real"
 
     def test_save_config_overwrites_placeholder_when_value_changes(
         self,

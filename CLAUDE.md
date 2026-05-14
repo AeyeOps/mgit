@@ -49,12 +49,17 @@ If the workflow fails after push, fix the issue and use `gh workflow run auto-re
 ### Build
 ```bash
 make build-standalone-linux       # Validate + build Linux binary at dist/mgit
-make install-standalone-linux     # Validate + build + test + install to /usr/local/bin/mgit without sudo
+make install-standalone-linux     # Validate + build + test + install to /usr/local/bin/mgit
+make build-standalone-macos       # Validate + build macOS Mach-O binary at dist/mgit
+make install-standalone-macos     # Validate + build + test + install to ~/.local/bin/mgit (no sudo)
 make build-standalone-windows     # Windows binary (from WSL)
 make clean                        # Remove build artifacts
 make test-standalone-linux        # Validate + build + test dist/mgit
+make test-standalone-macos        # Validate + build + test dist/mgit (Mach-O verified)
 make test-flat-layout-e2e         # E2E flat layout tests with binary
 ```
+
+`make release` auto-routes to `install-standalone-macos` on Darwin and `install-standalone-linux` elsewhere. Linux and macOS share a single build script (`scripts/build_mac_and_linux.sh`) since PyInstaller produces host-native binaries from the same `mgit.spec`. The macOS binary is unsigned — first run may trigger Gatekeeper. Clear the quarantine attribute once with `xattr -d com.apple.quarantine ~/.local/bin/mgit` (or right-click → Open in Finder).
 
 ### Running mgit
 ```bash

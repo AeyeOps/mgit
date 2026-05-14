@@ -4,6 +4,7 @@ import json as json_mod
 import os
 import subprocess
 import time
+import urllib.error
 import urllib.request
 from base64 import b64encode
 from pathlib import Path
@@ -14,62 +15,106 @@ import pytest
 
 GITEA_PORT = int(os.environ.get("GITEA_TEST_PORT", "3000"))
 GITEA_URL = f"http://localhost:{GITEA_PORT}"
-GITEA_ADMIN_USER = "admin"
-GITEA_ADMIN_PASS = "admin123"
-GITEA_ADMIN_EMAIL = "admin@test.local"
+# "admin" is a reserved username in Gitea — use a non-reserved name.
+GITEA_ADMIN_USER = "e2eadmin"
+GITEA_ADMIN_PASS = "e2eadmin-pass-123"
+GITEA_ADMIN_EMAIL = "e2eadmin@test.local"
 
 
 # --- API Helper Functions (stdlib only) ---
 
 
-def _gitea_api(method: str, path: str, headers: dict, data: dict | None = None) -> dict:
-    """Make a Gitea API request using urllib (stdlib)."""
+def _gitea_api(
+    method: str,
+    path: str,
+    headers: dict,
+    data: dict | None = None,
+    tolerate_conflict: bool = False,
+) -> dict:
+    """Make a Gitea API request using urllib (stdlib).
+
+    With ``tolerate_conflict``, a 409/422 response (resource already exists) is
+    treated as success and returns ``{}`` — keeps fixtures idempotent across
+    tests sharing the session-scoped Gitea container.
+    """
     url = f"{GITEA_URL}/api/v1{path}"
     body = json_mod.dumps(data).encode() if data else None
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
-    with urllib.request.urlopen(req) as resp:
-        return json_mod.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json_mod.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        if tolerate_conflict and exc.code in (409, 422):
+            return {}
+        raise
 
 
 def create_gitea_token(username: str, password: str) -> str:
-    """POST /api/v1/users/{username}/tokens with basic auth."""
+    """POST /api/v1/users/{username}/tokens with basic auth.
+
+    Gitea 1.21+ requires explicit token scopes; a scopeless token is rejected
+    with 403 on every API call. Request "all" so the test token can manage
+    orgs, repos, and contents.
+    """
     auth = b64encode(f"{username}:{password}".encode()).decode()
     result = _gitea_api(
         "POST",
         f"/users/{username}/tokens",
         headers={"Authorization": f"Basic {auth}", "Content-Type": "application/json"},
-        data={"name": f"test-token-{os.getpid()}"},
+        data={"name": f"test-token-{os.getpid()}", "scopes": ["all"]},
     )
     return result["sha1"]
 
 
 def create_gitea_org(token: str, org_name: str) -> dict:
-    """POST /api/v1/orgs"""
+    """POST /api/v1/orgs (idempotent — tolerates an already-existing org)."""
     return _gitea_api(
         "POST",
         "/orgs",
         headers={"Authorization": f"token {token}", "Content-Type": "application/json"},
         data={"username": org_name},
+        tolerate_conflict=True,
     )
 
 
 def create_gitea_repo(token: str, org: str, repo_name: str) -> dict:
-    """POST /api/v1/orgs/{org}/repos with auto_init=true."""
+    """POST /api/v1/orgs/{org}/repos with auto_init=true (idempotent)."""
     return _gitea_api(
         "POST",
         f"/orgs/{org}/repos",
         headers={"Authorization": f"token {token}", "Content-Type": "application/json"},
         data={"name": repo_name, "auto_init": True},
+        tolerate_conflict=True,
     )
 
 
 def create_gitea_repo_empty(token: str, org: str, repo_name: str) -> dict:
-    """POST /api/v1/orgs/{org}/repos with auto_init=false (empty, no commits)."""
+    """POST /api/v1/orgs/{org}/repos with auto_init=false (empty; idempotent)."""
     return _gitea_api(
         "POST",
         f"/orgs/{org}/repos",
         headers={"Authorization": f"token {token}", "Content-Type": "application/json"},
         data={"name": repo_name, "auto_init": False},
+        tolerate_conflict=True,
+    )
+
+
+def create_gitea_file(
+    token: str, org: str, repo: str, filepath: str, content: str
+) -> dict:
+    """POST /api/v1/repos/{org}/{repo}/contents/{filepath} — create a file.
+
+    Used to seed case-colliding tracked paths server-side, so the colliding
+    state originates from the remote regardless of the test host's filesystem.
+    """
+    return _gitea_api(
+        "POST",
+        f"/repos/{org}/{repo}/contents/{filepath}",
+        headers={"Authorization": f"token {token}", "Content-Type": "application/json"},
+        data={
+            "content": b64encode(content.encode()).decode(),
+            "message": f"add {filepath}",
+        },
     )
 
 
@@ -106,11 +151,17 @@ def gitea_container():
 
 @pytest.fixture(scope="session")
 def gitea_admin_token(gitea_container) -> str:
-    """Create admin via CLI, return API token."""
+    """Create admin via CLI, return API token.
+
+    The gitea CLI must run as the ``git`` user — ``docker exec`` defaults to
+    root, and Gitea refuses to run as root ("not supposed to be run as root").
+    """
     subprocess.run(
         [
             "docker",
             "exec",
+            "-u",
+            "git",
             "gitea",
             "gitea",
             "admin",
@@ -142,6 +193,7 @@ def gitea_mgit_env(gitea_admin_token, tmp_path) -> dict[str, str]:
 providers:
   gitea_test:
     url: {GITEA_URL}/api/v1
+    user: {GITEA_ADMIN_USER}
     token: {gitea_admin_token}
     type: github
 """
@@ -177,3 +229,27 @@ def gitea_edge_case_repos(gitea_admin_token):
     create_gitea_repo(gitea_admin_token, "edge-test-org", "normal-repo")
     create_gitea_repo_empty(gitea_admin_token, "edge-test-org", "empty-repo")
     yield
+
+
+@pytest.fixture
+def gitea_reporting_repos(gitea_admin_token):
+    """Create repos for sync-reporting tests under a unique org.
+
+    Contains a normal repo, an empty repo (no commits), and a repo with two
+    case-colliding tracked paths. The unique org name keeps the fixture
+    independent of other tests sharing the session-scoped Gitea container.
+    """
+    import uuid
+
+    org = f"rpt-{uuid.uuid4().hex[:8]}"
+    create_gitea_org(gitea_admin_token, org)
+    create_gitea_repo(gitea_admin_token, org, "normal-repo")
+    create_gitea_repo_empty(gitea_admin_token, org, "empty-repo")
+    create_gitea_repo(gitea_admin_token, org, "collide-repo")
+    create_gitea_file(
+        gitea_admin_token, org, "collide-repo", "teamcov5db/STATE.sql", "-- upper\n"
+    )
+    create_gitea_file(
+        gitea_admin_token, org, "collide-repo", "teamcov5db/State.sql", "-- mixed\n"
+    )
+    yield {"org": org}

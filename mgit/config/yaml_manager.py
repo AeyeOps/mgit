@@ -31,24 +31,27 @@ CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 _ENV_PLACEHOLDER_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
-def _expand_env_placeholders(value: Any, path: str = "") -> Any:
+def _expand_env_placeholders(value: Any, path: str = "", strict: bool = True) -> Any:
     """Recursively expand ``${VAR}`` placeholders in string leaves from os.environ.
 
     Walks dicts and lists; leaves non-string scalars untouched. Supports partial
-    strings and multiple placeholders per string. Raises ``ConfigurationError``
-    when a referenced variable is not set, naming both the YAML dotted path and
-    the missing variable.
+    strings and multiple placeholders per string.
 
-    The helper is pure: the only side effect is raising on unresolved vars.
+    When ``strict=True`` (default), raises ``ConfigurationError`` if a referenced
+    variable is not set, naming both the YAML dotted path and the missing var.
+    When ``strict=False``, unresolved placeholders are left as the literal
+    ``${VAR}`` text so callers can defer the error until point-of-use.
     """
     if isinstance(value, dict):
         return {
-            k: _expand_env_placeholders(v, f"{path}.{k}" if path else str(k))
+            k: _expand_env_placeholders(
+                v, f"{path}.{k}" if path else str(k), strict=strict
+            )
             for k, v in value.items()
         }
     if isinstance(value, list):
         return [
-            _expand_env_placeholders(item, f"{path}[{i}]")
+            _expand_env_placeholders(item, f"{path}[{i}]", strict=strict)
             for i, item in enumerate(value)
         ]
     if isinstance(value, str):
@@ -56,6 +59,8 @@ def _expand_env_placeholders(value: Any, path: str = "") -> Any:
         def _substitute(match: re.Match[str]) -> str:
             var_name = match.group(1)
             if var_name not in os.environ:
+                if not strict:
+                    return match.group(0)
                 location = path or "<root>"
                 raise ConfigurationError(
                     f"Unresolved env placeholder ${{{var_name}}} in {location}",
@@ -119,7 +124,14 @@ class ConfigurationManager:
                 # Expand ${VAR} placeholders on the plain-dict copy only.
                 # The raw CommentedMap keeps the literals so save_config is
                 # round-trip-safe.
-                config = _expand_env_placeholders(config)
+                #
+                # Lenient expansion: unset env vars leave the literal ``${VAR}``
+                # in place so that commands like ``mgit --version`` and
+                # ``mgit config --list`` don't crash when an unrelated provider's
+                # token env var is missing. ``get_provider_config(name)`` runs
+                # a strict re-expansion at point-of-use to surface a clear error
+                # for the provider actually being used.
+                config = _expand_env_placeholders(config, strict=False)
 
                 logger.debug(
                     f"Loaded config with {len(config.get('providers', {}))} providers"
@@ -144,14 +156,21 @@ class ConfigurationManager:
         return config.get("providers", {})
 
     def get_provider_config(self, name: str) -> dict[str, Any]:
-        """Get a specific named provider configuration."""
+        """Get a specific named provider configuration with strict env expansion.
+
+        Any remaining ``${VAR}`` placeholders in this provider's values are
+        expanded here; missing env vars raise ``ConfigurationError`` so the
+        failure points at the exact provider the caller asked for.
+        """
         providers = self.get_provider_configs()
         if name not in providers:
             available = list(providers.keys())
             raise ValueError(
                 f"Provider configuration '{name}' not found. Available: {available}"
             )
-        return providers[name]
+        return _expand_env_placeholders(
+            providers[name], path=f"providers.{name}", strict=True
+        )
 
     def get_default_provider_name(self) -> str | None:
         """Get the default provider name from global config."""

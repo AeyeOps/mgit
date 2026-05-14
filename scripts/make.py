@@ -152,6 +152,9 @@ def run_command(command: str, args: list[str], targets: dict[str, str]) -> int:
         "build-standalone-linux",
         "test-standalone-linux",
         "install-standalone-linux",
+        "build-standalone-macos",
+        "test-standalone-macos",
+        "install-standalone-macos",
         "release",
     }:
         make_cmd = ["make", command]
@@ -165,8 +168,10 @@ def run_command(command: str, args: list[str], targets: dict[str, str]) -> int:
         "validate": "make_validate.py",
         "test": "make_test.py",
         "test-standalone-linux": "test_binary.py",
+        "test-standalone-macos": "test_binary.py",
         "test-flat-layout-e2e": "make_test_flat_layout_e2e.py",
         "build-standalone-linux": "make_build.py",
+        "build-standalone-macos": "make_build.py",
         "build-standalone-windows": "make_build.py",
         "clean": "make_clean.py",
         "version": "make_version.py",
@@ -190,6 +195,8 @@ def run_command(command: str, args: list[str], targets: dict[str, str]) -> int:
     # Special handling for build targets
     if command == "build-standalone-linux":
         args = ["--target", "linux", "--install", *args]
+    elif command == "build-standalone-macos":
+        args = ["--target", "macos", "--install", *args]
     elif command == "build-standalone-windows":
         args = ["--target", "windows", *args]
 

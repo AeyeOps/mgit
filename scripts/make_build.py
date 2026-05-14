@@ -14,27 +14,33 @@ def main():
     parser = argparse.ArgumentParser(description="Build mgit executable")
     parser.add_argument(
         "--target",
-        choices=["linux", "windows", "all"],
+        choices=["linux", "macos", "windows", "all"],
         default="linux",
         help="Build target platform",
     )
     parser.add_argument(
         "--install",
         action="store_true",
-        help="Install to /usr/local/bin/mgit after Linux build without sudo",
+        help="Install after build (Linux: /usr/local/bin, macOS: ~/.local/bin)",
     )
     args = parser.parse_args()
 
-    if args.target in ("linux", "all"):
-        print("Building Linux executable...")
-        env = {"INSTALL_TO_OPT_BIN": "1"} if args.install else {}
+    if args.target in ("linux", "macos", "all"):
+        is_macos = args.target == "macos"
+        label = "macOS" if is_macos else "Linux"
+        print(f"Building {label} executable...")
+        env = {}
+        if args.install:
+            env["INSTALL_TO_OPT_BIN"] = "1"
+            if is_macos:
+                env["INSTALL_DIR"] = str(Path.home() / ".local" / "bin")
         result = subprocess.run(
-            ["bash", str(SCRIPT_DIR / "build_ubuntu.sh")],
+            ["bash", str(SCRIPT_DIR / "build_mac_and_linux.sh")],
             cwd=REPO_ROOT,
             env={**subprocess.os.environ, **env},
         )
         if result.returncode != 0:
-            print("Linux build failed")
+            print(f"{label} build failed")
             sys.exit(result.returncode)
 
     if args.target in ("windows", "all"):

@@ -3,6 +3,7 @@
 Requires Docker (Gitea container). Run with: pytest tests/e2e/test_sync_edge_cases.py -v -m docker
 """
 
+import re
 import subprocess
 
 import pytest
@@ -179,3 +180,92 @@ class TestErrorReporting:
             or "skipped" in output.lower()
             or result.returncode == 0
         )
+
+
+@pytest.mark.e2e
+@pytest.mark.docker
+class TestCaseCollisionReporting:
+    """Tests for case-collision classification and complete summary reporting."""
+
+    def _make_collision_dirty(self, temp_dir):
+        """Make collide-repo dirty in a collision-only way.
+
+        Writes content differing from HEAD to a case-colliding tracked path.
+        Deterministic on both case-sensitive and case-insensitive filesystems:
+        the only changed path is part of the case-collision set.
+        """
+        target = temp_dir / "collide-repo" / "teamcov5db" / "STATE.sql"
+        target.write_text("-- locally changed\n")
+
+    def test_case_collision_labeled_distinctly(
+        self, run_mgit, temp_dir, gitea_reporting_repos, gitea_mgit_env
+    ):
+        """A case-colliding repo is labeled as such, not 'uncommitted changes'."""
+        org = gitea_reporting_repos["org"]
+        run_mgit(
+            ["sync", f"{org}/*/*", str(temp_dir), "--provider", "gitea_test"],
+            env=gitea_mgit_env,
+        )
+        self._make_collision_dirty(temp_dir)
+
+        result = run_mgit(
+            ["sync", f"{org}/*/*", str(temp_dir), "--provider", "gitea_test"],
+            env=gitea_mgit_env,
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode == 0, f"Sync should succeed: {output}"
+        assert "case-colliding" in output, f"Expected case-collision label: {output}"
+        assert "collide-repo" in output
+        # The collision repo must NOT be reported as ordinary uncommitted changes.
+        assert "uncommitted changes" not in output, (
+            f"Case-collision repo mislabeled as uncommitted changes: {output}"
+        )
+
+    def test_summary_reconciles_to_resolved_total(
+        self, run_mgit, temp_dir, gitea_reporting_repos, gitea_mgit_env
+    ):
+        """Final summary tally accounts for every resolved repo (nothing vanishes)."""
+        org = gitea_reporting_repos["org"]
+        run_mgit(
+            ["sync", f"{org}/*/*", str(temp_dir), "--provider", "gitea_test"],
+            env=gitea_mgit_env,
+        )
+        self._make_collision_dirty(temp_dir)
+
+        result = run_mgit(
+            ["sync", f"{org}/*/*", str(temp_dir), "--provider", "gitea_test"],
+            env=gitea_mgit_env,
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode == 0, f"Sync should succeed: {output}"
+
+        # Resolved total is 3: normal-repo, empty-repo, collide-repo.
+        total = int(re.search(r"Total:\s*(\d+)", output).group(1))
+        successful = int(re.search(r"Successful:\D*(\d+)", output).group(1))
+        skipped = int(re.search(r"Skipped:\D*(\d+)", output).group(1))
+        failed_match = re.search(r"Failed:\D*(\d+)", output)
+        failed = int(failed_match.group(1)) if failed_match else 0
+
+        assert total == 3, f"Expected resolved total of 3, got {total}: {output}"
+        assert successful + skipped + failed == total, (
+            f"Summary does not reconcile: {successful}+{skipped}+{failed} != {total}"
+        )
+
+
+@pytest.mark.e2e
+@pytest.mark.docker
+class TestUnquotedGlobDetection:
+    """Tests for detection of shell-expanded (unquoted) wildcard patterns."""
+
+    def test_three_positional_args_detected(self, run_mgit, temp_dir):
+        """3+ positional args (shell glob expansion) exits 2 with a quote hint."""
+        result = run_mgit(["sync", "a/b/c", "d/e/f", "g/h/i"])
+        output = result.stdout + result.stderr
+        assert result.returncode == 2, f"Expected exit 2, got {result.returncode}"
+        assert "quote" in output.lower(), f"Expected quoting hint: {output}"
+
+    def test_two_positional_args_not_tripped(self, run_mgit, temp_dir):
+        """A legitimate pattern + path call must not trip glob detection."""
+        result = run_mgit(["sync", "no-such-org/*/*", str(temp_dir / "dest")])
+        output = result.stdout + result.stderr
+        assert "expanded an unquoted" not in output

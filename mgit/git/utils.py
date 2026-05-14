@@ -112,6 +112,41 @@ def is_git_repository(path: Path) -> bool:
     return (path / ".git").is_dir()
 
 
+def find_case_collisions(repo_path: Path) -> set[str]:
+    """Return tracked paths that collide case-insensitively with another tracked path.
+
+    A repo containing two paths differing only in case (e.g. ``dir/STATE.sql``
+    and ``dir/State.sql``) cannot check out cleanly on a case-insensitive
+    filesystem. This inspects the git index, so it reports both colliding paths
+    even when only one exists on disk.
+
+    Returns an empty set for non-git directories or on any git error.
+    """
+    import subprocess  # noqa: PLC0415 - local import keeps module import-light
+
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=str(repo_path),
+            capture_output=True,
+            check=True,
+            timeout=30,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        return set()
+
+    groups: dict[str, list[str]] = {}
+    for tracked in result.stdout.decode("utf-8", errors="ignore").split("\0"):
+        if tracked:
+            groups.setdefault(tracked.lower(), []).append(tracked)
+
+    collisions: set[str] = set()
+    for paths in groups.values():
+        if len(paths) > 1:
+            collisions.update(paths)
+    return collisions
+
+
 def normalize_path(path_str: str) -> Path:
     """Normalize a path string, expanding user and environment variables."""
     return Path(os.path.expanduser(os.path.expandvars(path_str)))

@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "[build_all] Step 1/2: Linux build via uv"
-bash "$SCRIPT_DIR/build_ubuntu.sh"
+bash "$SCRIPT_DIR/build_mac_and_linux.sh"
 
 echo "[build_all] Step 2/2: Windows build (from WSL wrapper if available)"
 if grep -qi microsoft /proc/version 2>/dev/null; then
