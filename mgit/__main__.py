@@ -229,11 +229,16 @@ if not _has_mgit_handler(mgit_logger, "console"):
     console_handler._mgit_handler = "console"
     mgit_logger.addHandler(console_handler)
 
-# Install credential-masking filter on the mgit logger so that every handler
-# (console + file) automatically strips PATs and other secrets from messages.
+# Mask credentials at the handler level so every emitted record is scrubbed,
+# including records propagated from child loggers. A logger-level filter only
+# sees records logged directly on that logger, not ones propagated up from
+# mgit.* children, so the handlers are where the guarantee actually holds.
 from mgit.security.logging import SecurityLogFilter  # noqa: E402
 
 _security_filter = SecurityLogFilter()
+for _masked_handler in (console_handler, file_handler):
+    if not any(isinstance(f, SecurityLogFilter) for f in _masked_handler.filters):
+        _masked_handler.addFilter(_security_filter)
 if not any(isinstance(f, SecurityLogFilter) for f in mgit_logger.filters):
     mgit_logger.addFilter(_security_filter)
 
@@ -948,18 +953,27 @@ def list_command(
     """
 
     async def do_list():
+        err_console = Console(stderr=True)
         try:
             listing = await list_repositories(query, provider, format_type, limit)
-            if listing.failed_providers and format_type != "json":
-                console.print(
-                    f"[yellow]Warning:[/yellow] Failed to query "
-                    f"{len(listing.failed_providers)} provider(s): "
-                    f"{', '.join(listing.failed_providers)}"
-                )
-            format_results(listing.results, format_type)
         except MgitError as e:
             console.print(f"[red]Error: {e}[/red]")
             raise typer.Exit(1) from e
+
+        # Route the failure warning to stderr so it never corrupts --format json
+        # (which writes results to stdout).
+        if listing.failed_providers:
+            err_console.print(
+                f"[yellow]Warning:[/yellow] Failed to query "
+                f"{len(listing.failed_providers)} provider(s): "
+                f"{', '.join(listing.failed_providers)}"
+            )
+        format_results(listing.results, format_type)
+
+        # Total provider failure must not exit 0 with an empty result set.
+        # Partial failure keeps exit 0 (results returned + stderr warning).
+        if listing.provider_outcomes and not listing.successful_providers:
+            raise typer.Exit(1)
 
     asyncio.run(do_list())
 

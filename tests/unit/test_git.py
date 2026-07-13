@@ -156,8 +156,9 @@ class TestRunSubprocessTimeout:
     @pytest.mark.asyncio
     async def test_timeout_raises_called_process_error(self, tmp_path, git_manager):
         """TimeoutExpired should be converted to CalledProcessError with code 124."""
-        with patch(
-            "subprocess.run",
+        with patch.object(
+            git_manager,
+            "_exec_once",
             side_effect=subprocess.TimeoutExpired(cmd=["git"], timeout=1),
         ):
             with pytest.raises(subprocess.CalledProcessError) as exc_info:
@@ -204,7 +205,7 @@ class TestRunSubprocessRetry:
             return success_result
 
         with (
-            patch("subprocess.run", side_effect=mock_run),
+            patch.object(git_manager, "_exec_once", side_effect=mock_run),
             patch("asyncio.sleep", new_callable=AsyncMock),
         ):
             result = await git_manager._run_subprocess(
@@ -235,7 +236,7 @@ class TestRunSubprocessRetry:
             raise permanent_error
 
         with (
-            patch("subprocess.run", side_effect=mock_run),
+            patch.object(git_manager, "_exec_once", side_effect=mock_run),
             pytest.raises(subprocess.CalledProcessError),
         ):
             await git_manager._run_subprocess(
@@ -265,7 +266,7 @@ class TestRunSubprocessRetry:
             raise error
 
         with (
-            patch("subprocess.run", side_effect=mock_run),
+            patch.object(git_manager, "_exec_once", side_effect=mock_run),
             pytest.raises(subprocess.CalledProcessError),
         ):
             await git_manager._run_subprocess(
@@ -295,7 +296,7 @@ class TestRunSubprocessRetry:
             raise transient_error
 
         with (
-            patch("subprocess.run", side_effect=mock_run),
+            patch.object(git_manager, "_exec_once", side_effect=mock_run),
             patch("asyncio.sleep", new_callable=AsyncMock),
             pytest.raises(subprocess.CalledProcessError),
         ):

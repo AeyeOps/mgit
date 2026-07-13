@@ -8,13 +8,13 @@ import asyncio
 import concurrent.futures
 import logging
 from dataclasses import dataclass
-from urllib.parse import urlparse
 
 from ..commands.listing import (
     ListingResult,
     ProviderOutcome,
     RepositoryResult,
     list_repositories,
+    provider_dedup_key,
 )
 from ..config.yaml_manager import list_provider_names
 from ..exceptions import MgitError
@@ -120,9 +120,7 @@ class MultiProviderResolver:
                 continue
 
             # Secondary deduplication by host/org/name combination
-            # Include host to allow same org/name on different providers (hybrid setups)
-            host = urlparse(repo.clone_url).hostname or "unknown"
-            org_name_key = f"{host}/{result.org_name}/{repo.name}"
+            org_name_key = provider_dedup_key(result)
             if org_name_key in seen_org_names:
                 duplicates_removed += 1
                 continue

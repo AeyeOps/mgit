@@ -261,6 +261,46 @@ class GitManager:
         except Exception:
             return True
 
+    async def _exec_once(
+        self,
+        cmd: list,
+        cwd: Path,
+        env: dict[str, str],
+        timeout: int,
+    ) -> subprocess.CompletedProcess:
+        """Run *cmd* once as a native async subprocess, mirroring subprocess.run.
+
+        Raises subprocess.TimeoutExpired when it outlives *timeout* and
+        subprocess.CalledProcessError on a non-zero exit (check=True semantics),
+        so _run_subprocess handles the same exceptions the blocking call raised.
+        stdout/stderr are captured and returned decoded.
+        """
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=str(cwd),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+        try:
+            stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout)
+        # wait_for raises asyncio.TimeoutError on every supported version; it
+        # only aliases the builtin TimeoutError from 3.11, so the aliased name
+        # is required to stay correct on the 3.10 floor (requires-python).
+        except asyncio.TimeoutError:  # noqa: UP041
+            proc.kill()
+            await proc.communicate()
+            raise subprocess.TimeoutExpired(cmd, timeout) from None
+
+        stdout = stdout_b.decode("utf-8")
+        stderr = stderr_b.decode("utf-8")
+        returncode = proc.returncode or 0
+        if returncode != 0:
+            raise subprocess.CalledProcessError(
+                returncode, cmd, output=stdout, stderr=stderr
+            )
+        return subprocess.CompletedProcess(cmd, returncode, stdout, stderr)
+
     async def _run_subprocess(
         self,
         cmd: list,
@@ -298,19 +338,11 @@ class GitManager:
 
         for attempt in range(max_retries + 1):
             try:
-                # Run in a worker thread: subprocess.run blocks, and running it
-                # on the event loop would serialize every concurrent git
-                # operation despite the semaphore throttling (ADR-003).
-                result = await asyncio.to_thread(
-                    subprocess.run,
-                    cmd,
-                    cwd=cwd,
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                    env=env,
-                    timeout=timeout,
-                )
+                # Git subprocesses must neither block the event loop nor occupy
+                # an executor thread; otherwise concurrent clones serialize
+                # below --concurrency and starve the Azure SDK's to_thread
+                # calls (ADR-003).
+                result = await self._exec_once(cmd, cwd, env, timeout)
                 if not capture_output and result.stdout:
                     logger.debug(f"stdout: {result.stdout.rstrip()}")
                 return result

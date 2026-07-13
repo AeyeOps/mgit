@@ -112,13 +112,14 @@ def execute_remote_diff_command(
         # Display results summary
         _display_discovery_summary(result, verbose)
 
+        # Output detailed results before saving so a changeset storage
+        # failure can't discard already-computed results.
+        if output or not save_changeset:
+            _output_discovery_results(result, output, verbose)
+
         # Save to changeset storage if requested
         if save_changeset:
             _save_discovery_to_changesets(result, changeset_name, verbose)
-
-        # Output detailed results
-        if output or not save_changeset:
-            _output_discovery_results(result, output, verbose)
 
         if verbose:
             console.print(

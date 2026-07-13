@@ -86,6 +86,15 @@ class AzureDevOpsProvider(GitProvider):
         if not self.token:
             raise ValueError("Personal Access Token is required")
 
+    async def _sdk(self, fn, /, *args, **kwargs):
+        """Boundary for the synchronous Azure DevOps SDK.
+
+        Every SDK call (including the client getters, whose cold-start resource
+        lookup hits the network) goes through here so none runs on the event
+        loop.
+        """
+        return await asyncio.to_thread(fn, *args, **kwargs)
+
     async def authenticate(self) -> bool:
         """Authenticate with Azure DevOps.
 
@@ -100,14 +109,12 @@ class AzureDevOpsProvider(GitProvider):
             credentials = BasicAuthentication("", self.token)
             self.connection = Connection(base_url=self.url, creds=credentials)
 
-            # Get clients
-            self.core_client = self.connection.clients.get_core_client()
-            self.git_client = self.connection.clients.get_git_client()
+            # Get clients (cold-start resource lookup hits the network)
+            self.core_client = await self._sdk(self.connection.clients.get_core_client)
+            self.git_client = await self._sdk(self.connection.clients.get_git_client)
 
-            # Test the connection by listing projects. The Azure SDK is
-            # synchronous — run it in a worker thread so the event loop
-            # stays free for concurrent operations.
-            await asyncio.to_thread(self.core_client.get_projects)
+            # Test the connection by listing projects.
+            await self._sdk(self.core_client.get_projects)
 
             self._authenticated = True
             logger.debug("Azure DevOps authentication successful for %s", self.url)
@@ -150,7 +157,7 @@ class AzureDevOpsProvider(GitProvider):
 
         try:
             # A simple call to verify authentication and connection
-            await asyncio.to_thread(self.core_client.get_projects)
+            await self._sdk(self.core_client.get_projects)
             logger.debug("Azure DevOps connection test successful.")
             return True
         except (AzureDevOpsAuthenticationError, ClientRequestError) as e:
@@ -207,7 +214,7 @@ class AzureDevOpsProvider(GitProvider):
 
         try:
             # Get all projects
-            projects_response = await asyncio.to_thread(self.core_client.get_projects)
+            projects_response = await self._sdk(self.core_client.get_projects)
             projects = []
 
             for proj in projects_response:
@@ -272,7 +279,7 @@ class AzureDevOpsProvider(GitProvider):
                 return
 
             # List repositories in the project
-            repos: list[GitRepository] = await asyncio.to_thread(
+            repos: list[GitRepository] = await self._sdk(
                 self.git_client.get_repositories, project=project_details.id
             )
 
@@ -339,7 +346,7 @@ class AzureDevOpsProvider(GitProvider):
                 return None
 
             # Get the specific repository
-            repo = await asyncio.to_thread(
+            repo = await self._sdk(
                 self.git_client.get_repository,
                 project=project_details.id,
                 repository_id=repository,
@@ -399,9 +406,7 @@ class AzureDevOpsProvider(GitProvider):
             return None
 
         try:
-            return await asyncio.to_thread(
-                self.core_client.get_project, project_name_or_id
-            )
+            return await self._sdk(self.core_client.get_project, project_name_or_id)
         except Exception as e:
             logger.error("Failed to get project '%s': %s", project_name_or_id, e)
             return None

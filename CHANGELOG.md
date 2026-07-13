@@ -4,31 +4,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.14.0] - 2026-07-13
 
 ### Fixed
 - Multi-provider discovery reports per-provider outcomes: `mgit list` warns
-  which providers failed, and the sync summary's failed-provider warning now
-  reflects reality instead of assuming every provider succeeded.
+  which providers failed (on stderr, in every output format) and exits
+  non-zero when every provider fails; the sync summary's failed-provider
+  warning now reflects reality instead of assuming every provider succeeded,
+  in single-provider pattern syncs too; and `mgit diff-remote` counts a
+  provider whose listing failed entirely in its failed-provider list and
+  success rate instead of reporting 100%.
 - Provider loggers no longer attach their own stdout handler, which duplicated
   log lines and could corrupt `--format json` output; records flow through the
   configured mgit handlers with credential masking intact.
 - `mgit diff --save-changeset` and `mgit diff-remote --save-changeset` exit
-  non-zero when the save fails instead of reporting success.
+  non-zero when the save fails instead of reporting success, and write the
+  computed results before saving so a failing changeset store no longer
+  discards them.
 - `mgit diff` records the destination path for renamed files instead of the
-  literal "old -> new" string.
+  literal "old -> new" string, and unquotes git's C-style quoted paths
+  (names with spaces or special characters) so their content embedding and
+  reported filenames are correct.
 - Bulk clone/pull operations now actually run concurrently. Git subprocesses
   and the synchronous Azure DevOps SDK calls ran on the event loop, serializing
-  every operation regardless of `--concurrency`; both now run in worker
-  threads.
-- Invalid credentials fail loud instead of presenting as success. The Azure
+  every operation regardless of `--concurrency`. Git subprocesses now spawn
+  natively async (no worker-thread pool capping parallelism), Azure DevOps SDK
+  calls — including client construction, which performs a network round-trip —
+  run in worker threads, and case-collision scans no longer block the event
+  loop.
+- Fatal provider errors fail loud instead of presenting as success. The Azure
   DevOps provider raises on authentication and listing failures (matching the
-  GitHub provider), and `mgit list` / `mgit sync --provider` exit non-zero on a
-  bad credential instead of reporting "Found 0 repositories" with exit 0.
+  GitHub provider), and API errors, connection failures, and rate-limit
+  exhaustion from any provider surface as failures instead of "Found 0
+  repositories" with exit 0; a provider that returns partial results still
+  degrades gracefully.
+- `mgit list` with an exact (wildcard-free) query and no `--provider` crashed
+  with UnboundLocalError; it now searches all configured providers.
 - `mgit sync` no longer conflates same-named repositories from different
   organizations. Skip filtering, the dry-run preview, and case-collision
   force-sync are keyed by clone URL; a dirty `org-a/repo` no longer causes a
-  clean `org-b/repo` to be skipped (or reset).
+  clean `org-b/repo` to be skipped (or reset). The summary identifies skipped
+  and failed repositories by their resolved directory path, so same-named
+  repositories stay distinguishable there too.
 - `mgit list` multi-provider deduplication includes the host, so the same
   org/name on different providers (hybrid setups) is no longer collapsed into
   one result.
@@ -43,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (~4,100 lines with no callers).
 - The `rate_limiter.exponential_rate` and `rate_limiter.backoff_max_seconds`
   config keys are removed; only `max_wait_seconds` remains.
+- typer upgraded to 0.26 (constraint `>=0.16.1,<1`) to support click 8.4;
+  CLI behavior is unchanged.
 - Local sync (`mgit sync` without a pattern) attaches provider credentials more
   strictly: base-URL prefix matching requires a path boundary, and the
   sole-configuration fallback applies only to canonical provider hosts
@@ -52,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - Dependency updates clear all pip-audit advisories: aiohttp 3.14.1 (nine
-  CVEs), cryptography 49.0.0, idna 3.18, msgpack 1.2.1, pip 26.1.2.
+  CVEs), cryptography 49.0.0, idna 3.18, msgpack 1.2.1, pip 26.1.2, and
+  click 8.4.2 (PYSEC-2026-2132).
 - Local sync no longer sends an Authorization header to hosts that merely
   pattern-match a provider type (e.g. a remote whose URL path contains
   "github"); see the credential-matching change above.

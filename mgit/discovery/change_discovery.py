@@ -144,8 +144,13 @@ class ChangeDiscoveryEngine:
             if local_scan_only:
                 return await self._discover_local_only(query_pattern, limit)
 
-            # Discover repositories through provider system
-            discovered_repos = await self._discover_repositories_via_providers(
+            # Discover repositories through provider system. failed_listing
+            # holds providers whose listing failed entirely (no repos), which
+            # would otherwise be invisible in the per-repo aggregation below.
+            (
+                discovered_repos,
+                failed_listing,
+            ) = await self._discover_repositories_via_providers(
                 query_pattern, provider_name, provider_url, limit
             )
 
@@ -156,7 +161,7 @@ class ChangeDiscoveryEngine:
                 return ChangeDiscoveryResult(
                     discovered_repositories=[],
                     successful_providers=[],
-                    failed_providers=[],
+                    failed_providers=sorted(failed_listing),
                     local_repositories_found=0,
                     remote_only_repositories=0,
                     total_repositories_with_changes=0,
@@ -168,12 +173,16 @@ class ChangeDiscoveryEngine:
                 discovered_repos, include_remote_only, query_pattern
             )
 
-            # Aggregate results
-            successful_providers = list(
-                set(r.provider_name for r in result_repos if r.error is None)
+            # Aggregate results. A fully-failed provider (in failed_listing)
+            # contributes no repos, so it is excluded from successful and folded
+            # into failed alongside the per-repo error derivation.
+            successful_providers = sorted(
+                {r.provider_name for r in result_repos if r.error is None}
+                - failed_listing
             )
-            failed_providers = list(
-                set(r.provider_name for r in result_repos if r.error is not None)
+            failed_providers = sorted(
+                {r.provider_name for r in result_repos if r.error is not None}
+                | failed_listing
             )
 
             local_count = sum(1 for r in result_repos if r.local_path is not None)
@@ -218,14 +227,16 @@ class ChangeDiscoveryEngine:
         provider_name: str | None,
         provider_url: str | None,
         limit: int | None,
-    ) -> list[tuple[Repository, str]]:
+    ) -> tuple[list[tuple[Repository, str]], set[str]]:
         """
         Discover repositories through provider system.
 
         Returns:
-            List of (Repository, provider_name) tuples
+            A tuple of (list of (Repository, provider_name) tuples, set of
+            provider names whose listing failed entirely).
         """
         discovered_repos = []
+        failed: set[str] = set()
 
         if provider_name:
             # Single provider discovery
@@ -249,8 +260,12 @@ class ChangeDiscoveryEngine:
                         f"Provider '{provider_name}' returned {len(listing.results)} repositories"
                     )
 
+                # A swallowed provider failure surfaces here, not as an exception.
+                failed.update(listing.failed_providers)
+
             except Exception as e:
                 logger.error(f"Provider '{provider_name}' query failed: {e}")
+                failed.add(provider_name)
 
         else:
             # Multi-provider discovery
@@ -273,22 +288,30 @@ class ChangeDiscoveryEngine:
 
                 if isinstance(result, Exception):
                     logger.debug(f"Provider '{prov_name}' failed: {result}")
-                elif isinstance(result, list):
-                    for repo in result:
+                    failed.add(prov_name)
+                elif isinstance(result, tuple):
+                    repos, failed_listings = result
+                    for repo in repos:
                         discovered_repos.append((repo, prov_name))
+                    failed.update(failed_listings)
                     logger.debug(
-                        f"Provider '{prov_name}' returned {len(result)} repositories"
+                        f"Provider '{prov_name}' returned {len(repos)} repositories"
                     )
 
         logger.info(
             f"Discovered {len(discovered_repos)} repositories across all providers"
         )
-        return discovered_repos
+        return discovered_repos, failed
 
     async def _query_single_provider(
         self, query_pattern: str, provider_name: str, limit: int | None
-    ) -> list[Repository]:
-        """Query a single provider for repositories."""
+    ) -> tuple[list[Repository], list[str]]:
+        """Query a single provider for repositories.
+
+        Returns (repositories, failed_provider_names). failed_provider_names is
+        surfaced from ListingResult so a provider whose listing failed entirely
+        is not silently reported as zero repositories.
+        """
         try:
             listing = await list_repositories(
                 query=query_pattern,
@@ -297,7 +320,7 @@ class ChangeDiscoveryEngine:
                 limit=limit,
             )
 
-            return [result.repo for result in listing.results]
+            return [result.repo for result in listing.results], listing.failed_providers
 
         except Exception as e:
             logger.debug(f"Provider '{provider_name}' query failed: {e}")

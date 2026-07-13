@@ -49,6 +49,7 @@ from mgit.providers import detect_provider_by_url
 from mgit.providers.base import Repository
 from mgit.providers.exceptions import RepositoryNotFoundError
 from mgit.providers.manager import ProviderManager
+from mgit.providers.registry import is_canonical_provider_host
 from mgit.utils.async_executor import AsyncExecutor
 from mgit.utils.directory_scanner import find_repositories_in_directory
 from mgit.utils.multi_provider_resolver import MultiProviderResolver
@@ -175,26 +176,6 @@ def _load_provider_auth_configs() -> list[ProviderAuthConfig]:
     return configs
 
 
-# Canonical public hosts per provider type. The sole-config fallback below
-# attaches credentials without a base-URL or host match, so it is restricted
-# to these hosts — never to an arbitrary host that merely pattern-detected as
-# the provider type (which would leak a token to an unrelated server).
-_CANONICAL_PROVIDER_HOSTS: dict[str, tuple[str, ...]] = {
-    "github": ("github.com",),
-    "bitbucket": ("bitbucket.org",),
-    "azuredevops": ("dev.azure.com",),
-}
-
-
-def _is_canonical_provider_host(host: str | None, provider_type: str) -> bool:
-    if not host:
-        return False
-    if host in _CANONICAL_PROVIDER_HOSTS.get(provider_type, ()):
-        return True
-    # Legacy Azure DevOps organization hosts: <org>.visualstudio.com
-    return provider_type == "azuredevops" and host.endswith(".visualstudio.com")
-
-
 def _match_provider_config(
     remote_url: str, provider_type: str, configs: list[ProviderAuthConfig]
 ) -> ProviderAuthConfig | None:
@@ -226,8 +207,11 @@ def _match_provider_config(
         return sorted(host_matches, key=lambda cfg: len(cfg.base_url), reverse=True)[0]
 
     # Sole-config fallback: covers configs whose URL is the API host (e.g.
-    # api.github.com) while remotes live on the web host. Canonical hosts only.
-    if not _is_canonical_provider_host(remote_host, provider_type):
+    # api.github.com) while remotes live on the web host. Restricted to
+    # canonical hosts — attaching credentials with no base-URL or host match to
+    # an arbitrary host that merely pattern-detected as the provider type would
+    # leak a token to an unrelated server.
+    if not is_canonical_provider_host(remote_host, provider_type):
         return None
 
     token_configs = [config for config in candidates if config.token]
@@ -514,6 +498,12 @@ async def resolve_repositories_for_sync(
                 f"[green]Found {len(repositories)} repositories[/green] in provider '{provider_name}'"
             )
 
+            if result.failed_providers:
+                console.print(
+                    f"[yellow]Warning:[/yellow] Failed to query {len(result.failed_providers)} providers: "
+                    f"{', '.join(result.failed_providers)}"
+                )
+
             return repositories, False
 
         else:
@@ -620,7 +610,9 @@ async def analyze_repository_states(
                     # dirty because it has case-colliding paths that cannot
                     # check out cleanly on a case-insensitive filesystem.
                     dirty_paths = parse_porcelain_z(stdout)
-                    collisions = find_case_collisions(local_path)
+                    collisions = await asyncio.to_thread(
+                        find_case_collisions, local_path
+                    )
                     if classify_dirty_repo(dirty_paths, collisions) == "case_collision":
                         case_collision_repos.append(repo.clone_url)
                     else:

@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,28 @@ from mgit.content.embedding import (
 from mgit.git.manager import GitManager
 
 logger = logging.getLogger(__name__)
+
+# Matches a leading git C-quoted path (double-quoted, backslash escapes), used
+# to peel off a rename/copy source that may itself contain " -> ".
+_QUOTED_PATH_RE = re.compile(r'^"(?:[^"\\]|\\.)*"')
+
+
+def _unquote_git_path(path: str) -> str:
+    """Decode a git C-style quoted path back to its real name.
+
+    With core.quotePath (git's default) any path containing spaces or non-ASCII
+    bytes is emitted wrapped in double quotes with C-style backslash escapes
+    (e.g. `"\\303\\244 b.txt"` for `ä b.txt`). Unquoted paths pass through.
+    """
+    if len(path) >= 2 and path[0] == '"' and path[-1] == '"':
+        return (
+            path[1:-1]
+            .encode("latin-1", "backslashreplace")
+            .decode("unicode_escape")
+            .encode("latin-1")
+            .decode("utf-8", "replace")
+        )
+    return path
 
 
 @dataclass
@@ -153,9 +176,17 @@ class DiffProcessor:
                 worktree_status = line[1]
                 filename = line[2:].lstrip()
                 # Rename/copy records carry "old -> new"; the current path is
-                # the destination.
-                if index_status in ("R", "C") and " -> " in filename:
-                    filename = filename.split(" -> ", 1)[1]
+                # the destination. A quoted source may itself contain " -> ",
+                # so peel it off before splitting on the arrow.
+                if index_status in ("R", "C"):
+                    if filename.startswith('"'):
+                        match = _QUOTED_PATH_RE.match(filename)
+                        if match:
+                            filename = filename[match.end() :].split(" -> ", 1)[-1]
+                    elif " -> " in filename:
+                        filename = filename.split(" -> ", 1)[1]
+                # Every status may carry a C-quoted path (e.g. `?? "a b.txt"`).
+                filename = _unquote_git_path(filename)
 
                 file_info = {
                     "filename": filename,

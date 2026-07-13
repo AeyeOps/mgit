@@ -19,6 +19,25 @@ from .exceptions import ConfigurationError, ProviderNotFoundError
 logger = logging.getLogger(__name__)
 
 
+# Canonical public hosts per provider type. Distinguishes an official host from
+# an arbitrary host that merely pattern-detects as the provider type — callers
+# use this to gate credential attachment when there is no base-URL or host match.
+CANONICAL_PROVIDER_HOSTS: dict[str, tuple[str, ...]] = {
+    "github": ("github.com",),
+    "bitbucket": ("bitbucket.org",),
+    "azuredevops": ("dev.azure.com",),
+}
+
+
+def is_canonical_provider_host(host: str | None, provider_type: str) -> bool:
+    if not host:
+        return False
+    if host in CANONICAL_PROVIDER_HOSTS.get(provider_type, ()):
+        return True
+    # Legacy Azure DevOps organization hosts: <org>.visualstudio.com
+    return provider_type == "azuredevops" and host.endswith(".visualstudio.com")
+
+
 class ProviderRegistry:
     """Singleton registry for managing git provider implementations.
 
@@ -410,6 +429,8 @@ clear = _registry.clear
 
 __all__ = [
     "ProviderRegistry",
+    "CANONICAL_PROVIDER_HOSTS",
+    "is_canonical_provider_host",
     "register_provider",
     "get_provider",
     "get_provider_by_url",

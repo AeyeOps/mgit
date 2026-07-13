@@ -202,17 +202,18 @@ def execute_diff_command(
                     f"[blue]Found {len(changes)} repositories with changes since last scan[/blue]"
                 )
 
-        # Save to changeset storage if requested
-        if save_changeset and storage:
-            _save_to_changeset_storage(changes, storage, changeset_name, verbose)
-
-        # Output results
+        # Output results before saving so a changeset storage failure can't
+        # discard already-computed results.
         output_stream = _get_output_stream(output)
         try:
             _write_changes_jsonl(changes, output_stream, verbose)
         finally:
             if output_stream != sys.stdout:
                 output_stream.close()
+
+        # Save to changeset storage if requested
+        if save_changeset and storage:
+            _save_to_changeset_storage(changes, storage, changeset_name, verbose)
 
         if verbose:
             console.print(

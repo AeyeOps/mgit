@@ -119,6 +119,14 @@ class BulkOperationProcessor:
                     repo_name[:30] + "..." if len(repo_name) > 30 else repo_name
                 )
 
+                # Resolved local path — the identity recorded in the
+                # skipped/failures tally so reporting matches sync.py's
+                # disambiguated display names rather than bare repo names.
+                repo_path = resolve_local_repo_path(
+                    repo_url, self.flat_layout, resolved_names
+                )
+                display_path = str(repo_path)
+
                 # Add a task for this specific repo
                 repo_task_id = progress.add_task(
                     f"[grey50]Pending: {display_name}[/grey50]", total=1, visible=True
@@ -129,7 +137,7 @@ class BulkOperationProcessor:
                     # Check if repository is disabled
                     if is_disabled:
                         logger.info(f"Skipping disabled repository: {repo_name}")
-                        self.skipped.append((repo_name, "repository is disabled"))
+                        self.skipped.append((display_path, "repository is disabled"))
                         progress.update(
                             repo_task_id,
                             description=f"[yellow]Disabled: {display_name}[/yellow]",
@@ -138,10 +146,6 @@ class BulkOperationProcessor:
                         progress.advance(overall_task_id, 1)
                         return
 
-                    # Determine repository folder path
-                    repo_path = resolve_local_repo_path(
-                        repo_url, self.flat_layout, resolved_names
-                    )
                     logger.debug(
                         f"Using path '{repo_path}' for repository '{repo_name}'"
                     )
@@ -157,6 +161,7 @@ class BulkOperationProcessor:
                             repo_task_id=repo_task_id,
                             overall_task_id=overall_task_id,
                             display_name=display_name,
+                            display_path=display_path,
                             confirmed_force_remove=confirmed_force_remove,
                             dirs_to_remove=dirs_to_remove or [],
                         )
@@ -172,6 +177,7 @@ class BulkOperationProcessor:
                         progress=progress,
                         repo_task_id=repo_task_id,
                         display_name=display_name,
+                        display_path=display_path,
                     )
 
                     progress.advance(overall_task_id, 1)
@@ -190,6 +196,7 @@ class BulkOperationProcessor:
         repo_task_id: int,
         overall_task_id: int,
         display_name: str,
+        display_path: str,
         confirmed_force_remove: bool,
         dirs_to_remove: list[tuple[str, str, Path]],
     ) -> bool:
@@ -221,7 +228,7 @@ class BulkOperationProcessor:
             if (repo_folder / ".git").exists():
                 if await self.git_manager.is_repo_empty(repo_folder):
                     logger.info(f"Skipping empty repo (no commits): {repo_name}")
-                    self.skipped.append((repo_name, "empty repo (no commits)"))
+                    self.skipped.append((display_path, "empty repo (no commits)"))
                     progress.update(
                         repo_task_id,
                         description=f"[yellow]Skipped (empty): {display_name}[/yellow]",
@@ -229,7 +236,12 @@ class BulkOperationProcessor:
                     )
                 elif repo.clone_url in self.case_collision_repos:
                     await self._force_sync_case_collision(
-                        repo_folder, repo_name, progress, repo_task_id, display_name
+                        repo_folder,
+                        repo_name,
+                        progress,
+                        repo_task_id,
+                        display_name,
+                        display_path,
                     )
                 else:
                     try:
@@ -245,7 +257,7 @@ class BulkOperationProcessor:
                         )
                         logger.warning(f"Pull failed for {repo_name}: {error_detail}")
                         self.failures.append(
-                            (repo_name, f"pull failed: {error_detail}")
+                            (display_path, f"pull failed: {error_detail}")
                         )
                         progress.update(
                             repo_task_id,
@@ -260,7 +272,7 @@ class BulkOperationProcessor:
                 else:
                     msg = "dir exists, not a git repo"
                     logger.warning(f"{repo_name}: {msg}")
-                    self.skipped.append((repo_name, msg))
+                    self.skipped.append((display_path, msg))
                     progress.update(
                         repo_task_id,
                         description=f"[yellow]Skipped (not repo): {display_name}[/yellow]",
@@ -287,7 +299,7 @@ class BulkOperationProcessor:
                     return False
                 except Exception as e:
                     self.failures.append(
-                        (repo_name, f"Failed removing old folder: {e}")
+                        (display_path, f"Failed removing old folder: {e}")
                     )
                     progress.update(
                         repo_task_id,
@@ -331,7 +343,7 @@ class BulkOperationProcessor:
         if proc.returncode != 0:
             return False
         dirty_paths = parse_porcelain_z(stdout.decode("utf-8", errors="ignore"))
-        collisions = find_case_collisions(repo_folder)
+        collisions = await asyncio.to_thread(find_case_collisions, repo_folder)
         return classify_dirty_repo(dirty_paths, collisions) == "case_collision"
 
     async def _force_sync_case_collision(
@@ -341,6 +353,7 @@ class BulkOperationProcessor:
         progress: Progress,
         repo_task_id: int,
         display_name: str,
+        display_path: str,
     ) -> None:
         """Bring a case-collision repo current with origin via fetch + reset.
 
@@ -359,7 +372,7 @@ class BulkOperationProcessor:
         if not await self._is_pure_case_collision(repo_folder):
             msg = "case-colliding paths plus genuine local edits"
             logger.warning(f"Skipping force-sync for {repo_name}: {msg}")
-            self.skipped.append((repo_name, msg))
+            self.skipped.append((display_path, msg))
             progress.update(
                 repo_task_id,
                 description=f"[yellow]Skipped (local edits): {display_name}[/yellow]",
@@ -375,7 +388,7 @@ class BulkOperationProcessor:
                 # No upstream branch to reset to — fetch still advanced the
                 # repo's history, the best that can be done without one.
                 logger.info(f"{repo_name}: no upstream branch; fetched without reset")
-            self.case_collision_synced.append(repo_name)
+            self.case_collision_synced.append(display_path)
             progress.update(
                 repo_task_id,
                 description=f"[green]Synced (case-collision): {display_name}[/green]",
@@ -387,7 +400,7 @@ class BulkOperationProcessor:
                 f"Case-collision sync failed for {repo_name}: {error_detail}"
             )
             self.failures.append(
-                (repo_name, f"case-collision sync failed: {error_detail}")
+                (display_path, f"case-collision sync failed: {error_detail}")
             )
             progress.update(
                 repo_task_id,
@@ -404,6 +417,7 @@ class BulkOperationProcessor:
         progress: Progress,
         repo_task_id: int,
         display_name: str,
+        display_path: str,
     ):
         """Perform the primary operation (clone or pull)."""
         repo_name = repo.name
@@ -430,7 +444,7 @@ class BulkOperationProcessor:
             except subprocess.CalledProcessError as e:
                 error_detail = sanitize_url((e.stderr or "").strip().split("\n")[0])
                 logger.warning(f"Clone failed for {repo_name}: {error_detail}")
-                self.failures.append((repo_name, f"clone failed: {error_detail}"))
+                self.failures.append((display_path, f"clone failed: {error_detail}"))
                 progress.update(
                     repo_task_id,
                     description=f"[red]Clone Failed: {display_name}[/red]",
@@ -441,7 +455,7 @@ class BulkOperationProcessor:
             if repo_folder.exists() and (repo_folder / ".git").exists():
                 if await self.git_manager.is_repo_empty(repo_folder):
                     logger.info(f"Skipping empty repo (no commits): {repo_name}")
-                    self.skipped.append((repo_name, "empty repo (no commits)"))
+                    self.skipped.append((display_path, "empty repo (no commits)"))
                     progress.update(
                         repo_task_id,
                         description=f"[yellow]Skipped (empty): {display_name}[/yellow]",
@@ -466,7 +480,7 @@ class BulkOperationProcessor:
                         )
                         logger.warning(f"Pull failed for {repo_name}: {error_detail}")
                         self.failures.append(
-                            (repo_name, f"pull failed: {error_detail}")
+                            (display_path, f"pull failed: {error_detail}")
                         )
                         progress.update(
                             repo_task_id,

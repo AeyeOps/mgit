@@ -45,7 +45,12 @@ class TestForceSyncCaseCollision:
             proc, "_is_pure_case_collision", AsyncMock(return_value=True)
         )
         await proc._force_sync_case_collision(
-            Path("/tmp/repo"), "collide-repo", MagicMock(), 1, "collide-repo"
+            Path("/tmp/repo"),
+            "collide-repo",
+            MagicMock(),
+            1,
+            "collide-repo",
+            "collide-repo",
         )
         proc.git_manager.git_fetch.assert_awaited_once()
         proc.git_manager.git_reset_hard.assert_awaited_once_with(
@@ -63,7 +68,12 @@ class TestForceSyncCaseCollision:
             proc, "_is_pure_case_collision", AsyncMock(return_value=False)
         )
         await proc._force_sync_case_collision(
-            Path("/tmp/repo"), "collide-repo", MagicMock(), 1, "collide-repo"
+            Path("/tmp/repo"),
+            "collide-repo",
+            MagicMock(),
+            1,
+            "collide-repo",
+            "collide-repo",
         )
         proc.git_manager.git_fetch.assert_not_awaited()
         proc.git_manager.git_reset_hard.assert_not_awaited()
@@ -80,7 +90,12 @@ class TestForceSyncCaseCollision:
             proc, "_is_pure_case_collision", AsyncMock(return_value=True)
         )
         await proc._force_sync_case_collision(
-            Path("/tmp/repo"), "collide-repo", MagicMock(), 1, "collide-repo"
+            Path("/tmp/repo"),
+            "collide-repo",
+            MagicMock(),
+            1,
+            "collide-repo",
+            "collide-repo",
         )
         proc.git_manager.git_fetch.assert_awaited_once()
         proc.git_manager.git_reset_hard.assert_not_awaited()
@@ -99,7 +114,12 @@ class TestForceSyncCaseCollision:
             )
         )
         await proc._force_sync_case_collision(
-            Path("/tmp/repo"), "collide-repo", MagicMock(), 1, "collide-repo"
+            Path("/tmp/repo"),
+            "collide-repo",
+            MagicMock(),
+            1,
+            "collide-repo",
+            "collide-repo",
         )
         assert proc.case_collision_synced == []
         assert len(proc.failures) == 1

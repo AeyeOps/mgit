@@ -4,6 +4,7 @@ Provides repository discovery across providers using query patterns.
 """
 
 import asyncio
+import contextlib
 import logging
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
@@ -22,12 +23,31 @@ from rich.table import Table
 from ..config.yaml_manager import list_provider_names
 from ..exceptions import MgitError
 from ..providers.base import Repository
-from ..providers.exceptions import AuthenticationError, ConfigurationError
+from ..providers.exceptions import (
+    APIError,
+    AuthenticationError,
+    ConfigurationError,
+    RateLimitError,
+)
+from ..providers.exceptions import (
+    ConnectionError as ProviderConnectionError,
+)
 from ..providers.manager import ProviderManager
 from ..utils.query_parser import matches_pattern, parse_query, validate_query
 
 logger = logging.getLogger(__name__)
 console = Console()
+
+# Errors that mean a provider produced NOTHING because it broke, not because it
+# legitimately has no matching repositories. These must fail loud rather than
+# present as "0 repositories".
+FATAL_PROVIDER_ERRORS = (
+    APIError,
+    AuthenticationError,
+    ConfigurationError,
+    ProviderConnectionError,
+    RateLimitError,
+)
 
 
 class RepositoryResult:
@@ -107,21 +127,18 @@ async def _process_single_provider(
         logger.warning(f"Could not initialize provider: {provider_name}")
         return []
 
-    try:
-        # Authenticate provider
-        if not await provider.authenticate():
-            logger.warning(f"Failed to authenticate with provider: {provider_name}")
-            return []
+    # Authenticate provider. A failure here propagates so the caller records
+    # the outcome instead of silently reporting "0 repositories".
+    if not await provider.authenticate():
+        raise AuthenticationError(
+            f"Failed to authenticate with provider: {provider_name}",
+            provider=provider_name,
+        )
 
-        logger.debug(f"Using provider: {provider.PROVIDER_NAME}")
-    except AuthenticationError:
-        # Fail loud: a bad credential must not present as "0 repositories".
-        raise
-    except Exception as e:
-        logger.warning(f"Failed to initialize provider {provider_name}: {e}")
-        return []
+    logger.debug(f"Using provider: {provider.PROVIDER_NAME}")
 
     results = []
+    errors: list[Exception] = []
     seen_repositories: set[tuple[str | None, str | None, str]] = set()
 
     def add_result(
@@ -273,6 +290,9 @@ async def _process_single_provider(
                                 break
 
             except Exception as e:
+                # Per-org degradation is by design: a fine-grained token can 403
+                # one org while others succeed, so keep going and union the rest.
+                errors.append(e)
                 logger.warning(
                     f"Failed to list repositories for {org.name} in {provider_name}: {e}"
                 )
@@ -283,6 +303,7 @@ async def _process_single_provider(
                 progress.update(provider_task_id, completed=i + 1)
 
     except Exception as e:
+        errors.append(e)
         logger.warning(
             f"Error during repository listing for provider {provider_name}: {e}"
         )
@@ -291,8 +312,150 @@ async def _process_single_provider(
         if hasattr(provider, "cleanup"):
             await provider.cleanup()
 
+    # A provider that yielded nothing AND errored must fail loud, not present as
+    # "0 repositories". Partial results still return (union design).
+    if not results and errors:
+        raise errors[0]
+
     logger.debug(f"Provider {provider_name}: Found {len(results)} repositories")
     return results
+
+
+def provider_dedup_key(result: RepositoryResult) -> str:
+    """Secondary dedup key: host/org/name.
+
+    Host is included so the same org/name on different providers (hybrid setups)
+    is preserved rather than collapsed onto a single entry.
+    """
+    host = urlparse(result.repo.clone_url).hostname or "unknown"
+    return f"{host}/{result.org_name}/{result.repo.name}"
+
+
+async def _gather_provider_results(
+    matching_providers: list[str],
+    remaining_query: str,
+    limit: int | None,
+    show_progress: bool,
+    fail_fast: bool,
+) -> tuple[list[RepositoryResult], list[ProviderOutcome]]:
+    """Query providers concurrently and return their results plus outcomes.
+
+    With ``fail_fast`` a fatal provider error propagates as an MgitError; without
+    it the provider is recorded as a failed outcome and the rest continue.
+    """
+    all_results: list[RepositoryResult] = []
+    outcomes: list[ProviderOutcome] = []
+    sem = asyncio.Semaphore(min(4, len(matching_providers)))
+
+    progress_cm = (
+        Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            MofNCompleteColumn(),
+            TextColumn("• {task.fields[repos_found]} repos found"),
+            console=console,
+            transient=False,
+        )
+        if show_progress
+        else contextlib.nullcontext()
+    )
+
+    with progress_cm as progress:
+        overall_task = None
+        if progress is not None:
+            overall_task = progress.add_task(
+                f"Discovering across {len(matching_providers)} providers...",
+                total=len(matching_providers),
+                repos_found=0,
+            )
+
+        async def process_provider(
+            provider_name_item: str,
+        ) -> tuple[list[RepositoryResult], ProviderOutcome]:
+            """Process one provider and return its results plus its outcome."""
+            async with sem:
+                provider_task = None
+                if progress is not None:
+                    provider_task = progress.add_task(
+                        f"  └─ {provider_name_item}: Initializing...",
+                        total=None,
+                        repos_found=0,
+                    )
+
+                try:
+                    results = await _process_single_provider(
+                        provider_name=provider_name_item,
+                        query=remaining_query,
+                        limit=limit,
+                        progress=progress,
+                        provider_task_id=provider_task,
+                    )
+                    if progress is not None:
+                        progress.update(
+                            overall_task,
+                            repos_found=len(all_results) + len(results),
+                        )
+                        progress.advance(overall_task, 1)
+                    return results, ProviderOutcome(provider_name_item, True)
+
+                except FATAL_PROVIDER_ERRORS as e:
+                    if fail_fast:
+                        raise
+                    logger.warning(
+                        f"Failed to process provider {provider_name_item}: {e}"
+                    )
+                    if progress is not None:
+                        progress.update(
+                            provider_task,
+                            description=f"  └─ {provider_name_item}: Error - {str(e)[:50]}",
+                            completed=True,
+                        )
+                        progress.advance(overall_task, 1)
+                    return [], ProviderOutcome(provider_name_item, False, str(e))
+
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to process provider {provider_name_item}: {e}"
+                    )
+                    if progress is not None:
+                        progress.update(
+                            provider_task,
+                            description=f"  └─ {provider_name_item}: Error - {str(e)[:50]}",
+                            completed=True,
+                        )
+                        progress.advance(overall_task, 1)
+                    return [], ProviderOutcome(provider_name_item, False, str(e))
+
+        gathered = await asyncio.gather(
+            *(process_provider(pname) for pname in matching_providers),
+            return_exceptions=True,
+        )
+
+        for pname, result in zip(matching_providers, gathered, strict=True):
+            if isinstance(result, FATAL_PROVIDER_ERRORS):
+                # Only reachable when fail_fast re-raised inside the closure.
+                raise MgitError(str(result))
+            elif isinstance(result, tuple):
+                items, outcome = result
+                all_results.extend(items)
+                outcomes.append(outcome)
+            elif isinstance(result, Exception):
+                # Progress-machinery calls outside the closure try (add_task /
+                # semaphore) can still raise; record rather than crash.
+                logger.warning(f"Provider processing failed: {result}")
+                outcomes.append(ProviderOutcome(pname, False, str(result)))
+
+        if progress is not None:
+            progress.update(
+                overall_task,
+                completed=len(matching_providers),
+                repos_found=len(all_results),
+                description=f"Completed - processed {len(matching_providers)} providers",
+            )
+
+    return all_results, outcomes
 
 
 async def list_repositories(
@@ -320,13 +483,12 @@ async def list_repositories(
     if error_msg:
         raise MgitError(f"Invalid query: {error_msg}")
 
-    # Check if this is a multi-provider wildcard discovery
-    # Multi-provider mode when no specific provider and first segment has wildcards
+    # Multi-provider mode whenever no specific provider is requested. The multi
+    # path also handles wildcard-free queries: a non-wildcard first segment maps
+    # to provider_pattern "*" against the full query.
     query_segments = query.split("/")
     first_segment = query_segments[0] if query_segments else ""
-    # Multi-provider mode when no specific provider OR when provider is specified with wildcards
-    # However, if a specific provider is requested, always use single-provider mode
-    is_multi_provider_pattern = provider_name is None and ("*" in query or "?" in query)
+    is_multi_provider_pattern = provider_name is None
 
     if is_multi_provider_pattern:
         query_segments = query.split("/")
@@ -366,139 +528,14 @@ async def list_repositories(
                 )
             return ListingResult()
 
-        # Process multiple providers concurrently
-        all_results = []
-        outcomes: list[ProviderOutcome] = []
-        sem = asyncio.Semaphore(
-            min(4, len(matching_providers))
-        )  # Limit concurrent providers
-
         show_progress = format_type != "json"
-        if show_progress:
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(),
-                MofNCompleteColumn(),
-                TextColumn("• {task.fields[repos_found]} repos found"),
-                console=console,
-                transient=False,
-            ) as progress:
-                # Overall discovery task
-                overall_task = progress.add_task(
-                    f"Discovering across {len(matching_providers)} providers...",
-                    total=len(matching_providers),
-                    repos_found=0,
-                )
-
-                async def process_provider(
-                    provider_name_item: str,
-                ) -> tuple[list[RepositoryResult], ProviderOutcome]:
-                    """Process a single provider and return its results."""
-                    async with sem:
-                        # Add provider-specific task
-                        provider_task = progress.add_task(
-                            f"  └─ {provider_name_item}: Initializing...",
-                            total=None,
-                            repos_found=0,
-                        )
-
-                        try:
-                            # Process this provider
-                            provider_results = await _process_single_provider(
-                                provider_name=provider_name_item,
-                                query=remaining_query,
-                                limit=limit,
-                                progress=progress,
-                                provider_task_id=provider_task,
-                            )
-
-                            # Update overall progress
-                            progress.update(
-                                overall_task,
-                                repos_found=len(all_results) + len(provider_results),
-                            )
-                            progress.advance(overall_task, 1)
-
-                            return provider_results, ProviderOutcome(
-                                provider_name_item, True
-                            )
-
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to process provider {provider_name_item}: {e}"
-                            )
-                            progress.update(
-                                provider_task,
-                                description=f"  └─ {provider_name_item}: Error - {str(e)[:50]}",
-                                completed=True,
-                            )
-                            progress.advance(overall_task, 1)
-                            return [], ProviderOutcome(
-                                provider_name_item, False, str(e)
-                            )
-
-                # Process all providers concurrently
-                provider_results = await asyncio.gather(
-                    *(process_provider(pname) for pname in matching_providers),
-                    return_exceptions=True,
-                )
-
-                # Collect all results and per-provider outcomes
-                for pname, result in zip(
-                    matching_providers, provider_results, strict=True
-                ):
-                    if isinstance(result, tuple):
-                        items, outcome = result
-                        all_results.extend(items)
-                        outcomes.append(outcome)
-                    elif isinstance(result, Exception):
-                        logger.warning(f"Provider processing failed: {result}")
-                        outcomes.append(ProviderOutcome(pname, False, str(result)))
-
-                # Final update
-                progress.update(
-                    overall_task,
-                    completed=len(matching_providers),
-                    repos_found=len(all_results),
-                    description=f"Completed - processed {len(matching_providers)} providers",
-                )
-        else:
-            # JSON mode: no progress output
-            async def process_provider(
-                provider_name_item: str,
-            ) -> tuple[list[RepositoryResult], ProviderOutcome]:
-                async with sem:
-                    try:
-                        provider_results = await _process_single_provider(
-                            provider_name=provider_name_item,
-                            query=remaining_query,
-                            limit=limit,
-                            progress=None,
-                            provider_task_id=None,
-                        )
-                        return provider_results, ProviderOutcome(
-                            provider_name_item, True
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to process provider {provider_name_item}: {e}"
-                        )
-                        return [], ProviderOutcome(provider_name_item, False, str(e))
-
-            provider_results = await asyncio.gather(
-                *(process_provider(pname) for pname in matching_providers),
-                return_exceptions=True,
-            )
-            for pname, result in zip(matching_providers, provider_results, strict=True):
-                if isinstance(result, tuple):
-                    items, outcome = result
-                    all_results.extend(items)
-                    outcomes.append(outcome)
-                elif isinstance(result, Exception):
-                    logger.warning(f"Provider processing failed: {result}")
-                    outcomes.append(ProviderOutcome(pname, False, str(result)))
+        all_results, outcomes = await _gather_provider_results(
+            matching_providers,
+            remaining_query,
+            limit,
+            show_progress,
+            fail_fast=False,
+        )
 
         logger.debug(
             f"Found {len(all_results)} total repositories from {len(matching_providers)} providers"
@@ -519,10 +556,7 @@ async def list_repositories(
                 continue
 
             # Secondary deduplication by host/org/name combination.
-            # Host is included so the same org/name on different providers
-            # (hybrid setups) is preserved rather than collapsed.
-            host = urlparse(repo.clone_url).hostname or "unknown"
-            org_name_key = f"{host}/{result.org_name}/{repo.name}"
+            org_name_key = provider_dedup_key(result)
             if org_name_key in seen_org_names:
                 duplicates_removed += 1
                 continue
@@ -539,162 +573,24 @@ async def list_repositories(
         )
 
         return ListingResult(results=deduplicated_results, provider_outcomes=outcomes)
-    # Single provider mode - use multi-provider logic with just one provider
+    # Single provider mode: query the one requested provider, fail-fast.
     else:
-        # When provider is specified, treat it as multi-provider with one provider
-        if provider_name:
-            matching_providers = [provider_name]
-            remaining_query = query
-        # Process the single provider using multi-provider logic
-        all_results = []
-        outcomes = []
-        sem = asyncio.Semaphore(1)  # Only one provider, so limit is 1
-
+        matching_providers = [provider_name]
+        remaining_query = query
         show_progress = format_type != "json"
-        if show_progress:
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(),
-                MofNCompleteColumn(),
-                TextColumn("• {task.fields[repos_found]} repos found"),
-                console=console,
-                transient=False,
-            ) as progress:
-                # Overall discovery task
-                overall_task = progress.add_task(
-                    "Discovering repositories...",
-                    total=len(matching_providers),
-                    repos_found=0,
-                )
-
-                async def process_provider(
-                    provider_name_item: str,
-                ) -> tuple[list[RepositoryResult], ProviderOutcome]:
-                    """Process the provider and return its results."""
-                    async with sem:
-                        # Add provider-specific task
-                        provider_task = progress.add_task(
-                            f"  └─ {provider_name_item}: Initializing...",
-                            total=None,
-                            repos_found=0,
-                        )
-
-                        try:
-                            # Process this provider
-                            provider_results = await _process_single_provider(
-                                provider_name=provider_name_item,
-                                query=remaining_query,
-                                limit=limit,
-                                progress=progress,
-                                provider_task_id=provider_task,
-                            )
-
-                            # Update overall progress
-                            progress.update(
-                                overall_task,
-                                repos_found=len(all_results) + len(provider_results),
-                            )
-                            progress.advance(overall_task, 1)
-
-                            return provider_results, ProviderOutcome(
-                                provider_name_item, True
-                            )
-
-                        except (ConfigurationError, AuthenticationError):
-                            # Fail-fast: configuration and credential errors
-                            # must propagate, not present as empty results.
-                            raise
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to process provider {provider_name_item}: {e}"
-                            )
-                            progress.update(
-                                provider_task,
-                                description=f"  └─ {provider_name_item}: Error - {str(e)[:50]}",
-                                completed=True,
-                            )
-                            progress.advance(overall_task, 1)
-                            return [], ProviderOutcome(
-                                provider_name_item, False, str(e)
-                            )
-
-                # Process the provider
-                provider_results = await asyncio.gather(
-                    *(process_provider(pname) for pname in matching_providers),
-                    return_exceptions=True,
-                )
-
-                # Collect results - fail-fast on configuration/credential errors
-                for pname, result in zip(
-                    matching_providers, provider_results, strict=True
-                ):
-                    if isinstance(result, (ConfigurationError, AuthenticationError)):
-                        raise MgitError(str(result))
-                    elif isinstance(result, tuple):
-                        items, outcome = result
-                        all_results.extend(items)
-                        outcomes.append(outcome)
-                    elif isinstance(result, Exception):
-                        logger.warning(f"Provider processing failed: {result}")
-                        outcomes.append(ProviderOutcome(pname, False, str(result)))
-
-                # Final update
-                progress.update(
-                    overall_task,
-                    completed=len(matching_providers),
-                    repos_found=len(all_results),
-                    description=f"Completed - processed {len(matching_providers)} providers",
-                )
-        else:
-            # JSON mode: no progress output
-            async def process_provider(
-                provider_name_item: str,
-            ) -> tuple[list[RepositoryResult], ProviderOutcome]:
-                async with sem:
-                    try:
-                        provider_results = await _process_single_provider(
-                            provider_name=provider_name_item,
-                            query=remaining_query,
-                            limit=limit,
-                            progress=None,
-                            provider_task_id=None,
-                        )
-                        return provider_results, ProviderOutcome(
-                            provider_name_item, True
-                        )
-                    except (ConfigurationError, AuthenticationError):
-                        # Fail-fast: configuration and credential errors
-                        # must propagate, not present as empty results.
-                        raise
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to process provider {provider_name_item}: {e}"
-                        )
-                        return [], ProviderOutcome(provider_name_item, False, str(e))
-
-            provider_results = await asyncio.gather(
-                *(process_provider(pname) for pname in matching_providers),
-                return_exceptions=True,
-            )
-            # Collect results - fail-fast on configuration/credential errors
-            for pname, result in zip(matching_providers, provider_results, strict=True):
-                if isinstance(result, (ConfigurationError, AuthenticationError)):
-                    raise MgitError(str(result))
-                elif isinstance(result, tuple):
-                    items, outcome = result
-                    all_results.extend(items)
-                    outcomes.append(outcome)
-                elif isinstance(result, Exception):
-                    logger.warning(f"Provider processing failed: {result}")
-                    outcomes.append(ProviderOutcome(pname, False, str(result)))
+        all_results, outcomes = await _gather_provider_results(
+            matching_providers,
+            remaining_query,
+            limit,
+            show_progress,
+            fail_fast=True,
+        )
 
         logger.debug(
             f"Found {len(all_results)} total repositories from {len(matching_providers)} providers"
         )
 
-        # For single provider, skip deduplication since there's only one provider
+        # Single provider: nothing to deduplicate.
         return ListingResult(results=all_results, provider_outcomes=outcomes)
 
 
