@@ -404,9 +404,10 @@ def _save_to_changeset_storage(
             )
 
     except Exception as e:
+        # Fail loud: the user asked for persistence; a lost save must not
+        # present as success.
         logger.error(f"Failed to save changesets: {e}")
-        if verbose:
-            console.print(f"[red]Failed to save changesets: {e}[/red]")
+        raise
 
 
 def _filter_incremental_changes(

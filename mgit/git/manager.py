@@ -298,7 +298,11 @@ class GitManager:
 
         for attempt in range(max_retries + 1):
             try:
-                result = subprocess.run(
+                # Run in a worker thread: subprocess.run blocks, and running it
+                # on the event loop would serialize every concurrent git
+                # operation despite the semaphore throttling (ADR-003).
+                result = await asyncio.to_thread(
+                    subprocess.run,
                     cmd,
                     cwd=cwd,
                     capture_output=True,

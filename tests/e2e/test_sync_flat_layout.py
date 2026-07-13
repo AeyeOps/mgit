@@ -378,6 +378,41 @@ class TestCollisionResolution:
         assert not (temp_dir / "repo-one_unique-org-a").exists()
         assert not (temp_dir / "repo-two_unique-org-b").exists()
 
+    @pytest.mark.docker
+    def test_25_dirty_collision_repo_does_not_block_sibling(
+        self, run_mgit, temp_dir, gitea_collision_repos, gitea_mgit_env
+    ):
+        """Test 25: A dirty repo must not block a same-named clean sibling.
+
+        Skip filtering is keyed by clone URL, not repo name: a dirty
+        common-repo in org-a must not knock the same-named org-b repo out of
+        the sync set.
+        """
+        import shutil
+
+        result = run_mgit(
+            ["sync", "test-org-*/*/*", str(temp_dir), "--provider", "gitea_test"],
+            env=gitea_mgit_env,
+        )
+        assert result.returncode == 0, f"Initial sync failed: {result.stderr}"
+        dir_a = temp_dir / "common-repo_test-org-a"
+        dir_b = temp_dir / "common-repo_test-org-b"
+        assert dir_a.exists() and dir_b.exists()
+
+        # Dirty org-a's clone; remove org-b's so the re-sync must clone it.
+        (dir_a / "dirty.txt").write_text("uncommitted\n")
+        shutil.rmtree(dir_b)
+
+        result = run_mgit(
+            ["sync", "test-org-*/*/*", str(temp_dir), "--provider", "gitea_test"],
+            env=gitea_mgit_env,
+        )
+        assert result.returncode == 0, f"Re-sync failed: {result.stderr}"
+        assert (dir_b / ".git").exists(), (
+            "Clean same-named repo was skipped because its sibling is dirty"
+        )
+        assert (dir_a / "dirty.txt").exists(), "Dirty repo's local change was lost"
+
 
 # --- Section D: Error Handling Tests ---
 

@@ -17,7 +17,6 @@ class QueryPattern:
     org_pattern: str
     project_pattern: str
     repo_pattern: str
-    provider_type: str | None = None
 
     @property
     def has_org_filter(self) -> bool:
@@ -26,9 +25,7 @@ class QueryPattern:
 
     @property
     def has_project_filter(self) -> bool:
-        """Check if project is filtered, considering provider type."""
-        if self.provider_type in ("github", "bitbucket"):
-            return False
+        """Check if project is filtered (not wildcard)."""
         return self.project_pattern != "*"
 
     @property
@@ -37,12 +34,11 @@ class QueryPattern:
         return self.repo_pattern != "*"
 
 
-def parse_query(query: str, provider_type: str | None = None) -> QueryPattern:
+def parse_query(query: str) -> QueryPattern:
     """Parse query string into pattern components.
 
     Args:
         query: Query pattern like "org/project/repo" with wildcards
-        provider_type: Type of provider to tailor parsing (e.g., 'github')
 
     Returns:
         QueryPattern with parsed segments
@@ -64,17 +60,10 @@ def parse_query(query: str, provider_type: str | None = None) -> QueryPattern:
     project_pattern = segments[1] if len(segments) > 1 else "*"
     repo_pattern = segments[2] if len(segments) > 2 else "*"
 
-    # Provider-specific parsing (override defaults if needed)
-    if provider_type in ("github", "bitbucket"):
-        # GitHub/BitBucket: org/repo (repo can have slashes)
-        project_pattern = "*"
-        repo_pattern = "/".join(segments[1:]) if len(segments) > 1 else "*"
-
     return QueryPattern(
         org_pattern=org_pattern or "*",
         project_pattern=project_pattern or "*",
         repo_pattern=repo_pattern or "*",
-        provider_type=provider_type,
     )
 
 

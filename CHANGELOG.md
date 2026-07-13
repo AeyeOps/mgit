@@ -6,6 +6,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Multi-provider discovery reports per-provider outcomes: `mgit list` warns
+  which providers failed, and the sync summary's failed-provider warning now
+  reflects reality instead of assuming every provider succeeded.
+- Provider loggers no longer attach their own stdout handler, which duplicated
+  log lines and could corrupt `--format json` output; records flow through the
+  configured mgit handlers with credential masking intact.
+- `mgit diff --save-changeset` and `mgit diff-remote --save-changeset` exit
+  non-zero when the save fails instead of reporting success.
+- `mgit diff` records the destination path for renamed files instead of the
+  literal "old -> new" string.
+- Bulk clone/pull operations now actually run concurrently. Git subprocesses
+  and the synchronous Azure DevOps SDK calls ran on the event loop, serializing
+  every operation regardless of `--concurrency`; both now run in worker
+  threads.
+- Invalid credentials fail loud instead of presenting as success. The Azure
+  DevOps provider raises on authentication and listing failures (matching the
+  GitHub provider), and `mgit list` / `mgit sync --provider` exit non-zero on a
+  bad credential instead of reporting "Found 0 repositories" with exit 0.
+- `mgit sync` no longer conflates same-named repositories from different
+  organizations. Skip filtering, the dry-run preview, and case-collision
+  force-sync are keyed by clone URL; a dirty `org-a/repo` no longer causes a
+  clean `org-b/repo` to be skipped (or reset).
+- `mgit list` multi-provider deduplication includes the host, so the same
+  org/name on different providers (hybrid setups) is no longer collapsed into
+  one result.
+- The provider rate limiter now waits until the reported reset timestamp
+  (bounded by `rate_limiter.max_wait_seconds`) and raises `RateLimitError`
+  instead of a bare `Exception`; previously an exponential-backoff value
+  silently replaced the computed wait.
+
+### Changed
+- Removed unreachable subsystems: the `mgit.pipeline` package,
+  `security/integration.py`, `security/patches.py`, and `utils/progress.py`
+  (~4,100 lines with no callers).
+- The `rate_limiter.exponential_rate` and `rate_limiter.backoff_max_seconds`
+  config keys are removed; only `max_wait_seconds` remains.
+- Local sync (`mgit sync` without a pattern) attaches provider credentials more
+  strictly: base-URL prefix matching requires a path boundary, and the
+  sole-configuration fallback applies only to canonical provider hosts
+  (`github.com`, `bitbucket.org`, `dev.azure.com`, `*.visualstudio.com`).
+  Remotes on other hosts get credentials only via an explicit base-URL or host
+  match against a configured provider URL.
+
+### Security
+- Dependency updates clear all pip-audit advisories: aiohttp 3.14.1 (nine
+  CVEs), cryptography 49.0.0, idna 3.18, msgpack 1.2.1, pip 26.1.2.
+- Local sync no longer sends an Authorization header to hosts that merely
+  pattern-match a provider type (e.g. a remote whose URL path contains
+  "github"); see the credential-matching change above.
+
 ## [0.13.0] - 2026-05-14
 
 ### Added

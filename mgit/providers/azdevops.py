@@ -4,6 +4,7 @@ This module implements the Azure DevOps provider that extends the abstract
 GitProvider base class to support Azure DevOps repositories.
 """
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from typing import Any
@@ -22,6 +23,11 @@ from mgit.providers.base import (
     Organization,
     Project,
     Repository,
+)
+from mgit.providers.exceptions import (
+    APIError,
+    AuthenticationError,
+    ConnectionError,
 )
 
 logger = logging.getLogger(__name__)
@@ -98,21 +104,33 @@ class AzureDevOpsProvider(GitProvider):
             self.core_client = self.connection.clients.get_core_client()
             self.git_client = self.connection.clients.get_git_client()
 
-            # Test the connection by listing projects
-            self.core_client.get_projects()
+            # Test the connection by listing projects. The Azure SDK is
+            # synchronous — run it in a worker thread so the event loop
+            # stays free for concurrent operations.
+            await asyncio.to_thread(self.core_client.get_projects)
 
             self._authenticated = True
             logger.debug("Azure DevOps authentication successful for %s", self.url)
             return True
 
-        except (AzureDevOpsAuthenticationError, ClientRequestError) as e:
+        except AzureDevOpsAuthenticationError as e:
             logger.error("Azure DevOps authentication failed: %s", e)
             self._authenticated = False
-            return False
+            raise AuthenticationError(
+                f"Azure DevOps authentication failed: {e}", self.PROVIDER_NAME
+            ) from e
+        except ClientRequestError as e:
+            logger.error("Azure DevOps connection failed: %s", e)
+            self._authenticated = False
+            raise ConnectionError(
+                f"Failed to connect to Azure DevOps: {e}", self.PROVIDER_NAME
+            ) from e
         except Exception as e:
             logger.error("Unexpected error during Azure DevOps authentication: %s", e)
             self._authenticated = False
-            return False
+            raise AuthenticationError(
+                f"Azure DevOps authentication failed: {e}", self.PROVIDER_NAME
+            ) from e
 
     async def test_connection(self) -> bool:
         """Test if the connection and authentication are valid.
@@ -121,14 +139,18 @@ class AzureDevOpsProvider(GitProvider):
             bool: True if connection is valid
         """
         if not self._authenticated:
-            return await self.authenticate()
+            try:
+                return await self.authenticate()
+            except (AuthenticationError, ConnectionError) as e:
+                logger.error("Azure DevOps connection test failed: %s", e)
+                return False
 
         if not self.core_client:
             return False
 
         try:
             # A simple call to verify authentication and connection
-            self.core_client.get_projects()
+            await asyncio.to_thread(self.core_client.get_projects)
             logger.debug("Azure DevOps connection test successful.")
             return True
         except (AzureDevOpsAuthenticationError, ClientRequestError) as e:
@@ -185,7 +207,7 @@ class AzureDevOpsProvider(GitProvider):
 
         try:
             # Get all projects
-            projects_response = self.core_client.get_projects()
+            projects_response = await asyncio.to_thread(self.core_client.get_projects)
             projects = []
 
             for proj in projects_response:
@@ -213,7 +235,7 @@ class AzureDevOpsProvider(GitProvider):
 
         except Exception as e:
             logger.error("Error listing projects: %s", e)
-            return []
+            raise APIError(f"Failed to list projects: {e}", self.PROVIDER_NAME) from e
 
     async def list_repositories(
         self,
@@ -250,8 +272,8 @@ class AzureDevOpsProvider(GitProvider):
                 return
 
             # List repositories in the project
-            repos: list[GitRepository] = self.git_client.get_repositories(
-                project=project_details.id
+            repos: list[GitRepository] = await asyncio.to_thread(
+                self.git_client.get_repositories, project=project_details.id
             )
 
             for repo in repos:
@@ -281,6 +303,9 @@ class AzureDevOpsProvider(GitProvider):
 
         except Exception as e:
             logger.error("Error listing repositories: %s", e)
+            raise APIError(
+                f"Failed to list repositories: {e}", self.PROVIDER_NAME
+            ) from e
 
     async def get_repository(
         self, organization: str, repository: str, project: str | None = None
@@ -314,8 +339,10 @@ class AzureDevOpsProvider(GitProvider):
                 return None
 
             # Get the specific repository
-            repo = self.git_client.get_repository(
-                project=project_details.id, repository_id=repository
+            repo = await asyncio.to_thread(
+                self.git_client.get_repository,
+                project=project_details.id,
+                repository_id=repository,
             )
 
             if repo:
@@ -372,7 +399,9 @@ class AzureDevOpsProvider(GitProvider):
             return None
 
         try:
-            return self.core_client.get_project(project_name_or_id)
+            return await asyncio.to_thread(
+                self.core_client.get_project, project_name_or_id
+            )
         except Exception as e:
             logger.error("Failed to get project '%s': %s", project_name_or_id, e)
             return None

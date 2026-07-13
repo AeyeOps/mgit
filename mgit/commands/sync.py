@@ -175,6 +175,26 @@ def _load_provider_auth_configs() -> list[ProviderAuthConfig]:
     return configs
 
 
+# Canonical public hosts per provider type. The sole-config fallback below
+# attaches credentials without a base-URL or host match, so it is restricted
+# to these hosts — never to an arbitrary host that merely pattern-detected as
+# the provider type (which would leak a token to an unrelated server).
+_CANONICAL_PROVIDER_HOSTS: dict[str, tuple[str, ...]] = {
+    "github": ("github.com",),
+    "bitbucket": ("bitbucket.org",),
+    "azuredevops": ("dev.azure.com",),
+}
+
+
+def _is_canonical_provider_host(host: str | None, provider_type: str) -> bool:
+    if not host:
+        return False
+    if host in _CANONICAL_PROVIDER_HOSTS.get(provider_type, ()):
+        return True
+    # Legacy Azure DevOps organization hosts: <org>.visualstudio.com
+    return provider_type == "azuredevops" and host.endswith(".visualstudio.com")
+
+
 def _match_provider_config(
     remote_url: str, provider_type: str, configs: list[ProviderAuthConfig]
 ) -> ProviderAuthConfig | None:
@@ -189,7 +209,11 @@ def _match_provider_config(
     remote_lower = normalized_remote.lower()
     best_match = None
     for config in candidates:
-        if remote_lower.startswith(config.base_url.lower()):
+        # Prefix match must land on a path boundary: without it,
+        # "https://github.com" would also match "https://github.community/…"
+        # and hand that host the github.com credentials.
+        base = config.base_url.lower()
+        if remote_lower == base or remote_lower.startswith(base + "/"):
             if best_match is None or len(config.base_url) > len(best_match.base_url):
                 best_match = config
 
@@ -200,6 +224,11 @@ def _match_provider_config(
     host_matches = [config for config in candidates if config.host == remote_host]
     if host_matches:
         return sorted(host_matches, key=lambda cfg: len(cfg.base_url), reverse=True)[0]
+
+    # Sole-config fallback: covers configs whose URL is the API host (e.g.
+    # api.github.com) while remotes live on the web host. Canonical hosts only.
+    if not _is_canonical_provider_host(remote_host, provider_type):
+        return None
 
     token_configs = [config for config in candidates if config.token]
     if len(token_configs) == 1:
@@ -524,18 +553,8 @@ async def resolve_repositories_for_sync(
                 )
                 return repo_list, False
 
-            # Fallback: list repositories based on provided pattern scope
-            repositories = provider_manager.list_repositories(pattern)
-            if hasattr(repositories, "__len__"):
-                repo_list = list(repositories)
-            else:
-                repo_list = [repositories] if repositories else []
-
-            console.print(
-                f"[green]Found {len(repo_list)} repositories[/green] for exact match"
-            )
-
-            return repo_list, False
+            # Unreachable: analyze_pattern rejects non-3-segment patterns above.
+            raise ValueError(f"Expected org/project/repo pattern, got: {pattern!r}")
 
     except Exception as e:
         logger.error(f"Error resolving repositories: {e}")
@@ -549,11 +568,18 @@ async def analyze_repository_states(
     flat_layout: bool = True,
     resolved_names: dict[str, str] | None = None,
 ):
-    """Analyze current state of repositories in target path."""
+    """Analyze current state of repositories in target path.
+
+    Repositories are tracked by clone URL, not name: repos from different
+    orgs can share a name (flat-layout collision resolution exists for
+    exactly that case), so name-keyed tracking would conflate them.
+    """
     from dataclasses import dataclass
 
     @dataclass
     class RepoAnalysis:
+        """Each list holds clone URLs (unique), not display names."""
+
         clean_repos: list[str]
         dirty_repos: list[str]
         missing_repos: list[str]
@@ -571,15 +597,15 @@ async def analyze_repository_states(
         local_path = target_path / repo_path
 
         if not local_path.exists():
-            missing_repos.append(repo.name)
+            missing_repos.append(repo.clone_url)
         elif not (local_path / ".git").exists():
             # An empty directory will be removed and cloned into by the
             # processor, so treat it as cloneable; only a non-empty non-git
             # directory is a genuine skip.
             if any(local_path.iterdir()):
-                non_git_dirs.append(repo.name)
+                non_git_dirs.append(repo.clone_url)
             else:
-                missing_repos.append(repo.name)
+                missing_repos.append(repo.clone_url)
         else:
             # Check if repo has uncommitted changes
             try:
@@ -588,7 +614,7 @@ async def analyze_repository_states(
                 )
                 if returncode != 0:
                     # Could not determine state — treat as dirty for safety.
-                    dirty_repos.append(repo.name)
+                    dirty_repos.append(repo.clone_url)
                 elif stdout:
                     # Distinguish a genuine dirty repo from one that only looks
                     # dirty because it has case-colliding paths that cannot
@@ -596,14 +622,14 @@ async def analyze_repository_states(
                     dirty_paths = parse_porcelain_z(stdout)
                     collisions = find_case_collisions(local_path)
                     if classify_dirty_repo(dirty_paths, collisions) == "case_collision":
-                        case_collision_repos.append(repo.name)
+                        case_collision_repos.append(repo.clone_url)
                     else:
-                        dirty_repos.append(repo.name)
+                        dirty_repos.append(repo.clone_url)
                 else:
-                    clean_repos.append(repo.name)
+                    clean_repos.append(repo.clone_url)
             except Exception:
                 # If git status fails, consider it dirty for safety
-                dirty_repos.append(repo.name)
+                dirty_repos.append(repo.clone_url)
 
     return RepoAnalysis(
         clean_repos, dirty_repos, missing_repos, non_git_dirs, case_collision_repos
@@ -638,13 +664,13 @@ async def show_sync_preview(
         else:
             repo_name = f"{repo_path.parts[-3]}/{repo_path.parts[-1]}"
 
-        if repo.name in repo_analysis.missing_repos:
+        if repo.clone_url in repo_analysis.missing_repos:
             table.add_row(repo_name, "Missing", "🔄 Clone", "New repository")
-        elif repo.name in repo_analysis.non_git_dirs:
+        elif repo.clone_url in repo_analysis.non_git_dirs:
             table.add_row(
                 repo_name, "Non-Git", "⚠️ Skip", "Directory exists but not git repo"
             )
-        elif repo.name in repo_analysis.case_collision_repos:
+        elif repo.clone_url in repo_analysis.case_collision_repos:
             if force:
                 table.add_row(
                     repo_name, "Case-collision", "🗑️ Force Clone", "Will re-clone fresh"
@@ -656,7 +682,7 @@ async def show_sync_preview(
                     "↻ Sync to origin",
                     "Case-colliding paths; fetch + reset to origin",
                 )
-        elif repo.name in repo_analysis.dirty_repos:
+        elif repo.clone_url in repo_analysis.dirty_repos:
             if force:
                 table.add_row(
                     repo_name, "Dirty", "🗑️ Force Clone", "Will delete local changes"
@@ -995,12 +1021,20 @@ async def sync_command(
                 console.print(f"  • {name}: {len(repos)} repos")
         resolved_names = resolve_collision_names(repositories)
 
+    def _display_name(repo_url: str) -> str:
+        """Human-readable identity for a repo: its resolved local path.
+
+        Unique even when repo names collide across orgs, because flat-layout
+        collision resolution disambiguates the directory names.
+        """
+        return str(resolve_local_repo_path(repo_url, flat_layout, resolved_names))
+
     # Repositories filtered out before the sync runs, with the reason for each.
     # Threaded into the final summary so nothing silently vanishes from the tally.
     pre_skipped: list[tuple[str, str]] = []
     # Repos whose dirtiness is purely a case-collision checkout artifact. These
     # stay in `repositories` and are force-synced to origin by the processor.
-    case_collision_names: set[str] = set()
+    case_collision_urls: set[str] = set()
 
     # Analyze repositories before operation
     if not dry_run:
@@ -1012,8 +1046,8 @@ async def sync_command(
             console.print(
                 "\n[yellow]⚠️  Repositories with uncommitted changes:[/yellow]"
             )
-            for repo_name in repo_analysis.dirty_repos:
-                console.print(f"  • {repo_name}")
+            for repo_url in repo_analysis.dirty_repos:
+                console.print(f"  • {_display_name(repo_url)}")
             console.print(
                 "\n[blue]These will be skipped. Use --force to override (will lose changes)[/blue]"
             )
@@ -1023,8 +1057,8 @@ async def sync_command(
                 "\n[cyan]ℹ️  Repositories with case-colliding paths "
                 "(will be synced to origin):[/cyan]"
             )
-            for repo_name in repo_analysis.case_collision_repos:
-                console.print(f"  • {repo_name}")
+            for repo_url in repo_analysis.case_collision_repos:
+                console.print(f"  • {_display_name(repo_url)}")
             console.print(
                 "\n[blue]These contain paths differing only in case. mgit will "
                 "fetch and reset them to origin so they stay current; on a "
@@ -1036,8 +1070,8 @@ async def sync_command(
             console.print(
                 "\n[yellow]⚠️  Directories that exist but are not git repositories:[/yellow]"
             )
-            for dir_name in repo_analysis.non_git_dirs:
-                console.print(f"  • {dir_name}")
+            for repo_url in repo_analysis.non_git_dirs:
+                console.print(f"  • {_display_name(repo_url)}")
             console.print(
                 "\n[blue]These will be skipped (folder exists but not a git repo)[/blue]"
             )
@@ -1048,16 +1082,16 @@ async def sync_command(
         # Case-collision repos are NOT filtered: they stay in `repositories`
         # and the processor force-syncs them to origin.
         if not force:
-            for repo_name in repo_analysis.dirty_repos:
-                pre_skipped.append((repo_name, SKIP_REASON_DIRTY))
-            for dir_name in repo_analysis.non_git_dirs:
-                pre_skipped.append((dir_name, SKIP_REASON_NON_GIT))
+            for repo_url in repo_analysis.dirty_repos:
+                pre_skipped.append((_display_name(repo_url), SKIP_REASON_DIRTY))
+            for repo_url in repo_analysis.non_git_dirs:
+                pre_skipped.append((_display_name(repo_url), SKIP_REASON_NON_GIT))
 
-            skip_names = {name for name, _ in pre_skipped}
-            if skip_names:
-                repositories = [r for r in repositories if r.name not in skip_names]
+            skip_urls = set(repo_analysis.dirty_repos) | set(repo_analysis.non_git_dirs)
+            if skip_urls:
+                repositories = [r for r in repositories if r.clone_url not in skip_urls]
 
-            case_collision_names = set(repo_analysis.case_collision_repos)
+            case_collision_urls = set(repo_analysis.case_collision_repos)
 
     # Enhanced dry run with repository analysis
     if dry_run:
@@ -1107,7 +1141,7 @@ async def sync_command(
             dirs_to_remove,
             resolved_names,
             pre_skipped,
-            case_collision_names,
+            case_collision_urls,
         )
     else:
         await run_sync_quiet(
@@ -1120,7 +1154,7 @@ async def sync_command(
             dirs_to_remove,
             resolved_names,
             pre_skipped,
-            case_collision_names,
+            case_collision_urls,
         )
 
 

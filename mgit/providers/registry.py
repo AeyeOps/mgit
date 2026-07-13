@@ -392,41 +392,6 @@ class ProviderRegistry:
         self._auto_discovered = False
         logger.debug("Cleared provider registry")
 
-    def get_provider_info(self, provider_type: str) -> dict[str, Any]:
-        """Get information about a registered provider.
-
-        Args:
-            provider_type: Provider type to get info for
-
-        Returns:
-            Dictionary with provider information
-
-        Raises:
-            ProviderNotFoundError: If provider not found
-        """
-        provider_type = provider_type.lower()
-
-        if provider_type not in self._providers:
-            raise ProviderNotFoundError(provider_type)
-
-        provider_class = self._providers[provider_type]
-
-        return {
-            "name": provider_type,
-            "class_name": provider_class.__name__,
-            "provider_name": provider_class.PROVIDER_NAME,
-            "supported_auth_methods": [
-                m.value for m in provider_class.SUPPORTED_AUTH_METHODS
-            ],
-            "default_api_version": provider_class.DEFAULT_API_VERSION,
-            "supports_projects": (
-                provider_class().supports_projects()
-                if hasattr(provider_class(), "supports_projects")
-                else True
-            ),
-            "module": provider_class.__module__,
-        }
-
 
 # Create singleton instance
 _registry = ProviderRegistry()
@@ -440,7 +405,6 @@ is_registered = _registry.is_registered
 unregister_provider = _registry.unregister_provider
 auto_discover = _registry.auto_discover
 detect_provider_by_url = _registry.detect_provider_by_url
-get_provider_info = _registry.get_provider_info
 clear = _registry.clear
 
 
@@ -454,6 +418,5 @@ __all__ = [
     "unregister_provider",
     "auto_discover",
     "detect_provider_by_url",
-    "get_provider_info",
     "clear",
 ]

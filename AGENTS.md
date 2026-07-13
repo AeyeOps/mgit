@@ -2,17 +2,13 @@
 
 ## Project Structure & Module Organization
 - `mgit/` is the main package. Key areas: `commands/` (CLI commands), `providers/` (GitHub/Azure DevOps/BitBucket implementations), `config/` (YAML config), `git/` (git ops), `security/`, `utils/`.
-- `tests/` holds the pytest suite; `docs/` contains provider guides; `scripts/` has build helpers.
+- `tests/` holds the pytest suite; `scripts/` has build helpers.
 - `mgit.spec` drives PyInstaller builds; `dist/` and `build/` are build outputs.
 
-## Architecture Decision Records
-- ADRs in `docs/ADR/` document key design decisions (provider abstraction, config hierarchy, concurrency, pattern matching).
-- Read relevant ADRs before modifying core architecture.
-
 ## Build, Test, and Development Commands
-- Setup (preferred): `uv sync --all-extras --dev` (Poetry alternative: `poetry install --with dev`).
+- Setup: `uv sync --all-extras --dev`.
 - Run locally: `uv run mgit --help` or `python -m mgit`.
-- Tests: `uv run pytest` (or `poetry run pytest`). Use markers like `-m unit` or `-m "not requires_network"`.
+- Tests: `uv run pytest`. Use markers like `-m unit` or `-m "not requires_network"`.
 - Lint/format/type-check: `make validate` (runs ruff format, ruff check, ty, bandit). Use `make validate ARGS="--fix"` to auto-fix.
 - Build binaries: `make build-standalone-linux` (Linux + install) or `make build-standalone-windows` (Windows from WSL).
 

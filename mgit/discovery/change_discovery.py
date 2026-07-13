@@ -234,19 +234,19 @@ class ChangeDiscoveryEngine:
                     f"Querying provider '{provider_name}' for pattern: {query_pattern}"
                 )
 
-                repository_results = await list_repositories(
+                listing = await list_repositories(
                     query=query_pattern,
                     provider_name=provider_name,
                     format_type="json",
                     limit=limit,
                 )
 
-                if repository_results:
-                    for result in repository_results:
+                if listing.results:
+                    for result in listing.results:
                         discovered_repos.append((result.repo, provider_name))
 
                     logger.debug(
-                        f"Provider '{provider_name}' returned {len(repository_results)} repositories"
+                        f"Provider '{provider_name}' returned {len(listing.results)} repositories"
                     )
 
             except Exception as e:
@@ -290,14 +290,14 @@ class ChangeDiscoveryEngine:
     ) -> list[Repository]:
         """Query a single provider for repositories."""
         try:
-            repository_results = await list_repositories(
+            listing = await list_repositories(
                 query=query_pattern,
                 provider_name=provider_name,
                 format_type="json",
                 limit=limit,
             )
 
-            return [result.repo for result in (repository_results or [])]
+            return [result.repo for result in listing.results]
 
         except Exception as e:
             logger.debug(f"Provider '{provider_name}' query failed: {e}")

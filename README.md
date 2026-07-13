@@ -2,7 +2,7 @@
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.8.1-blue.svg)](#)
+[![PyPI](https://img.shields.io/pypi/v/mgit.svg)](https://pypi.org/project/mgit/)
 
 **One CLI for all your Git repositories across Azure DevOps, GitHub, and BitBucket.**
 
@@ -51,7 +51,7 @@ sudo mv mgit /usr/local/bin/mgit
 
 # Verify installation
 mgit --version
-# Should show: mgit version: 0.8.1
+# Prints the installed version
 ```
 
 **Option 2: Build from Source (uv preferred)**
@@ -133,12 +133,6 @@ mgit list "*/*/*" --limit 10
 ```
 
 ## Provider Setup
-
-See detailed provider setup guides:
-- **[Azure DevOps Guide](docs/providers/azure-devops-usage-guide.md)** - Enterprise setup with organizations and projects
-- **[GitHub Guide](docs/providers/github-usage-guide.md)** - Open source and organization repositories  
-- **[BitBucket Guide](docs/providers/bitbucket-usage-guide.md)** - Workspace and team repositories
-- **[Provider Comparison](docs/providers/provider-comparison-guide.md)** - Feature comparison and selection guide
 
 ### Quick Setup (All Providers)
 ```bash
@@ -323,10 +317,6 @@ mgit status ./repos --fail-on-dirty
 ## Configuration
 
 mgit stores configuration in `~/.config/mgit/config.yaml`. Use `mgit login` to configure providers automatically.
-
-For detailed configuration examples and troubleshooting, see:
-- **[Configuration Examples](docs/configuration/mgit-configuration-examples.md)** - Complete YAML examples for all providers
-- **[Query Patterns Guide](docs/usage/query-patterns.md)** - Repository discovery patterns
 
 ### Configuration Management
 
@@ -818,48 +808,27 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 Development commands:
 ```bash
-make test               # Run tests
-make lint               # Check code quality
-make format             # Format code
-make build              # Build Linux binary (no install)
-make build-linux        # Build + install Linux binary to /opt/bin/mgit
-make build-windows       # Build Windows binary (WSL wrapper)
+make validate                     # Format + lint + type check + security scan
+make test                         # Run tests
+make build-standalone-linux       # Build Linux binary at dist/mgit
+make install-standalone-linux     # Build + install to /usr/local/bin/mgit
+make build-standalone-macos       # Build macOS binary
+make build-standalone-windows     # Build Windows binary (from WSL)
 ```
 
 ### Release Process
 
-mgit uses an automated release process that triggers when the version changes:
+Releases are automated: pushing a version change to `main` triggers the
+release workflow (quality gates → git tag → GitHub Release → PyPI).
 
-1. **Update Version**: Use either Poetry or the helper script
+1. **Update CHANGELOG.md**: Document your changes under `[Unreleased]`
+
+2. **Bump, commit, and push** (validates first; never edit the version by hand):
    ```bash
-   # Using Poetry directly:
-   poetry version patch  # For bug fixes (0.3.1 -> 0.3.2)
-   poetry version minor  # For features (0.3.1 -> 0.4.0)
-   poetry version major  # For breaking changes (0.3.1 -> 1.0.0)
-   poetry version 1.2.3  # Specific version
-   
-   # Or using the helper script (wraps Poetry):
-   python scripts/update_version.py patch
-   python scripts/update_version.py minor
-   python scripts/update_version.py major
-   python scripts/update_version.py 1.2.3
+   make release ARGS="--bump patch"  # Bug fixes
+   make release ARGS="--bump minor"  # New features
+   make release ARGS="--bump major"  # Breaking changes
    ```
-
-2. **Update CHANGELOG.md**: Document your changes under the new version
-
-3. **Commit and Push**:
-   ```bash
-   git add -A
-   git commit -m "chore: bump version to X.Y.Z"
-   git push origin main
-   ```
-
-The automated workflow will:
-- Create a git tag
-- Build Python packages
-- Generate AI-powered release notes from CHANGELOG
-- Create GitHub release with binaries
-- Publish to PyPI (if configured)
 
 ## Security
 
@@ -879,197 +848,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Built for DevOps teams who manage repositories at scale.**
-
----
-
-## Appendix: Future Roadmap
-
-This section outlines potential future enhancements and features for mgit. These represent possible directions for evolution based on user feedback and emerging needs in multi-provider Git repository management.
-
-### User Experience Improvements
-
-#### Enhanced Interactive Mode
-```bash
-# Potential future commands:
-mgit init-interactive     # Guided setup wizard
-mgit sync --interactive  # Interactive repository selection
-mgit migrate            # Migrate between providers with conflict resolution
-```
-
-#### Watch Mode and Automation
-```bash
-mgit sync --watch        # Auto-sync on file changes
-mgit sync --schedule     # Scheduled synchronization
-mgit webhook-setup      # Setup webhooks for automatic syncing
-```
-
-#### Desktop Integration
-```bash
-mgit notify             # Desktop notifications for sync status
-mgit status --desktop   # Desktop widget showing repository health
-mgit conflicts          # Visual conflict resolution interface
-```
-
-### Advanced Git Operations
-
-#### Branch and Tag Management
-```bash
-mgit branch-sync        # Sync branch changes across repos
-mgit tag-sync           # Sync tags across repositories
-mgit release-sync       # Manage releases across repos
-mgit cherry-pick-all    # Cherry-pick commits to multiple repos
-```
-
-#### Advanced Merging and Rebasing
-```bash
-mgit rebase-all         # Rebase branches across repos
-mgit merge-all          # Merge branches across repos
-mgit squash-all         # Interactive squash across repos
-```
-
-#### Repository Health and Maintenance
-```bash
-mgit health             # Repository health check dashboard
-mgit cleanup            # Remove stale branches and tags
-mgit archive            # Archive old/unused repositories
-mgit backup             # Backup repository configurations
-```
-
-### Analytics and Insights
-
-#### Repository Analytics
-```bash
-mgit stats              # Repository statistics dashboard
-mgit trends             # Code activity trends over time
-mgit contributors       # Contributor analysis and statistics
-mgit languages          # Language distribution analysis
-```
-
-#### CI/CD Integration
-```bash
-mgit ci-status          # Show CI status across repos
-mgit deploy             # Trigger deployments across repos
-mgit pipeline-status    # Show pipeline status across repos
-mgit releases           # Manage releases across repos
-```
-
-#### Security and Compliance
-```bash
-mgit audit              # Security audit across repos
-mgit compliance         # Compliance check dashboard
-mgit secrets-scan       # Scan for exposed secrets
-mgit license-check      # License compliance analysis
-```
-
-### Performance and Scalability
-
-#### Caching and Optimization
-- Repository metadata caching
-- Incremental synchronization
-- Parallel processing improvements
-- Memory usage optimization
-
-#### Enterprise Features
-- LDAP/SSO integration
-- Audit logging
-- Role-based access control
-- Multi-tenant support
-
-### Platform Integration
-
-#### IDE Integration
-- VS Code extension
-- JetBrains IDE plugins
-- Vim/Neovim integration
-- Shell completion enhancements
-
-#### Container and Cloud Integration
-- Docker image optimization
-- Kubernetes operator
-- Cloud-native deployment
-- Serverless function support
-
-### Advanced Provider Support
-
-#### Additional Git Providers
-- GitLab (self-hosted and cloud)
-- Gitee (Chinese alternative)
-- SourceForge
-- Custom Git provider support
-
-#### Enhanced Provider Features
-- Repository templates and automation
-- Advanced permission management
-- Branch protection rules
-- Repository settings synchronization
-
-### Development and Contribution
-
-#### Enhanced Development Tools
-- Hot reload for development
-- Enhanced debugging tools
-- Performance profiling
-- Development containers
-
-#### Testing and Quality
-- Integration test expansion
-- Performance benchmarking
-- Load testing capabilities
-- Chaos engineering support
-
-### Migration and Compatibility
-
-#### Legacy Support
-- Import from other tools (e.g., repo, gclient)
-- Configuration migration assistants
-- Backward compatibility guarantees
-
-#### Ecosystem Integration
-- Integration with Git hooks
-- Support for Git LFS
-- Integration with Git submodules
-- Support for Git worktrees
-
-### Priority Assessment
-
-The roadmap items are categorized by potential impact and implementation complexity:
-
-**High Priority (High Impact, Medium Complexity):**
-- Enhanced interactive mode
-- Repository health dashboard
-- CI/CD status integration
-- Performance optimizations
-
-**Medium Priority (Medium Impact, Medium Complexity):**
-- Watch mode and automation
-- Branch/tag synchronization
-- Analytics and insights
-- IDE integration
-
-**Lower Priority (Variable Impact, High Complexity):**
-- Advanced Git operations (rebasing, cherry-picking)
-- Enterprise features (LDAP, audit logging)
-- Additional provider support
-- Container/cloud-native features
-
-### Implementation Guidelines
-
-**Architecture Principles:**
-- Maintain backward compatibility
-- Keep the CLI interface intuitive
-- Ensure security best practices
-- Optimize for performance at scale
-
-**Development Approach:**
-- Feature flags for experimental features
-- Comprehensive testing before release
-- User feedback integration
-- Documentation-first development
-
-**Community Engagement:**
-- GitHub discussions for feature requests
-- User surveys for prioritization
-- Beta testing programs
-- Contributor guidelines enhancement
-
-This roadmap represents potential directions for mgit evolution. Actual implementation priorities will be determined based on user feedback, community needs, and available development resources.

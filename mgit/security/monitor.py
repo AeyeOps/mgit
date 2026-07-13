@@ -93,7 +93,7 @@ class SecurityMonitor:
             "credential_keywords": ["password", "token", "secret", "key", "auth"],
         }
 
-        self.security_logger = SecurityLogger("security_monitor")
+        self.security_logger = SecurityLogger("mgit.security.monitor")
 
     def log_event(
         self,

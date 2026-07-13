@@ -37,14 +37,11 @@ By participating in this project, you agree to abide by our Code of Conduct: be 
 
 2. **Set Up Development Environment**
    ```bash
-   # Install Poetry
-   curl -sSL https://install.python-poetry.org | python3 -
+   # Install uv (https://docs.astral.sh/uv/)
+   curl -LsSf https://astral.sh/uv/install.sh | sh
 
    # Install dependencies
-   poetry install --with dev
-
-   # Activate virtual environment
-   poetry shell
+   uv sync --all-extras --dev
    ```
 
 3. **Create Feature Branch**
@@ -59,20 +56,17 @@ By participating in this project, you agree to abide by our Code of Conduct: be 
 
 5. **Run Tests and Checks**
    ```bash
+   # All quality gates (format + lint + type check + security scan)
+   make validate
+
+   # Auto-fix formatting and lint issues first
+   make validate ARGS="--fix"
+
    # Run all tests
-   poetry run pytest
+   make test
 
-   # Run with coverage
-   poetry run pytest --cov=mgit
-
-   # Run linting
-   poetry run ruff check .
-
-   # Format code
-   poetry run black .
-
-   # Type checking
-   poetry run mypy mgit/
+   # Run a subset
+   make test ARGS="tests/unit/ -v"
    ```
 
 6. **Commit Changes**
@@ -117,7 +111,6 @@ By participating in this project, you agree to abide by our Code of Conduct: be 
 
 - Update README.md for user-facing changes
 - Add/update docstrings for API changes
-- Update relevant guides in docs/
 - Include examples for new features
 
 ### Provider Development
@@ -128,8 +121,7 @@ When adding a new provider:
 2. Implement all required abstract methods
 3. Add to provider registry
 4. Create provider-specific tests
-5. Document authentication requirements
-6. Add usage guide in docs/providers/
+5. Document authentication requirements in README.md
 
 ## Project Structure
 
@@ -140,11 +132,9 @@ mgit/
 │   ├── providers/      # Provider implementations
 │   ├── config/         # Configuration management
 │   ├── git/           # Git operations
-│   ├── monitoring/    # Monitoring/metrics
 │   ├── security/      # Security features
 │   └── utils/         # Utilities
 ├── tests/             # Test suite
-├── docs/              # Documentation
 └── scripts/           # Build/utility scripts
 ```
 
@@ -154,16 +144,16 @@ mgit/
 
 ```bash
 # All tests
-poetry run pytest
+uv run pytest
 
 # Specific test file
-poetry run pytest tests/unit/test_providers.py
+uv run pytest tests/unit/test_providers.py
 
 # With coverage
-poetry run pytest --cov=mgit --cov-report=html
+uv run pytest --cov=mgit --cov-report=html
 
 # Specific test
-poetry run pytest -k "test_github_auth"
+uv run pytest -k "test_github_auth"
 ```
 
 ### Writing Tests

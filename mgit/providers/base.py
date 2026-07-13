@@ -16,6 +16,8 @@ Usage:
 """
 
 import asyncio
+import logging
+import random
 import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
@@ -23,7 +25,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from mgit.providers.exceptions import RepositoryNotFoundError
+from mgit.providers.exceptions import RateLimitError, RepositoryNotFoundError
+
+logger = logging.getLogger(__name__)
 
 
 # Common data structures
@@ -448,8 +452,6 @@ class GitProvider(ABC):
 
         Configuration options:
         - max_wait_seconds: Maximum time to wait for rate limit reset (default: 300)
-        - exponential_rate: Base multiplier for exponential backoff (default: 2.0)
-        - backoff_max_seconds: Maximum backoff delay (default: 60.0)
         """
         # Import here to avoid circular imports
         from ..config.yaml_manager import get_global_config
@@ -459,18 +461,14 @@ class GitProvider(ABC):
 
         return {
             "max_wait_seconds": rate_limiter_config.get("max_wait_seconds", 300),
-            "exponential_rate": rate_limiter_config.get("exponential_rate", 2.0),
-            "backoff_max_seconds": rate_limiter_config.get("backoff_max_seconds", 60.0),
         }
 
     async def _wait_for_rate_limit(self) -> None:
-        """Wait if we're close to rate limit or if rate limited.
+        """Wait until the provider's rate-limit window resets.
 
-        This method implements intelligent rate limit handling:
-        - Checks remaining requests against buffer
-        - Calculates wait time based on reset timestamp
-        - Uses exponential backoff with configurable multiplier
-        - Always active (rate limiting is mandatory for API stability)
+        When 1 or fewer requests remain, sleeps until the reported reset
+        timestamp (plus jitter). A reset further away than max_wait_seconds
+        raises RateLimitError instead of stalling the operation.
         """
         if not self._rate_limit_info:
             return
@@ -487,44 +485,24 @@ class GitProvider(ABC):
                 # Respect max wait time
                 max_wait = self._rate_limiter_config["max_wait_seconds"]
                 if wait_seconds > max_wait:
-                    raise Exception(
-                        f"Rate limit wait time ({wait_seconds}s) exceeds maximum ({max_wait}s)"
+                    raise RateLimitError(
+                        f"Rate limit reset is {wait_seconds}s away, exceeding "
+                        f"the maximum wait of {max_wait}s",
+                        self.PROVIDER_NAME,
                     )
 
-                # Use exponential backoff with configurable multiplier
-                multiplier = self._rate_limiter_config["exponential_rate"]
-                max_backoff = self._rate_limiter_config["backoff_max_seconds"]
-                retry_count = self._retry_count()
-                exponential_wait = 1.0 * (
-                    multiplier**retry_count
-                )  # Start at 1s, multiply by rate each retry
-                wait_seconds = min(exponential_wait, max_backoff)
-
                 # Add jitter to prevent thundering herd (0.1-1.0 seconds)
-                import random
+                wait_seconds += random.uniform(0.1, 1.0)
 
-                jitter = random.uniform(0.1, 1.0)
-                wait_seconds += jitter
-
-                print(f"Rate limit: waiting {wait_seconds:.1f}s until reset")
+                logger.info(
+                    "Rate limit: waiting %.1fs until reset (%s)",
+                    wait_seconds,
+                    self.PROVIDER_NAME,
+                )
                 await asyncio.sleep(wait_seconds)
 
                 # Reset rate limit info after waiting
                 self._rate_limit_info = None
-
-    def _retry_count(self) -> int:
-        """Get current retry count for exponential backoff."""
-        return getattr(self, "_retry_count_attr", 0)
-
-    def _increment_retry_count(self) -> None:
-        """Increment retry count for exponential backoff."""
-        if not hasattr(self, "_retry_count_attr"):
-            self._retry_count_attr = 0
-        self._retry_count_attr += 1
-
-    def _reset_retry_count(self) -> None:
-        """Reset retry count after successful operation."""
-        self._retry_count_attr = 0
 
     async def _check_rate_limit(self, response) -> None:
         """Check response for rate limit headers and update info.
@@ -574,11 +552,5 @@ class GitProvider(ABC):
 
         # Check and update rate limit info
         await self._check_rate_limit(response)
-
-        # Reset retry count on successful response
-        if hasattr(response, "status") and 200 <= response.status < 300:
-            self._reset_retry_count()
-        else:
-            self._increment_retry_count()
 
         return response

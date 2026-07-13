@@ -55,9 +55,10 @@ class BulkOperationProcessor:
         self.flat_layout = flat_layout
         self.failures: list[tuple[str, str]] = []
         self.skipped: list[tuple[str, str]] = []
-        # Repos whose dirtiness is purely a case-collision checkout artifact;
-        # force-synced to origin instead of pulled. Tracked separately so the
-        # summary can report them distinctly from ordinary pulls.
+        # Clone URLs of repos whose dirtiness is purely a case-collision
+        # checkout artifact; force-synced to origin instead of pulled. Tracked
+        # separately so the summary can report them distinctly from ordinary
+        # pulls.
         self.case_collision_repos: set[str] = set()
         self.case_collision_synced: list[str] = []
 
@@ -85,9 +86,10 @@ class BulkOperationProcessor:
             dirs_to_remove: List of directories marked for removal in force mode
             show_progress: Whether to show progress bar
             resolved_names: Pre-resolved directory names for flat layout (handles collisions)
-            case_collision_repos: Names of repos whose dirtiness is purely a
-                case-collision checkout artifact — force-synced to origin
-                (fetch + reset) instead of pulled, in pull update mode.
+            case_collision_repos: Clone URLs of repos whose dirtiness is purely
+                a case-collision checkout artifact — force-synced to origin
+                (fetch + reset) instead of pulled, in pull update mode. Keyed
+                by clone URL because repo names are not unique across orgs.
 
         Returns:
             List of (repo_name, error_reason) tuples for failed operations
@@ -225,7 +227,7 @@ class BulkOperationProcessor:
                         description=f"[yellow]Skipped (empty): {display_name}[/yellow]",
                         completed=1,
                     )
-                elif repo_name in self.case_collision_repos:
+                elif repo.clone_url in self.case_collision_repos:
                     await self._force_sync_case_collision(
                         repo_folder, repo_name, progress, repo_task_id, display_name
                     )

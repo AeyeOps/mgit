@@ -10,8 +10,14 @@ import logging
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
-from ..commands.listing import RepositoryResult, list_repositories
+from ..commands.listing import (
+    ListingResult,
+    ProviderOutcome,
+    RepositoryResult,
+    list_repositories,
+)
 from ..config.yaml_manager import list_provider_names
+from ..exceptions import MgitError
 from ..providers.base import Repository
 
 logger = logging.getLogger(__name__)
@@ -61,7 +67,7 @@ class MultiProviderResolver:
 
     async def _query_single_provider(
         self, provider_name: str, project: str
-    ) -> list[RepositoryResult]:
+    ) -> ListingResult:
         """Query a single provider for repositories.
 
         Args:
@@ -69,21 +75,25 @@ class MultiProviderResolver:
             project: Query pattern
 
         Returns:
-            List of repository results from this provider
+            ListingResult from this provider
         """
         try:
             logger.debug(f"Querying provider '{provider_name}' for pattern '{project}'")
-            # Use asyncio.run to match the pattern from __main__.py since list_repositories is async
-            results = await list_repositories(
+            return await list_repositories(
                 query=project,
                 provider_name=provider_name,
                 format_type="json",
                 limit=None,
             )
-            return results or []
+        except MgitError:
+            # Fail loud: listing raises MgitError for configuration and
+            # credential failures — they must not present as "0 repositories".
+            raise
         except Exception as e:
             logger.error(f"Provider '{provider_name}' listing failed: {e}")
-            return []
+            return ListingResult(
+                provider_outcomes=[ProviderOutcome(provider_name, False, str(e))]
+            )
 
     def _deduplicate_repositories(
         self, all_results: list[RepositoryResult]
@@ -186,7 +196,7 @@ class MultiProviderResolver:
         # This delegates to the list command's multi-provider logic
         try:
             logger.debug(f"Using multi-provider discovery for pattern '{project}'")
-            results = await list_repositories(
+            listing = await list_repositories(
                 query=project,
                 provider_name=None,  # This triggers multi-provider mode in list_repositories
                 format_type="json",
@@ -194,7 +204,7 @@ class MultiProviderResolver:
             )
 
             # Extract repositories from results and deduplicate
-            all_repositories = results or []
+            all_repositories = listing.results
             logger.debug(
                 f"Multi-provider query returned {len(all_repositories)} raw results"
             )
@@ -213,8 +223,8 @@ class MultiProviderResolver:
 
             return MultiProviderResult(
                 repositories=deduplicated_repos,  # Already extracted .repo in deduplication
-                successful_providers=providers,  # Assume all providers were successful
-                failed_providers=[],
+                successful_providers=listing.successful_providers,
+                failed_providers=listing.failed_providers,
                 total_found=len(all_repositories),
                 duplicates_removed=duplicates_removed,
             )
@@ -232,8 +242,8 @@ class MultiProviderResolver:
         self, project: str, provider_name: str
     ) -> MultiProviderResult:
         """Resolve repositories using single provider with pattern."""
-        results = await self._query_single_provider(provider_name, project)
-        repositories = [r.repo for r in results]
+        listing = await self._query_single_provider(provider_name, project)
+        repositories = [r.repo for r in listing.results]
 
         logger.info(
             f"Found {len(repositories)} repositories in provider '{provider_name}' "
@@ -242,8 +252,8 @@ class MultiProviderResolver:
 
         return MultiProviderResult(
             repositories=repositories,
-            successful_providers=[provider_name],
-            failed_providers=[],
+            successful_providers=listing.successful_providers,
+            failed_providers=listing.failed_providers,
             total_found=len(repositories),
             duplicates_removed=0,
         )

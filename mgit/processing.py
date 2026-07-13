@@ -152,6 +152,10 @@ class DiffProcessor:
                 index_status = line[0]
                 worktree_status = line[1]
                 filename = line[2:].lstrip()
+                # Rename/copy records carry "old -> new"; the current path is
+                # the destination.
+                if index_status in ("R", "C") and " -> " in filename:
+                    filename = filename.split(" -> ", 1)[1]
 
                 file_info = {
                     "filename": filename,

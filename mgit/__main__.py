@@ -949,8 +949,14 @@ def list_command(
 
     async def do_list():
         try:
-            results = await list_repositories(query, provider, format_type, limit)
-            format_results(results, format_type)
+            listing = await list_repositories(query, provider, format_type, limit)
+            if listing.failed_providers and format_type != "json":
+                console.print(
+                    f"[yellow]Warning:[/yellow] Failed to query "
+                    f"{len(listing.failed_providers)} provider(s): "
+                    f"{', '.join(listing.failed_providers)}"
+                )
+            format_results(listing.results, format_type)
         except MgitError as e:
             console.print(f"[red]Error: {e}[/red]")
             raise typer.Exit(1) from e

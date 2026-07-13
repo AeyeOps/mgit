@@ -242,9 +242,10 @@ def _save_discovery_to_changesets(
             )
 
     except Exception as e:
+        # Fail loud: the user asked for persistence; a lost save must not
+        # present as success.
         logger.error(f"Failed to save discovery to changesets: {e}")
-        if verbose:
-            console.print(f"[red]Failed to save changesets: {e}[/red]")
+        raise
 
 
 def _output_discovery_results(
