@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Preserve literal Unicode in Git's quoted filenames when `core.quotePath=false`,
+  including change detection and content embedding.
+- Terminate Git and its helpers on timeout or cancellation, with a one-second
+  cleanup limit so inherited output pipes cannot hang synchronization.
+- Keep Git error logging importable on Python 3.10 and 3.11.
+
+### Security
+- Update locked aiohttp, cryptography, pip, and setuptools to patched versions
+  identified by the dependency audit.
+
 ## [0.14.0] - 2026-07-13
 
 ### Fixed

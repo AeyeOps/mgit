@@ -1,9 +1,11 @@
 """Git operations manager for mgit CLI tool."""
 
 import asyncio
+import contextlib
 import logging
 import os
 import re
+import signal
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -266,7 +268,7 @@ class GitManager:
         cmd: list,
         cwd: Path,
         env: dict[str, str],
-        timeout: int,
+        timeout: float,
     ) -> subprocess.CompletedProcess:
         """Run *cmd* once as a native async subprocess, mirroring subprocess.run.
 
@@ -281,6 +283,9 @@ class GitManager:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
+            # Keep Git and its SSH/credential helpers in a group that can be
+            # terminated without signalling the CLI or concurrent Git jobs.
+            start_new_session=os.name == "posix",
         )
         try:
             stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout)
@@ -288,9 +293,11 @@ class GitManager:
         # only aliases the builtin TimeoutError from 3.11, so the aliased name
         # is required to stay correct on the 3.10 floor (requires-python).
         except asyncio.TimeoutError:  # noqa: UP041
-            proc.kill()
-            await proc.communicate()
+            await self._terminate_process(proc)
             raise subprocess.TimeoutExpired(cmd, timeout) from None
+        except asyncio.CancelledError:
+            await self._terminate_process(proc)
+            raise
 
         stdout = stdout_b.decode("utf-8")
         stderr = stderr_b.decode("utf-8")
@@ -301,13 +308,56 @@ class GitManager:
             )
         return subprocess.CompletedProcess(cmd, returncode, stdout, stderr)
 
+    async def _terminate_process(self, proc: asyncio.subprocess.Process) -> None:
+        """Terminate Git and its helpers, allowing at most one second to drain."""
+
+        async def terminate_and_drain():
+            if os.name == "posix":
+                # The parent may have exited while a helper still holds a pipe.
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(proc.pid, signal.SIGKILL)
+            elif proc.returncode is None:
+                # Windows kill() terminates only the parent; taskkill /T also
+                # terminates its descendants. It shares the cleanup deadline.
+                killer = await asyncio.create_subprocess_exec(
+                    "taskkill",
+                    "/F",
+                    "/T",
+                    "/PID",
+                    str(proc.pid),
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                try:
+                    await killer.wait()
+                    if killer.returncode:
+                        logger.warning(
+                            "Git process-tree cleanup failed with exit code %s",
+                            killer.returncode,
+                        )
+                finally:
+                    killer._transport.close()  # ty: ignore[unresolved-attribute]
+                if proc.returncode is None:
+                    with contextlib.suppress(ProcessLookupError):
+                        proc.kill()
+            await proc.communicate()
+
+        try:
+            await asyncio.wait_for(terminate_and_drain(), timeout=1.0)
+        except asyncio.TimeoutError:  # noqa: UP041
+            logger.warning("Git subprocess cleanup exceeded 1s; closing output pipes")
+        finally:
+            # Process has no public close API. Close the owned transport so an
+            # escaped helper cannot retain our pipes after the cleanup deadline.
+            proc._transport.close()  # ty: ignore[unresolved-attribute]
+
     async def _run_subprocess(
         self,
         cmd: list,
         cwd: Path,
         capture_output: bool = False,
         log_level: int = logging.ERROR,
-        timeout: int = 300,
+        timeout: float = 300,
         max_retries: int = 3,
         initial_delay: float = 2.0,
         backoff: float = 2.0,
@@ -386,9 +436,7 @@ class GitManager:
                 if safe_stderr:
                     logger.log(log_level, f"  {safe_stderr}")
                 if e.stdout:
-                    logger.debug(
-                        f"stdout: {_CRED_URL_RE.sub(r'\\1***@', e.stdout.rstrip())}"
-                    )
+                    logger.debug("stdout: %s", sanitize_url(e.stdout.rstrip()))
                 raise
 
             except Exception as e:
