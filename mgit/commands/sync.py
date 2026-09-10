@@ -14,14 +14,7 @@ from urllib.parse import urlparse
 
 import typer
 from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TaskProgressColumn,
-    TextColumn,
-    TimeElapsedColumn,
-)
+from rich.markup import escape
 from rich.prompt import Confirm
 from rich.table import Table
 
@@ -50,6 +43,7 @@ from mgit.providers.base import Repository
 from mgit.providers.exceptions import RepositoryNotFoundError
 from mgit.providers.manager import ProviderManager
 from mgit.providers.registry import is_canonical_provider_host
+from mgit.ui.progress import create_progress, progress_console
 from mgit.utils.async_executor import AsyncExecutor
 from mgit.utils.directory_scanner import find_repositories_in_directory
 from mgit.utils.multi_provider_resolver import MultiProviderResolver
@@ -788,7 +782,7 @@ async def sync_local_command(
     console.print(f"[blue]Local sync scan:[/blue] {root_path}")
 
     provider_auth_configs = _load_provider_auth_configs()
-    executor = AsyncExecutor(concurrency=concurrency, rich_console=console)
+    executor = AsyncExecutor(concurrency=concurrency, rich_console=progress_console)
 
     async def inspect_repo(repo_path: Path) -> LocalRepoState:
         return await _inspect_local_repository(repo_path)
@@ -797,7 +791,7 @@ async def sync_local_command(
         items=repo_paths,
         process_func=inspect_repo,
         task_description="Scanning local repositories...",
-        show_progress=False,
+        show_progress=progress,
     )
     repo_states = [state for state in repo_states if state]
 
@@ -1165,23 +1159,19 @@ async def run_sync_with_progress(
     """Run sync operation with rich progress reporting."""
     pre_skipped = pre_skipped or []
 
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress:
+    with create_progress() as progress:
         # Add main progress task
         sync_task = progress.add_task(
             "Synchronizing repositories...", total=len(repositories)
         )
 
         # Custom callback to update progress
-        async def progress_callback(completed: int, total: int, current_repo: str):
+        def progress_callback(completed: int, total: int, current_repo: str):
             progress.update(
-                sync_task, completed=completed, description=f"Syncing: {current_repo}"
+                sync_task,
+                completed=completed,
+                description=f"Syncing: {escape(current_repo)}",
+                refresh=True,
             )
 
         # Run sync with progress callback
@@ -1195,6 +1185,7 @@ async def run_sync_with_progress(
             show_progress=False,
             resolved_names=resolved_names,
             case_collision_repos=case_collision_repos or set(),
+            on_progress=progress_callback,
         )
 
     # Show final results. The summary reconciles to the resolved repository

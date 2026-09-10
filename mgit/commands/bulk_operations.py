@@ -4,14 +4,15 @@ Provides common logic for clone and pull operations across multiple repositories
 """
 
 import asyncio
-import io
 import logging
 import shutil
 import subprocess
+from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
 
 from rich.console import Console
+from rich.markup import escape
 from rich.progress import Progress
 from rich.prompt import Confirm
 
@@ -19,6 +20,7 @@ from ..git import GitManager, resolve_local_repo_path, sanitize_url
 from ..git.utils import classify_dirty_repo, find_case_collisions, parse_porcelain_z
 from ..providers.base import Repository
 from ..providers.manager import ProviderManager
+from ..ui.progress import create_progress
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -73,6 +75,7 @@ class BulkOperationProcessor:
         show_progress: bool = True,
         resolved_names: dict[str, str] | None = None,
         case_collision_repos: set[str] | None = None,
+        on_progress: Callable[[int, int, str], None] | None = None,
     ) -> list[tuple[str, str]]:
         """
         Process repositories asynchronously with progress tracking.
@@ -90,6 +93,8 @@ class BulkOperationProcessor:
                 a case-collision checkout artifact — force-synced to origin
                 (fetch + reset) instead of pulled, in pull update mode. Keyed
                 by clone URL because repo names are not unique across orgs.
+            on_progress: Receives the completed count, total, and repository name
+                after each processed repository, including failures and skips.
 
         Returns:
             List of (repo_name, error_reason) tuples for failed operations
@@ -101,11 +106,7 @@ class BulkOperationProcessor:
         sem = asyncio.Semaphore(concurrency)
         repo_tasks = {}
 
-        progress_console = console
-        if not show_progress:
-            progress_console = Console(file=io.StringIO(), force_terminal=False)
-
-        with Progress(console=progress_console) as progress:
+        with create_progress(disable=not show_progress) as progress:
             overall_task_id = progress.add_task(
                 "[green]Processing Repositories...",
                 total=len(repositories),
@@ -115,7 +116,7 @@ class BulkOperationProcessor:
                 repo_name = repo.name
                 repo_url = repo.clone_url
                 is_disabled = repo.is_disabled
-                display_name = (
+                display_name = escape(
                     repo_name[:30] + "..." if len(repo_name) > 30 else repo_name
                 )
 
@@ -182,8 +183,16 @@ class BulkOperationProcessor:
 
                     progress.advance(overall_task_id, 1)
 
-            # Process all repositories concurrently
-            await asyncio.gather(*(process_one_repo(repo) for repo in repositories))
+            completed = 0
+
+            async def process_and_report(repo: Repository):
+                nonlocal completed
+                await process_one_repo(repo)
+                completed += 1
+                if on_progress is not None:
+                    on_progress(completed, len(repositories), repo.name)
+
+            await asyncio.gather(*(process_and_report(repo) for repo in repositories))
 
         return self.failures
 

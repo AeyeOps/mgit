@@ -40,6 +40,7 @@ from mgit.config.yaml_manager import (
 )
 from mgit.exceptions import MgitError
 from mgit.providers.manager import ProviderManager
+from mgit.ui.progress import ProgressLogFilter, progress_console
 
 # Suppress the specific UserWarning from PyInstaller's bootloader
 warnings.filterwarnings(
@@ -204,9 +205,10 @@ console_handler = ConsoleFriendlyRichHandler(
     markup=True,
     show_path=False,  # Hide the file path in log messages
     show_time=False,  # Hide timestamp (already in the formatter)
-    console=Console(stderr=True),
+    console=progress_console,
 )
 console_handler.setLevel(get_config_value("CON_LEVEL"))
+console_handler.addFilter(ProgressLogFilter())
 
 
 def _has_mgit_handler(target_logger: logging.Logger, marker: str) -> bool:

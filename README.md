@@ -708,7 +708,7 @@ mgit sync --filter <pattern> [path]
 | `--concurrency` | No | `-c` | Number of parallel operations (default: 4) | `--concurrency 10` |
 | `--force` | No | `-f` | Force re-clone all repositories (requires confirmation) | `--force` |
 | `--dry-run` | No | - | Preview what would be done without making changes | `--dry-run` |
-| `--progress` | No | - | Show progress bar (default: enabled) | `--no-progress` |
+| `--progress` | No | - | Show in-place completion percentage and repository counts (default: enabled) | `--no-progress` |
 | `--summary` | No | - | Show detailed summary (default: enabled) | `--no-summary` |
 
 #### Synchronization Behavior

@@ -7,6 +7,10 @@ import sys
 import time
 from typing import Any
 
+from rich.console import Console
+from rich.live import Live
+from rich.text import Text
+
 # Platform-specific imports for terminal handling
 _IS_WINDOWS = platform.system() == "Windows"
 
@@ -30,16 +34,14 @@ else:
     msvcrt = None  # type: ignore
 
 from mgit.ui.ascii_tree import (  # noqa: E402
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
     get_static_tree,
-    get_tree_height,
     render_tree_frame,
 )
 from mgit.ui.terminal import (  # noqa: E402
     TerminalCaps,
     get_terminal_capabilities,
-    hide_cursor,
-    move_to_start_of_frame,
-    show_cursor,
 )
 
 # Animation settings
@@ -48,7 +50,7 @@ ANIMATION_FPS = 12  # frames per second
 ROTATION_SPEED = 0.15  # radians per frame
 
 
-class AnimationInterrupted(Exception):
+class AnimationInterrupted(KeyboardInterrupt):
     """Raised when animation is interrupted by user."""
 
 
@@ -139,66 +141,62 @@ def run_tree_animation(
     frame_time = 1.0 / fps
     angle = 0.0  # Rotation around vertical axis
 
-    tree_height = get_tree_height()
+    console = Console(file=sys.stdout)
     start_time = time.monotonic()
-    first_frame = True
 
     previous_handler = _setup_signal_handler()
-    old_terminal_settings = _set_raw_mode()  # Enable keypress detection
+    old_terminal_settings = None
 
     try:
-        hide_cursor()
+        old_terminal_settings = _set_raw_mode()  # Enable keypress detection
+        with contextlib.ExitStack() as stack:
+            live: Live | None = None
+            while time.monotonic() - start_time < duration:
+                frame_start = time.monotonic()
+                if _check_for_keypress():
+                    break
 
-        while time.monotonic() - start_time < duration:
-            frame_start = time.monotonic()
+                # Leave room for cursor cleanup and avoid wrapping the last column.
+                # Read the dimensions each frame so terminal resizing takes effect.
+                size = console.size
+                frame = Text.from_ansi(
+                    render_tree_frame(
+                        angle,
+                        use_color=not console.no_color,
+                        width=max(1, min(SCREEN_WIDTH, size.width - 1)),
+                        height=max(1, min(SCREEN_HEIGHT, size.height - 1)),
+                    )
+                )
+                if live is None:
+                    # Start only after the first key check: an immediate skip owns
+                    # no terminal rows and must not erase previous command output.
+                    live = Live(
+                        frame,
+                        console=console,
+                        transient=True,
+                        auto_refresh=False,
+                        vertical_overflow="crop",
+                        redirect_stdout=False,
+                        redirect_stderr=False,
+                    )
+                    # Own cleanup before rendering: Ctrl+C can arrive during the
+                    # first frame, before a Live context manager finishes entry.
+                    stack.callback(live.stop)
+                    live.start(refresh=True)
+                else:
+                    live.update(frame, refresh=True)
 
-            # Check for keypress to skip animation
-            if _check_for_keypress():
-                break
-
-            # Render frame with current rotation angle
-            frame = render_tree_frame(angle)
-
-            # Move cursor back to start for overwrite (except first frame)
-            if not first_frame:
-                move_to_start_of_frame(tree_height)
-            first_frame = False
-
-            # Output frame
-            sys.stdout.write(frame)
-            sys.stdout.write("\n")
-            sys.stdout.flush()
-
-            # Advance rotation
-            angle += ROTATION_SPEED
-
-            # Maintain frame rate
-            elapsed = time.monotonic() - frame_start
-            sleep_time = frame_time - elapsed
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-
-        # Clear animation area after completion
-        move_to_start_of_frame(tree_height)
-        for _ in range(tree_height):
-            sys.stdout.write(" " * 65 + "\n")
-        move_to_start_of_frame(tree_height)
-        sys.stdout.flush()
+                angle += ROTATION_SPEED
+                elapsed = time.monotonic() - frame_start
+                sleep_time = frame_time - elapsed
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
 
     except AnimationInterrupted:
-        # Clean exit on Ctrl+C - clear animation and re-raise as KeyboardInterrupt
-        move_to_start_of_frame(tree_height)
-        for _ in range(tree_height):
-            sys.stdout.write(" " * 65 + "\n")
-        move_to_start_of_frame(tree_height)
-        sys.stdout.flush()
-        show_cursor()
-        _restore_terminal(old_terminal_settings)
-        _restore_signal_handler(previous_handler)
+        # Live clears its own frame before terminal settings are restored below.
         raise KeyboardInterrupt from None
 
     finally:
-        show_cursor()
         _restore_terminal(old_terminal_settings)
         _restore_signal_handler(previous_handler)
 
@@ -232,7 +230,7 @@ def show_animated_help(help_text: str) -> None:
     Animation can be disabled via config: global.help_animation = false
     """
     caps = get_terminal_capabilities()
-    use_color = caps in (TerminalCaps.ANSI, TerminalCaps.BASIC)
+    use_color = caps == TerminalCaps.ANSI
 
     try:
         if caps == TerminalCaps.ANSI and _is_animation_enabled():

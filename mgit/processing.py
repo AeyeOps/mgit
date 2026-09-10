@@ -91,12 +91,12 @@ class DiffProcessor:
             async with semaphore:
                 try:
                     change_data = await self._detect_repository_changes(repo_path)
-                    if progress and task_id:
+                    if progress is not None and task_id is not None:
                         progress.advance(task_id)
                     return change_data
                 except Exception as e:
                     logger.error(f"Error processing repository {repo_path}: {e}")
-                    if progress and task_id:
+                    if progress is not None and task_id is not None:
                         progress.advance(task_id)
                     return RepositoryChange(
                         repository_path=str(repo_path),

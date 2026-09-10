@@ -14,7 +14,6 @@ from typing import TextIO
 
 import typer
 from rich.console import Console
-from rich.progress import Progress
 
 from mgit.changesets.models import CommitInfo, FileChange, RepositoryChangeset
 from mgit.changesets.storage import ChangesetStorage
@@ -24,6 +23,7 @@ from mgit.content.embedding import (
 from mgit.discovery.change_discovery import ChangeDiscoveryEngine
 from mgit.git.utils import is_git_repository
 from mgit.processing import DiffProcessor, RepositoryChange
+from mgit.ui.progress import create_progress
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -184,7 +184,7 @@ def execute_diff_command(
             content_memory_mb=content_memory_mb,
         )
 
-        with Progress() as progress:
+        with create_progress() as progress:
             task = progress.add_task(
                 "[green]Detecting changes...", total=len(repositories)
             )
