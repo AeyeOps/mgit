@@ -53,8 +53,9 @@ async def _cleanup(processes, pid_file):
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX process group lifecycle")
 @pytest.mark.parametrize("parent_exits", [False, True])
+@pytest.mark.parametrize("streaming", [False, True])
 async def test_timeout_kills_helpers_holding_output_pipes(
-    tmp_path, spawned_processes, parent_exits
+    tmp_path, spawned_processes, parent_exits, streaming
 ):
     pid_file = tmp_path / "helper.pid"
     script = (
@@ -67,7 +68,11 @@ async def test_timeout_kills_helpers_holding_output_pipes(
     try:
         with pytest.raises(subprocess.CalledProcessError) as error:
             await GitManager()._run_subprocess(
-                [sys.executable, "-c", script], tmp_path, timeout=0.3, max_retries=0
+                [sys.executable, "-c", script],
+                tmp_path,
+                timeout=0.3,
+                max_retries=0,
+                on_progress=(lambda event: None) if streaming else None,
             )
         elapsed = time.monotonic() - start
         assert error.value.returncode == 124
@@ -112,12 +117,14 @@ async def test_cancellation_terminates_git_and_helpers(tmp_path, spawned_process
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX process group lifecycle")
+@pytest.mark.parametrize("streaming", [False, True])
 async def test_cleanup_is_bounded_when_helper_leaves_process_group(
-    tmp_path, spawned_processes, caplog, monkeypatch
+    tmp_path, spawned_processes, caplog, monkeypatch, streaming
 ):
     # CLI imports disable mgit propagation; let pytest capture the warning even
     # when this test runs after CLI tests in the full suite.
     monkeypatch.setattr(logging.getLogger("mgit"), "propagate", True)
+    caplog.set_level(logging.DEBUG, logger="mgit.git.manager")
     pid_file = tmp_path / "helper.pid"
     script = (
         "import subprocess, sys, time; from pathlib import Path; "
@@ -129,7 +136,11 @@ async def test_cleanup_is_bounded_when_helper_leaves_process_group(
     try:
         with pytest.raises(subprocess.CalledProcessError) as error:
             await GitManager()._run_subprocess(
-                [sys.executable, "-c", script], tmp_path, timeout=0.3, max_retries=0
+                [sys.executable, "-c", script],
+                tmp_path,
+                timeout=0.3,
+                max_retries=0,
+                on_progress=(lambda event: None) if streaming else None,
             )
         elapsed = time.monotonic() - start
         assert error.value.returncode == 124

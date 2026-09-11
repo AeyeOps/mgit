@@ -7,6 +7,7 @@ the functionality of clone-all and pull-all into a single, intuitive command.
 
 import asyncio
 import logging
+import subprocess
 from base64 import b64encode
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,7 +15,6 @@ from urllib.parse import urlparse
 
 import typer
 from rich.console import Console
-from rich.markup import escape
 from rich.prompt import Confirm
 from rich.table import Table
 
@@ -30,7 +30,8 @@ from mgit.config.yaml_manager import (
     get_provider_configs,
     list_provider_names,
 )
-from mgit.git import GitManager
+from mgit.git import GitManager, sanitize_url
+from mgit.git.progress import GitProgress, ProgressCallback
 from mgit.git.utils import (
     classify_dirty_repo,
     find_case_collisions,
@@ -43,7 +44,7 @@ from mgit.providers.base import Repository
 from mgit.providers.exceptions import RepositoryNotFoundError
 from mgit.providers.manager import ProviderManager
 from mgit.providers.registry import is_canonical_provider_host
-from mgit.ui.progress import create_progress, progress_console
+from mgit.ui.sync_progress import SyncProgress
 from mgit.utils.async_executor import AsyncExecutor
 from mgit.utils.directory_scanner import find_repositories_in_directory
 from mgit.utils.multi_provider_resolver import MultiProviderResolver
@@ -107,20 +108,22 @@ def _detect_local_provider(remote_url: str | None) -> str:
         return "unknown"
 
 
-async def _run_git_command(repo_path: Path, args: list[str]) -> tuple[int, str, str]:
-    process = await asyncio.create_subprocess_exec(
-        "git",
-        *args,
-        cwd=str(repo_path),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await process.communicate()
-    return (
-        process.returncode or 0,
-        stdout.decode("utf-8", errors="ignore"),
-        stderr.decode("utf-8", errors="ignore"),
-    )
+async def _run_git_command(
+    repo_path: Path, args: list[str], on_progress: ProgressCallback | None = None
+) -> tuple[int, str, str]:
+    """Use the same bounded Git runner for local inspection and synchronization."""
+    try:
+        result = await GitManager()._run_subprocess(
+            ["git", *args],
+            repo_path,
+            capture_output=True,
+            log_level=logging.DEBUG,
+            max_retries=0,
+            on_progress=on_progress,
+        )
+        return result.returncode, result.stdout, result.stderr
+    except subprocess.CalledProcessError as error:
+        return error.returncode, error.stdout or "", sanitize_url(error.stderr or "")
 
 
 def _normalize_http_url(url: str) -> str | None:
@@ -716,13 +719,18 @@ async def show_sync_preview(
 
 
 async def _sync_local_repository(
-    state: LocalRepoState, force: bool, auth_configs: list[ProviderAuthConfig]
+    state: LocalRepoState,
+    force: bool,
+    auth_configs: list[ProviderAuthConfig],
+    on_progress: ProgressCallback | None = None,
 ) -> LocalRepoResult:
     action = _determine_local_action(state, force)
     if action != LOCAL_ACTION_PULL:
         return LocalRepoResult(state=state, action=action, error=state.error)
 
     if force:
+        if on_progress is not None:
+            on_progress(GitProgress("Resetting checkout"))
         returncode, stdout, stderr = await _run_git_command(
             state.path, ["reset", "--hard"]
         )
@@ -741,7 +749,12 @@ async def _sync_local_repository(
             )
 
     pull_args = _build_git_pull_args(state, auth_configs)
-    returncode, stdout, stderr = await _run_git_command(state.path, pull_args)
+    if on_progress is not None:
+        pull_args.append("--progress")
+        on_progress(GitProgress("Pulling"))
+    returncode, stdout, stderr = await _run_git_command(
+        state.path, pull_args, on_progress=on_progress
+    )
     if returncode != 0:
         error_msg = stderr.strip() or stdout.strip() or "git pull failed"
         return LocalRepoResult(state=state, action=LOCAL_ACTION_FAILED, error=error_msg)
@@ -771,101 +784,141 @@ async def sync_local_command(
         )
         raise typer.Exit(code=1)
 
-    logger.info("Local sync scan: %s", root_path)
-    repo_paths = sorted(find_repositories_in_directory(root_path, recursive=True))
-    if not repo_paths:
-        logger.info("Local sync found no git repositories under %s", root_path)
-        console.print(f"[yellow]No git repositories found under {root_path}[/yellow]")
-        return
-
-    logger.info("Local sync repositories found: %d", len(repo_paths))
-    console.print(f"[blue]Local sync scan:[/blue] {root_path}")
-
+    console.print(f"[blue]Local sync:[/blue] {root_path}")
     provider_auth_configs = _load_provider_auth_configs()
-    executor = AsyncExecutor(concurrency=concurrency, rich_console=progress_console)
+    executor = AsyncExecutor(concurrency=concurrency)
+    cancelled = False
 
-    async def inspect_repo(repo_path: Path) -> LocalRepoState:
-        return await _inspect_local_repository(repo_path)
-
-    repo_states, errors = await executor.run_batch(
-        items=repo_paths,
-        process_func=inspect_repo,
-        task_description="Scanning local repositories...",
-        show_progress=progress,
-    )
-    repo_states = [state for state in repo_states if state]
-
-    if errors:
-        logger.warning("Local sync scan encountered %d errors", len(errors))
-
-    for repo_path, error in errors:
-        logger.debug("Local sync scan failed for %s: %s", repo_path, error)
-        repo_states.append(
-            LocalRepoState(
-                path=repo_path,
-                name=repo_path.name,
-                remote_url=None,
-                provider="unknown",
-                is_dirty=True,
-                error=str(error),
+    with SyncProgress(phase="Discovering", disable=not progress) as display:
+        display.set_message("Finding local repositories")
+        repo_paths = sorted(
+            await asyncio.to_thread(
+                find_repositories_in_directory, root_path, recursive=True
             )
         )
+        display.begin_phase("Scanning", total=len(repo_paths))
 
-    planned_results = [
-        LocalRepoResult(
-            state=state,
-            action=_determine_local_action(state, force),
-            error=state.error,
-        )
-        for state in repo_states
-    ]
-
-    if dry_run:
-        _render_local_plan(root_path, planned_results, force)
-        if summary:
-            _render_local_summary(planned_results, dry_run=True)
-        return
-
-    if force:
-        force_targets = [
-            result for result in planned_results if result.action == LOCAL_ACTION_PULL
-        ]
-        if force_targets:
-            confirmed = Confirm.ask(
-                "[red]WARNING:[/red] Force mode will reset and clean "
-                f"{len(force_targets)} repositories before pulling. Continue?"
+        async def inspect_repo(repo_path: Path) -> LocalRepoState:
+            key = str(repo_path)
+            display.start_repository(
+                key, _format_repo_display(root_path, repo_path), "Checking status"
             )
-            if not confirmed:
-                console.print("Sync cancelled.")
-                return
+            try:
+                state = await _inspect_local_repository(repo_path)
+            except Exception:
+                display.finish_repository(key, "failed")
+                raise
+            display.finish_repository(key, "failed" if state.error else "success")
+            return state
 
-    async def process_repo(state: LocalRepoState) -> LocalRepoResult:
-        return await _sync_local_repository(state, force, provider_auth_configs)
-
-    results, errors = await executor.run_batch(
-        items=repo_states,
-        process_func=process_repo,
-        task_description="Pulling local repositories...",
-        item_description=lambda state: _format_repo_display(root_path, state.path),
-        show_progress=progress,
-    )
-    results = [result for result in results if result]
-
-    for repo_path, error in errors:
-        results.append(
-            LocalRepoResult(
-                state=LocalRepoState(
+        repo_states, scan_errors = await executor.run_batch(
+            items=repo_paths,
+            process_func=inspect_repo,
+            show_progress=False,
+        )
+        repo_states = [state for state in repo_states if state is not None]
+        for repo_path, error in scan_errors:
+            repo_states.append(
+                LocalRepoState(
                     path=repo_path,
                     name=repo_path.name,
                     remote_url=None,
                     provider="unknown",
                     is_dirty=True,
                     error=str(error),
-                ),
-                action=LOCAL_ACTION_FAILED,
-                error=str(error),
+                )
             )
-        )
+
+        planned_results = [
+            LocalRepoResult(
+                state=state,
+                action=_determine_local_action(state, force),
+                error=state.error,
+            )
+            for state in repo_states
+        ]
+        if force and not dry_run:
+            force_targets = [
+                result
+                for result in planned_results
+                if result.action == LOCAL_ACTION_PULL
+            ]
+            if force_targets:
+                # Pause live rendering while the user makes a destructive choice.
+                display.stop()
+                try:
+                    cancelled = not Confirm.ask(
+                        "[red]WARNING:[/red] Force mode will reset and clean "
+                        f"{len(force_targets)} repositories before pulling. Continue?"
+                    )
+                finally:
+                    display.start()
+
+        results = []
+        if not dry_run and not cancelled:
+            display.begin_phase("Syncing", total=len(repo_states))
+
+            async def process_repo(state: LocalRepoState) -> LocalRepoResult:
+                key = str(state.path)
+                display.start_repository(
+                    key,
+                    _format_repo_display(root_path, state.path),
+                    "Checking repository",
+                )
+
+                def report(event: GitProgress) -> None:
+                    display.update_repository(key, event)
+
+                try:
+                    result = await _sync_local_repository(
+                        state,
+                        force,
+                        provider_auth_configs,
+                        on_progress=report if progress else None,
+                    )
+                except Exception:
+                    display.finish_repository(key, "failed")
+                    raise
+                if result.action == LOCAL_ACTION_FAILED:
+                    outcome = "failed"
+                elif result.action in (
+                    LOCAL_ACTION_SKIP_DIRTY,
+                    LOCAL_ACTION_SKIP_NO_REMOTE,
+                ):
+                    outcome = "skipped"
+                else:
+                    outcome = "success"
+                display.finish_repository(key, outcome)
+                return result
+
+            results, sync_errors = await executor.run_batch(
+                items=repo_states,
+                process_func=process_repo,
+                show_progress=False,
+            )
+            results = [result for result in results if result is not None]
+            for state, error in sync_errors:
+                results.append(
+                    LocalRepoResult(
+                        state=state, action=LOCAL_ACTION_FAILED, error=str(error)
+                    )
+                )
+        elif cancelled:
+            display.set_message("Cancelled")
+        else:
+            display.set_message("Preview ready")
+
+    if not repo_paths:
+        console.print(f"[yellow]No git repositories found under {root_path}[/yellow]")
+        return
+    if dry_run:
+        _render_local_plan(root_path, planned_results, force)
+        if summary:
+            _render_local_summary(planned_results, dry_run=True)
+        return
+    if cancelled:
+        console.print("Sync cancelled.")
+        return
 
     if summary:
         _render_local_summary(results, dry_run=False)
@@ -1159,22 +1212,13 @@ async def run_sync_with_progress(
     """Run sync operation with rich progress reporting."""
     pre_skipped = pre_skipped or []
 
-    with create_progress() as progress:
-        # Add main progress task
-        sync_task = progress.add_task(
-            "Synchronizing repositories...", total=len(repositories)
+    with SyncProgress(len(repositories) + len(pre_skipped), phase="Syncing") as display:
+        display.begin_phase(
+            "Syncing",
+            total=len(repositories) + len(pre_skipped),
+            completed=len(pre_skipped),
+            skipped=len(pre_skipped),
         )
-
-        # Custom callback to update progress
-        def progress_callback(completed: int, total: int, current_repo: str):
-            progress.update(
-                sync_task,
-                completed=completed,
-                description=f"Syncing: {escape(current_repo)}",
-                refresh=True,
-            )
-
-        # Run sync with progress callback
         failures = await processor.process_repositories(
             repositories=repositories,
             target_path=target_path,
@@ -1185,7 +1229,7 @@ async def run_sync_with_progress(
             show_progress=False,
             resolved_names=resolved_names,
             case_collision_repos=case_collision_repos or set(),
-            on_progress=progress_callback,
+            display=display,
         )
 
     # Show final results. The summary reconciles to the resolved repository

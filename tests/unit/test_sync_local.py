@@ -2,7 +2,11 @@
 Unit tests for local sync helper logic.
 """
 
+import os
+import subprocess
 from pathlib import Path
+
+import pytest
 
 from mgit.commands.sync import (
     LOCAL_ACTION_FAILED,
@@ -13,6 +17,7 @@ from mgit.commands.sync import (
     LocalRepoResult,
     LocalRepoState,
     _determine_local_action,
+    _inspect_local_repository,
     _summarize_local_results,
 )
 
@@ -68,3 +73,22 @@ def test_summarize_local_results_counts():
     assert counts["skipped_dirty"] == 1
     assert counts["skipped_no_remote"] == 1
     assert counts["failed"] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(os.name != "posix", reason="Arbitrary filename bytes require POSIX")
+async def test_non_utf8_filename_is_dirty_instead_of_a_scan_failure(tmp_path):
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "core.quotePath", "false"], cwd=tmp_path, check=True
+    )
+    (tmp_path / os.fsdecode(b"invalid-\xff.txt")).touch()
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://example.invalid/org/repo"],
+        cwd=tmp_path,
+        check=True,
+    )
+    state = await _inspect_local_repository(tmp_path)
+    assert state.is_dirty
+    assert state.error is None
+    assert _determine_local_action(state, force=False) == LOCAL_ACTION_SKIP_DIRTY

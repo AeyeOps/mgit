@@ -210,24 +210,22 @@ def print_static_tree(use_color: bool = True) -> None:
 
 
 def _is_animation_enabled() -> bool:
-    """Check if help animation is enabled in config."""
-    try:
-        from mgit.config.yaml_manager import get_global_setting
+    """Check whether the user explicitly enabled help animation."""
+    from mgit.config.yaml_manager import get_global_setting
 
-        return get_global_setting("help_animation", True)
-    except Exception:
-        return True  # Default to enabled if config unavailable
+    return get_global_setting("help_animation", False)
 
 
 def show_animated_help(help_text: str) -> None:
     """
     Show help with optional animation based on terminal capabilities.
 
-    In capable terminals: shows spinning tree animation, then static tree on top of help text.
+    In capable terminals with animation enabled: shows spinning tree animation,
+    then static tree on top of help text.
     In limited terminals: shows static tree on top of help text.
     In pipes: shows static tree on top of help text (no color).
 
-    Animation can be disabled via config: global.help_animation = false
+    Animation is opt-in via config: global.help_animation = true
     """
     caps = get_terminal_capabilities()
     use_color = caps == TerminalCaps.ANSI

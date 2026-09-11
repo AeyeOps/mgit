@@ -8,9 +8,68 @@ from unittest.mock import Mock
 import pytest
 from rich.console import Console
 from rich.text import Text
+from ruamel.yaml.error import YAMLError
 
+from mgit.config import yaml_manager
 from mgit.ui import help_animation
 from mgit.ui.terminal import TerminalCaps
+
+
+@pytest.fixture
+def animation_config(monkeypatch, tmp_path):
+    """Read animation settings from an isolated config, without cached globals."""
+    config_file = tmp_path / "config.yaml"
+    monkeypatch.setattr(yaml_manager, "CONFIG_FILE", config_file)
+    monkeypatch.setattr(
+        yaml_manager, "config_manager", yaml_manager.ConfigurationManager()
+    )
+    return config_file
+
+
+@pytest.mark.parametrize(
+    "config,enabled",
+    [
+        (None, False),
+        ("global: {}\n", False),
+        ("global:\n  help_animation: false\n", False),
+        ("global:\n  help_animation: true\n", True),
+    ],
+)
+def test_animation_requires_saved_opt_in(animation_config, config, enabled):
+    """Only an explicit configuration setting turns on the help animation."""
+    if config is not None:
+        animation_config.write_text(config)
+
+    assert help_animation._is_animation_enabled() is enabled
+
+
+def test_animation_config_error_is_visible(animation_config):
+    """Invalid configuration must not silently enable animation."""
+    animation_config.write_text("global: [\n")
+
+    with pytest.raises(YAMLError):
+        help_animation._is_animation_enabled()
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_ansi_help_respects_animation_opt_in(
+    animation_config, monkeypatch, capsys, enabled
+):
+    """Default terminal help is static; saved opt-in retains animation."""
+    if enabled:
+        animation_config.write_text("global:\n  help_animation: true\n")
+    animation = Mock()
+    monkeypatch.setattr(help_animation, "run_tree_animation", animation)
+    monkeypatch.setattr(
+        help_animation, "get_terminal_capabilities", lambda: TerminalCaps.ANSI
+    )
+
+    help_animation.show_animated_help("Usage: mgit [OPTIONS]\n")
+
+    assert animation.call_count == int(enabled)
+    output = capsys.readouterr().out
+    assert "M   G   I   T" in output
+    assert "Usage: mgit" in output
 
 
 def test_immediate_skip_does_not_erase_previous_output(monkeypatch, capsys):
