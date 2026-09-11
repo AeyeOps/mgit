@@ -47,9 +47,6 @@ class TestForceSyncCaseCollision:
         await proc._force_sync_case_collision(
             Path("/tmp/repo"),
             "collide-repo",
-            MagicMock(),
-            1,
-            "collide-repo",
             "collide-repo",
         )
         proc.git_manager.git_fetch.assert_awaited_once()
@@ -70,9 +67,6 @@ class TestForceSyncCaseCollision:
         await proc._force_sync_case_collision(
             Path("/tmp/repo"),
             "collide-repo",
-            MagicMock(),
-            1,
-            "collide-repo",
             "collide-repo",
         )
         proc.git_manager.git_fetch.assert_not_awaited()
@@ -91,9 +85,6 @@ class TestForceSyncCaseCollision:
         )
         await proc._force_sync_case_collision(
             Path("/tmp/repo"),
-            "collide-repo",
-            MagicMock(),
-            1,
             "collide-repo",
             "collide-repo",
         )
@@ -115,9 +106,6 @@ class TestForceSyncCaseCollision:
         )
         await proc._force_sync_case_collision(
             Path("/tmp/repo"),
-            "collide-repo",
-            MagicMock(),
-            1,
             "collide-repo",
             "collide-repo",
         )

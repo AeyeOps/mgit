@@ -708,8 +708,18 @@ mgit sync --filter <pattern> [path]
 | `--concurrency` | No | `-c` | Number of parallel operations (default: 4) | `--concurrency 10` |
 | `--force` | No | `-f` | Force re-clone all repositories (requires confirmation) | `--force` |
 | `--dry-run` | No | - | Preview what would be done without making changes | `--dry-run` |
-| `--progress` | No | - | Show progress bar (default: enabled) | `--no-progress` |
+| `--progress` | No | - | Show a fixed status panel with repository counts and live Git progress (default: enabled) | `--no-progress` |
 | `--summary` | No | - | Show detailed summary (default: enabled) | `--no-summary` |
+
+The status panel stays within three rows. Its overall percentage counts processed
+repositories, including skips and failures; the current repository shows Git's
+reported stage percentage separately. Git stages can restart at zero, so a stage
+reaching 100% does not mean the repository is finished. Elapsed time and time since
+the last Git progress update remain visible during operations without a percentage.
+Discovery shows an unknown total until repositories have been counted.
+
+Help opens immediately with static branding. To enable the tree animation, set
+`global.help_animation: true` in `~/.config/mgit/config.yaml`.
 
 #### Synchronization Behavior
 

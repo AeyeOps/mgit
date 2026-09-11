@@ -14,12 +14,12 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.progress import Progress
 from rich.table import Table
 
 from mgit.changesets.storage import ChangesetStorage
 from mgit.discovery.change_discovery import ChangeDiscoveryEngine, ChangeDiscoveryResult
 from mgit.git.utils import get_repo_components
+from mgit.ui.progress import create_progress
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -95,7 +95,7 @@ def execute_remote_diff_command(
         )
 
         # Perform discovery
-        with Progress() as progress:
+        with create_progress() as progress:
             task = progress.add_task("[green]Discovering repositories...", total=None)
 
             result = asyncio.run(

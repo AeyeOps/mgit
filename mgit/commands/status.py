@@ -136,18 +136,7 @@ async def get_repository_statuses(
     if not repos_to_check:
         return []
 
-    # For JSON mode, disable progress output to avoid mixing with JSON output
-    import io
-
-    from rich.console import Console
-
-    if json_mode:
-        # Create a null console that discards all output
-        progress_console = Console(file=io.StringIO(), force_terminal=False)
-    else:
-        progress_console = console
-
-    executor = AsyncExecutor(concurrency=concurrency, rich_console=progress_console)
+    executor = AsyncExecutor(concurrency=concurrency)
 
     async def process_repo(repo_path: Path):
         return await _get_single_repo_status(repo_path, fetch)
@@ -156,6 +145,7 @@ async def get_repository_statuses(
         items=repos_to_check,
         process_func=process_repo,
         task_description="Checking repository statuses...",
+        show_progress=not json_mode,
     )
 
     # Process errors into status objects

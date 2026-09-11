@@ -1,6 +1,7 @@
 """Core processing classes for mgit operations."""
 
 import asyncio
+import codecs
 import logging
 import re
 from dataclasses import asdict, dataclass
@@ -27,16 +28,12 @@ def _unquote_git_path(path: str) -> str:
 
     With core.quotePath (git's default) any path containing spaces or non-ASCII
     bytes is emitted wrapped in double quotes with C-style backslash escapes
-    (e.g. `"\\303\\244 b.txt"` for `ä b.txt`). Unquoted paths pass through.
+    (e.g. `"\\303\\244 b.txt"` for `ä b.txt`). With core.quotePath=false,
+    quoted paths can contain literal Unicode too. Unquoted paths pass through.
     """
     if len(path) >= 2 and path[0] == '"' and path[-1] == '"':
-        return (
-            path[1:-1]
-            .encode("latin-1", "backslashreplace")
-            .decode("unicode_escape")
-            .encode("latin-1")
-            .decode("utf-8", "replace")
-        )
+        escaped_bytes = path[1:-1].encode("utf-8")
+        return codecs.escape_decode(escaped_bytes)[0].decode("utf-8", "replace")
     return path
 
 
@@ -94,12 +91,12 @@ class DiffProcessor:
             async with semaphore:
                 try:
                     change_data = await self._detect_repository_changes(repo_path)
-                    if progress and task_id:
+                    if progress is not None and task_id is not None:
                         progress.advance(task_id)
                     return change_data
                 except Exception as e:
                     logger.error(f"Error processing repository {repo_path}: {e}")
-                    if progress and task_id:
+                    if progress is not None and task_id is not None:
                         progress.advance(task_id)
                     return RepositoryChange(
                         repository_path=str(repo_path),

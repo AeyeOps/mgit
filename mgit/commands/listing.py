@@ -10,14 +10,7 @@ from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
 from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    SpinnerColumn,
-    TaskProgressColumn,
-    TextColumn,
-)
+from rich.progress import Progress
 from rich.table import Table
 
 from ..config.yaml_manager import list_provider_names
@@ -33,6 +26,7 @@ from ..providers.exceptions import (
     ConnectionError as ProviderConnectionError,
 )
 from ..providers.manager import ProviderManager
+from ..ui.progress import create_progress
 from ..utils.query_parser import matches_pattern, parse_query, validate_query
 
 logger = logging.getLogger(__name__)
@@ -347,20 +341,7 @@ async def _gather_provider_results(
     outcomes: list[ProviderOutcome] = []
     sem = asyncio.Semaphore(min(4, len(matching_providers)))
 
-    progress_cm = (
-        Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            MofNCompleteColumn(),
-            TextColumn("• {task.fields[repos_found]} repos found"),
-            console=console,
-            transient=False,
-        )
-        if show_progress
-        else contextlib.nullcontext()
-    )
+    progress_cm = create_progress() if show_progress else contextlib.nullcontext()
 
     with progress_cm as progress:
         overall_task = None
@@ -382,6 +363,7 @@ async def _gather_provider_results(
                         f"  └─ {provider_name_item}: Initializing...",
                         total=None,
                         repos_found=0,
+                        visible=False,
                     )
 
                 try:

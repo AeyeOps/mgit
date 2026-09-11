@@ -4,21 +4,23 @@ Provides common logic for clone and pull operations across multiple repositories
 """
 
 import asyncio
-import io
+import contextlib
 import logging
 import shutil
 import subprocess
 from enum import Enum
 from pathlib import Path
+from typing import Literal
 
 from rich.console import Console
-from rich.progress import Progress
 from rich.prompt import Confirm
 
 from ..git import GitManager, resolve_local_repo_path, sanitize_url
+from ..git.progress import GitProgress, ProgressCallback
 from ..git.utils import classify_dirty_repo, find_case_collisions, parse_porcelain_z
 from ..providers.base import Repository
 from ..providers.manager import ProviderManager
+from ..ui.sync_progress import SyncProgress
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -73,117 +75,80 @@ class BulkOperationProcessor:
         show_progress: bool = True,
         resolved_names: dict[str, str] | None = None,
         case_collision_repos: set[str] | None = None,
+        display: SyncProgress | None = None,
     ) -> list[tuple[str, str]]:
-        """
-        Process repositories asynchronously with progress tracking.
+        """Process repositories and report actual work to one status display.
 
-        Args:
-            repositories: List of repositories to process
-            target_path: Target directory for operations
-            concurrency: Number of concurrent operations
-            update_mode: How to handle existing directories
-            confirmed_force_remove: Whether user confirmed force removal
-            dirs_to_remove: List of directories marked for removal in force mode
-            show_progress: Whether to show progress bar
-            resolved_names: Pre-resolved directory names for flat layout (handles collisions)
-            case_collision_repos: Clone URLs of repos whose dirtiness is purely
-                a case-collision checkout artifact — force-synced to origin
-                (fetch + reset) instead of pulled, in pull update mode. Keyed
-                by clone URL because repo names are not unique across orgs.
-
-        Returns:
-            List of (repo_name, error_reason) tuples for failed operations
+        An optional caller-owned display includes repositories skipped during
+        preflight. Otherwise this processor owns the display for its batch.
         """
         self.failures = []
         self.skipped = []
         self.case_collision_repos = case_collision_repos or set()
         self.case_collision_synced = []
         sem = asyncio.Semaphore(concurrency)
-        repo_tasks = {}
-
-        progress_console = console
-        if not show_progress:
-            progress_console = Console(file=io.StringIO(), force_terminal=False)
-
-        with Progress(console=progress_console) as progress:
-            overall_task_id = progress.add_task(
-                "[green]Processing Repositories...",
-                total=len(repositories),
+        display_context = (
+            contextlib.nullcontext(display)
+            if display is not None
+            else SyncProgress(
+                len(repositories), phase="Syncing", disable=not show_progress
             )
+        )
 
-            async def process_one_repo(repo: Repository):
-                repo_name = repo.name
-                repo_url = repo.clone_url
-                is_disabled = repo.is_disabled
-                display_name = (
-                    repo_name[:30] + "..." if len(repo_name) > 30 else repo_name
-                )
+        with display_context as panel:
 
-                # Resolved local path — the identity recorded in the
-                # skipped/failures tally so reporting matches sync.py's
-                # disambiguated display names rather than bare repo names.
-                repo_path = resolve_local_repo_path(
-                    repo_url, self.flat_layout, resolved_names
-                )
-                display_path = str(repo_path)
-
-                # Add a task for this specific repo
-                repo_task_id = progress.add_task(
-                    f"[grey50]Pending: {display_name}[/grey50]", total=1, visible=True
-                )
-                repo_tasks[repo_name] = repo_task_id
-
+            async def process_one_repo(repo: Repository) -> None:
                 async with sem:
-                    # Check if repository is disabled
-                    if is_disabled:
-                        logger.info(f"Skipping disabled repository: {repo_name}")
-                        self.skipped.append((display_path, "repository is disabled"))
-                        progress.update(
-                            repo_task_id,
-                            description=f"[yellow]Disabled: {display_name}[/yellow]",
-                            completed=1,
-                        )
-                        progress.advance(overall_task_id, 1)
-                        return
-
-                    logger.debug(
-                        f"Using path '{repo_path}' for repository '{repo_name}'"
+                    repo_path = resolve_local_repo_path(
+                        repo.clone_url, self.flat_layout, resolved_names
                     )
+                    display_path = str(repo_path)
+                    key = repo.clone_url
+                    panel.start_repository(key, display_path, "Checking repository")
 
-                    repo_folder = target_path / repo_path
-                    # Handle existing directory
-                    if repo_folder.exists():
-                        handled = await self._handle_existing_directory(
-                            repo=repo,
-                            repo_folder=repo_folder,
-                            update_mode=update_mode,
-                            progress=progress,
-                            repo_task_id=repo_task_id,
-                            overall_task_id=overall_task_id,
-                            display_name=display_name,
-                            display_path=display_path,
-                            confirmed_force_remove=confirmed_force_remove,
-                            dirs_to_remove=dirs_to_remove or [],
-                        )
-                        if handled:
-                            return
+                    def report(event: GitProgress) -> None:
+                        panel.update_repository(key, event)
 
-                    # Perform the primary operation (clone or pull)
-                    await self._perform_operation(
-                        repo=repo,
-                        repo_folder=repo_folder,
-                        target_path=target_path,
-                        repo_path=repo_path,
-                        progress=progress,
-                        repo_task_id=repo_task_id,
-                        display_name=display_name,
-                        display_path=display_path,
-                    )
+                    on_progress = report if not panel.disable else None
+                    try:
+                        if repo.is_disabled:
+                            self.skipped.append(
+                                (display_path, "repository is disabled")
+                            )
+                            outcome = "skipped"
+                        else:
+                            repo_folder = target_path / repo_path
+                            outcome = None
+                            if repo_folder.exists():
+                                outcome = await self._handle_existing_directory(
+                                    repo,
+                                    repo_folder,
+                                    update_mode,
+                                    display_path,
+                                    confirmed_force_remove,
+                                    dirs_to_remove or [],
+                                    on_progress,
+                                )
+                            if outcome is None:
+                                outcome = await self._perform_operation(
+                                    repo, repo_folder, display_path, on_progress
+                                )
+                    except Exception:
+                        panel.finish_repository(key, "failed")
+                        raise
+                    panel.finish_repository(key, outcome)
 
-                    progress.advance(overall_task_id, 1)
-
-            # Process all repositories concurrently
-            await asyncio.gather(*(process_one_repo(repo) for repo in repositories))
+            tasks = [
+                asyncio.create_task(process_one_repo(repo)) for repo in repositories
+            ]
+            try:
+                await asyncio.gather(*tasks)
+            finally:
+                # All work belongs to this batch, including on callback failure.
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
 
         return self.failures
 
@@ -192,144 +157,56 @@ class BulkOperationProcessor:
         repo: Repository,
         repo_folder: Path,
         update_mode: UpdateMode,
-        progress: Progress,
-        repo_task_id: int,
-        overall_task_id: int,
-        display_name: str,
         display_path: str,
         confirmed_force_remove: bool,
         dirs_to_remove: list[tuple[str, str, Path]],
-    ) -> bool:
-        """
-        Handle existing directory based on update mode.
-
-        Returns:
-            True if the operation should be skipped, False to continue
-        """
-        repo_name = repo.name
-        sanitized_name = repo_folder.name
-
+        on_progress: ProgressCallback | None,
+    ) -> Literal["success", "skipped", "failed"] | None:
+        """Return an outcome, or None when a fresh clone should follow."""
         if update_mode == UpdateMode.skip:
-            logger.info(f"Skipping existing repo folder: {sanitized_name}")
-            progress.update(
-                repo_task_id,
-                description=f"[blue]Skipped (exists): {display_name}[/blue]",
-                completed=1,
-            )
-            progress.advance(overall_task_id, 1)
-            return True
+            self.skipped.append((display_path, "already exists"))
+            return "skipped"
 
-        elif update_mode == UpdateMode.pull:
-            progress.update(
-                repo_task_id,
-                description=f"[cyan]Pulling: {display_name}...",
-                visible=True,
-            )
+        if update_mode == UpdateMode.pull:
             if (repo_folder / ".git").exists():
                 if await self.git_manager.is_repo_empty(repo_folder):
-                    logger.info(f"Skipping empty repo (no commits): {repo_name}")
                     self.skipped.append((display_path, "empty repo (no commits)"))
-                    progress.update(
-                        repo_task_id,
-                        description=f"[yellow]Skipped (empty): {display_name}[/yellow]",
-                        completed=1,
+                    return "skipped"
+                if repo.clone_url in self.case_collision_repos:
+                    return await self._force_sync_case_collision(
+                        repo_folder, repo.name, display_path, on_progress
                     )
-                elif repo.clone_url in self.case_collision_repos:
-                    await self._force_sync_case_collision(
-                        repo_folder,
-                        repo_name,
-                        progress,
-                        repo_task_id,
-                        display_name,
-                        display_path,
-                    )
-                else:
-                    try:
-                        await self.git_manager.git_pull(repo_folder)
-                        progress.update(
-                            repo_task_id,
-                            description=f"[green]Pulled (update): {display_name}[/green]",
-                            completed=1,
-                        )
-                    except subprocess.CalledProcessError as e:
-                        error_detail = sanitize_url(
-                            (e.stderr or "").strip().split("\n")[0]
-                        )
-                        logger.warning(f"Pull failed for {repo_name}: {error_detail}")
-                        self.failures.append(
-                            (display_path, f"pull failed: {error_detail}")
-                        )
-                        progress.update(
-                            repo_task_id,
-                            description=f"[red]Pull Failed (update): {display_name}[/red]",
-                            completed=1,
-                        )
-            else:
-                if not any(repo_folder.iterdir()):
-                    logger.info(f"Removing empty non-git directory: {repo_folder}")
-                    repo_folder.rmdir()
-                    return False
-                else:
-                    msg = "dir exists, not a git repo"
-                    logger.warning(f"{repo_name}: {msg}")
-                    self.skipped.append((display_path, msg))
-                    progress.update(
-                        repo_task_id,
-                        description=f"[yellow]Skipped (not repo): {display_name}[/yellow]",
-                        completed=1,
-                    )
-            progress.advance(overall_task_id, 1)
-            return True
+                return await self._pull_repository(
+                    repo_folder, display_path, on_progress
+                )
+            if not any(repo_folder.iterdir()):
+                repo_folder.rmdir()
+                return None
+            self.skipped.append((display_path, "dir exists, not a git repo"))
+            return "skipped"
 
-        elif update_mode == UpdateMode.force:
-            # Check if removal was confirmed AND this dir was marked
+        if update_mode == UpdateMode.force:
             should_remove = confirmed_force_remove and any(
-                rf == repo_folder for _, _, rf in dirs_to_remove
+                folder == repo_folder for _, _, folder in dirs_to_remove
             )
-            if should_remove:
-                progress.update(
-                    repo_task_id,
-                    description=f"[magenta]Removing: {display_name}...",
-                    visible=True,
+            if not should_remove:
+                self.skipped.append((display_path, "removal not confirmed"))
+                return "skipped"
+            if on_progress is not None:
+                on_progress(GitProgress("Removing existing directory"))
+            try:
+                shutil.rmtree(repo_folder)
+            except OSError as error:
+                self.failures.append(
+                    (display_path, f"Failed removing old folder: {error}")
                 )
-                logger.info(f"Removing existing folder: {sanitized_name}")
-                try:
-                    shutil.rmtree(repo_folder)
-                    # Removal successful, continue to clone
-                    return False
-                except Exception as e:
-                    self.failures.append(
-                        (display_path, f"Failed removing old folder: {e}")
-                    )
-                    progress.update(
-                        repo_task_id,
-                        description=f"[red]Remove Failed: {display_name}[/red]",
-                        completed=1,
-                    )
-                    progress.advance(overall_task_id, 1)
-                    return True
-            else:
-                logger.warning(
-                    f"Skipping removal of existing folder (not confirmed): {sanitized_name}"
-                )
-                progress.update(
-                    repo_task_id,
-                    description=f"[blue]Skipped (force declined/not applicable): {display_name}[/blue]",
-                    completed=1,
-                )
-                progress.advance(overall_task_id, 1)
-                return True
+                return "failed"
+            return None
 
-        return False
+        raise ValueError(f"Unsupported update mode: {update_mode}")
 
     async def _is_pure_case_collision(self, repo_folder: Path) -> bool:
-        """True if the repo is dirty solely because of case-colliding paths.
-
-        Re-checked at sync time because the classification done during analysis
-        can be stale: every changed path must also be a case-colliding tracked
-        path, meaning there is no real local work that ``git reset --hard``
-        would lose.
-        """
+        """Recheck that every dirty path is a case-collision checkout artifact."""
         proc = await asyncio.create_subprocess_exec(
             "git",
             "status",
@@ -350,149 +227,80 @@ class BulkOperationProcessor:
         self,
         repo_folder: Path,
         repo_name: str,
-        progress: Progress,
-        repo_task_id: int,
-        display_name: str,
         display_path: str,
-    ) -> None:
-        """Bring a case-collision repo current with origin via fetch + reset.
-
-        A verified case-collision repo has no real local changes — every dirty
-        path is a case-colliding tracked path the filesystem cannot represent.
-        That makes ``git reset --hard`` safe: it only discards the unavoidable
-        checkout artifact, which reappears on checkout anyway. The repo is
-        re-verified first, so one that gained genuine edits since analysis is
-        skipped rather than reset.
-        """
-        progress.update(
-            repo_task_id,
-            description=f"[cyan]Syncing (case-collision): {display_name}...",
-            visible=True,
-        )
+        on_progress: ProgressCallback | None = None,
+    ) -> Literal["success", "skipped", "failed"]:
+        """Fetch/reset only after rechecking that no genuine edits would be lost."""
         if not await self._is_pure_case_collision(repo_folder):
-            msg = "case-colliding paths plus genuine local edits"
-            logger.warning(f"Skipping force-sync for {repo_name}: {msg}")
-            self.skipped.append((display_path, msg))
-            progress.update(
-                repo_task_id,
-                description=f"[yellow]Skipped (local edits): {display_name}[/yellow]",
-                completed=1,
+            self.skipped.append(
+                (display_path, "case-colliding paths plus genuine local edits")
             )
-            return
+            return "skipped"
         try:
-            await self.git_manager.git_fetch(repo_folder)
+            await self.git_manager.git_fetch(repo_folder, on_progress=on_progress)
             upstream = await self.git_manager.get_upstream_ref(repo_folder)
             if upstream:
+                if on_progress is not None:
+                    on_progress(GitProgress("Updating checkout"))
                 await self.git_manager.git_reset_hard(repo_folder, upstream)
             else:
-                # No upstream branch to reset to — fetch still advanced the
-                # repo's history, the best that can be done without one.
-                logger.info(f"{repo_name}: no upstream branch; fetched without reset")
+                logger.info("%s: no upstream branch; fetched without reset", repo_name)
             self.case_collision_synced.append(display_path)
-            progress.update(
-                repo_task_id,
-                description=f"[green]Synced (case-collision): {display_name}[/green]",
-                completed=1,
-            )
-        except subprocess.CalledProcessError as e:
-            error_detail = sanitize_url((e.stderr or "").strip().split("\n")[0])
-            logger.warning(
-                f"Case-collision sync failed for {repo_name}: {error_detail}"
-            )
-            self.failures.append(
-                (display_path, f"case-collision sync failed: {error_detail}")
-            )
-            progress.update(
-                repo_task_id,
-                description=f"[red]Sync Failed: {display_name}[/red]",
-                completed=1,
-            )
+            return "success"
+        except subprocess.CalledProcessError as error:
+            self._record_failure(display_path, "case-collision sync", error)
+            return "failed"
+
+    def _record_failure(
+        self, display_path: str, operation: str, error: subprocess.CalledProcessError
+    ) -> None:
+        # Progress records may precede the actual fatal message in captured stderr.
+        # Keep the diagnostic, with credentials removed, for the final report.
+        detail = sanitize_url((error.stderr or error.stdout or str(error)).strip())
+        self.failures.append((display_path, f"{operation} failed: {detail}"))
+        logger.debug("%s failed for %s: %s", operation, display_path, detail)
+
+    async def _pull_repository(
+        self, repo_folder: Path, display_path: str, on_progress: ProgressCallback | None
+    ) -> Literal["success", "failed"]:
+        try:
+            await self.git_manager.git_pull(repo_folder, on_progress=on_progress)
+            return "success"
+        except subprocess.CalledProcessError as error:
+            self._record_failure(display_path, "pull", error)
+            return "failed"
 
     async def _perform_operation(
         self,
         repo: Repository,
         repo_folder: Path,
-        target_path: Path,
-        repo_path: Path,
-        progress: Progress,
-        repo_task_id: int,
-        display_name: str,
         display_path: str,
-    ):
-        """Perform the primary operation (clone or pull)."""
-        repo_name = repo.name
-
+        on_progress: ProgressCallback | None,
+    ) -> Literal["success", "skipped", "failed"]:
+        """Clone or pull one repository, retaining a complete outcome tally."""
         if self.operation_type == OperationType.clone:
-            progress.update(
-                repo_task_id,
-                description=f"[cyan]Cloning: {display_name}...",
-                visible=True,
-            )
-            # Get authenticated URL from provider manager
             pat_url = self.provider_manager.get_authenticated_clone_url(repo)
             try:
-                # Ensure parent directories exist
                 repo_folder.parent.mkdir(parents=True, exist_ok=True)
                 await self.git_manager.git_clone(
-                    pat_url, repo_folder.parent, repo_folder.name
+                    pat_url,
+                    repo_folder.parent,
+                    repo_folder.name,
+                    on_progress=on_progress,
                 )
-                progress.update(
-                    repo_task_id,
-                    description=f"[green]Cloned: {display_name}[/green]",
-                    completed=1,
-                )
-            except subprocess.CalledProcessError as e:
-                error_detail = sanitize_url((e.stderr or "").strip().split("\n")[0])
-                logger.warning(f"Clone failed for {repo_name}: {error_detail}")
-                self.failures.append((display_path, f"clone failed: {error_detail}"))
-                progress.update(
-                    repo_task_id,
-                    description=f"[red]Clone Failed: {display_name}[/red]",
-                    completed=1,
-                )
-
-        elif self.operation_type == OperationType.pull:
-            if repo_folder.exists() and (repo_folder / ".git").exists():
-                if await self.git_manager.is_repo_empty(repo_folder):
-                    logger.info(f"Skipping empty repo (no commits): {repo_name}")
-                    self.skipped.append((display_path, "empty repo (no commits)"))
-                    progress.update(
-                        repo_task_id,
-                        description=f"[yellow]Skipped (empty): {display_name}[/yellow]",
-                        completed=1,
-                    )
-                else:
-                    progress.update(
-                        repo_task_id,
-                        description=f"[cyan]Pulling: {display_name}...",
-                        visible=True,
-                    )
-                    try:
-                        await self.git_manager.git_pull(repo_folder)
-                        progress.update(
-                            repo_task_id,
-                            description=f"[green]Pulled: {display_name}[/green]",
-                            completed=1,
-                        )
-                    except subprocess.CalledProcessError as e:
-                        error_detail = sanitize_url(
-                            (e.stderr or "").strip().split("\n")[0]
-                        )
-                        logger.warning(f"Pull failed for {repo_name}: {error_detail}")
-                        self.failures.append(
-                            (display_path, f"pull failed: {error_detail}")
-                        )
-                        progress.update(
-                            repo_task_id,
-                            description=f"[red]Pull Failed: {display_name}[/red]",
-                            completed=1,
-                        )
-            else:
-                progress.update(
-                    repo_task_id,
-                    description=f"[yellow]Skipped (not found): {display_name}[/yellow]",
-                    completed=1,
-                )
+                return "success"
+            except subprocess.CalledProcessError as error:
+                self._record_failure(display_path, "clone", error)
+                return "failed"
+        if self.operation_type == OperationType.pull:
+            if not repo_folder.exists() or not (repo_folder / ".git").exists():
+                self.skipped.append((display_path, "repository not found"))
+                return "skipped"
+            if await self.git_manager.is_repo_empty(repo_folder):
+                self.skipped.append((display_path, "empty repo (no commits)"))
+                return "skipped"
+            return await self._pull_repository(repo_folder, display_path, on_progress)
+        raise ValueError(f"Unsupported operation: {self.operation_type}")
 
 
 def check_force_mode_confirmation(

@@ -14,15 +14,10 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TaskID,
-    TextColumn,
-    TimeElapsedColumn,
-)
-from rich.table import Column
+from rich.markup import escape
+from rich.progress import Progress, TaskID
+
+from mgit.ui.progress import ProgressDisplay, create_progress, progress_console
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +77,7 @@ class AsyncExecutor:
         self.semaphore = (
             asyncio.Semaphore(concurrency) if mode == ExecutionMode.CONCURRENT else None
         )
-        self.console = rich_console or Console(stderr=True)
-        self._bar_width = 28
-        self._min_desc_width = 24
+        self.console = rich_console or progress_console
 
     async def run_batch(
         self,
@@ -151,7 +144,9 @@ class AsyncExecutor:
         else:
             # Run with progress tracking
             with self._create_progress() as progress:
-                overall_task = progress.add_task(task_description, total=len(items))
+                overall_task = progress.add_task(
+                    escape(task_description), total=len(items)
+                )
 
                 if self.mode == ExecutionMode.CONCURRENT:
                     await self._run_concurrent_with_worker_progress(
@@ -367,14 +362,15 @@ class AsyncExecutor:
         process_func: Callable[[T], Coroutine[Any, Any, Any]],
         results: list[Any],
         errors: list[tuple[T, Exception]],
-        progress: Progress,
+        progress: ProgressDisplay,
         overall_task: TaskID,
         item_description: Callable[[T], str] | None,
         collect_errors: bool,
         on_error: Callable[[T, Exception], None] | None,
         on_success: Callable[[T, Any], None] | None,
     ) -> None:
-        worker_count = max(self.concurrency, 1)
+        worker_count = min(max(self.concurrency, 1), len(items))
+        visible_workers = max(self.console.size.height - 3, 0)
         queue: asyncio.Queue[tuple[int, T] | None] = asyncio.Queue()
 
         for idx, item in enumerate(items):
@@ -383,7 +379,11 @@ class AsyncExecutor:
             queue.put_nowait(None)
 
         worker_tasks = [
-            progress.add_task(f"[grey50]Worker {i + 1}: idle[/grey50]", total=1)
+            progress.add_task(
+                f"[grey50]Worker {i + 1}: idle[/grey50]",
+                total=None,
+                visible=i < visible_workers,
+            )
             for i in range(worker_count)
         ]
 
@@ -392,11 +392,6 @@ class AsyncExecutor:
             while True:
                 payload = await queue.get()
                 if payload is None:
-                    progress.update(
-                        task_id,
-                        description=f"[grey50]Worker {worker_idx + 1}: idle[/grey50]",
-                        completed=0,
-                    )
                     queue.task_done()
                     break
 
@@ -407,10 +402,9 @@ class AsyncExecutor:
                 desc = self._format_description(
                     raw_desc, prefix=f"Worker {worker_idx + 1}: "
                 )
-                progress.update(
+                progress.start_indeterminate_task(
                     task_id,
                     description=f"[cyan]{desc}[/cyan]",
-                    completed=1,
                 )
 
                 try:
@@ -419,6 +413,7 @@ class AsyncExecutor:
                     progress.update(
                         task_id,
                         description=f"[green]✓ {desc}[/green]",
+                        total=1,
                         completed=1,
                     )
                     if on_success:
@@ -429,6 +424,7 @@ class AsyncExecutor:
                     progress.update(
                         task_id,
                         description=f"[red]✗ {desc}[/red]",
+                        total=1,
                         completed=1,
                     )
                     if on_error:
@@ -442,61 +438,14 @@ class AsyncExecutor:
 
         await asyncio.gather(*(worker(i) for i in range(worker_count)))
 
-    def _create_progress(self) -> Progress:
-        columns = [
-            SpinnerColumn(),
-            TextColumn(
-                "[progress.description]{task.description}",
-                justify="left",
-                table_column=Column(ratio=1, overflow="ellipsis", no_wrap=True),
-            ),
-            BarColumn(
-                bar_width=self._bar_width,
-                table_column=Column(justify="right"),
-            ),
-            TextColumn("{task.percentage:>3.0f}%", justify="right"),
-            TimeElapsedColumn(table_column=Column(justify="right")),
-        ]
-        return Progress(*columns, console=self.console, expand=True)
+    def _create_progress(self) -> ProgressDisplay:
+        return create_progress(console=self.console)
 
     def _format_description(self, text: str, prefix: str | None = None) -> str:
-        display = f"{prefix or ''}{text}"
-        max_len = self._get_max_description_width()
-        return self._truncate_middle(display, max_len)
-
-    def _get_max_description_width(self) -> int:
-        try:
-            width = self.console.size.width
-        except Exception:
-            width = 0
-
-        if width <= 0:
-            return 60
-
-        reserved = self._bar_width + 16
-        max_len = width - reserved
-        return max(max_len, self._min_desc_width)
-
-    @staticmethod
-    def _truncate_middle(text: str, max_len: int) -> str:
-        if max_len <= 0 or len(text) <= max_len:
-            return text
-        if max_len <= 3:
-            return text[:max_len]
-        head_len = (max_len - 3) // 2
-        tail_len = max_len - 3 - head_len
-        return f"{text[:head_len]}...{text[-tail_len:]}"
+        return escape(f"{prefix or ''}{text}")
 
     def _should_use_compact_progress(self, item_count: int) -> bool:
-        try:
-            height = self.console.size.height
-        except Exception:
-            return False
-
-        if height <= 0:
-            return False
-
-        max_visible_tasks = max(height - 5, 5)
+        max_visible_tasks = max(self.console.size.height - 3, 0)
         return item_count > max_visible_tasks
 
     async def _process_item_with_compact_progress(

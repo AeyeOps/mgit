@@ -107,26 +107,30 @@ def _sample_trunk_surface(
     return x, y, z, nx, ny, nz
 
 
-def render_tree_frame(angle: float, tilt: float = 0.2, use_color: bool = True) -> str:
+def render_tree_frame(
+    angle: float,
+    tilt: float = 0.2,
+    use_color: bool = True,
+    *,
+    width: int = SCREEN_WIDTH,
+    height: int = SCREEN_HEIGHT,
+) -> str:
     """
     Render a single frame of the spinning tree.
 
     angle: rotation angle around Y axis (spin)
     tilt: constant tilt for 3D perspective
     use_color: whether to include ANSI color codes
+    width: viewport width in terminal cells
+    height: viewport height in terminal rows
 
     Returns: Multi-line string of ASCII art
     """
     # Initialize screen buffer, z-buffer, and color buffer
-    output: list[list[str]] = [
-        [" " for _ in range(SCREEN_WIDTH)] for _ in range(SCREEN_HEIGHT)
-    ]
-    zbuffer: list[list[float]] = [
-        [0.0 for _ in range(SCREEN_WIDTH)] for _ in range(SCREEN_HEIGHT)
-    ]
-    colors: list[list[str]] = [
-        ["" for _ in range(SCREEN_WIDTH)] for _ in range(SCREEN_HEIGHT)
-    ]
+    output: list[list[str]] = [[" " for _ in range(width)] for _ in range(height)]
+    zbuffer: list[list[float]] = [[0.0 for _ in range(width)] for _ in range(height)]
+    colors: list[list[str]] = [["" for _ in range(width)] for _ in range(height)]
+    projection_scale = K1 * min(width / SCREEN_WIDTH, height / SCREEN_HEIGHT)
 
     # Precompute trig values - tilt around X, spin around Y
     sin_a, cos_a = math.sin(tilt), math.cos(tilt)
@@ -153,17 +157,13 @@ def render_tree_frame(angle: float, tilt: float = 0.2, use_color: bool = True) -
 
             # Perspective projection
             ooz = 1 / (rz + K2)
-            xp = int(SCREEN_WIDTH / 2 + K1 * ooz * rx)
-            yp = int(SCREEN_HEIGHT / 2 - K1 * ooz * ry)  # Invert Y for screen coords
+            xp = int(width / 2 + projection_scale * ooz * rx)
+            yp = int(height / 2 - projection_scale * ooz * ry)  # Invert screen Y
 
             # Calculate luminance (dot product with rotating light direction)
             luminance = rnx * light_x + rny * light_y + rnz * light_z
 
-            if (
-                0 <= xp < SCREEN_WIDTH
-                and 0 <= yp < SCREEN_HEIGHT
-                and ooz > zbuffer[yp][xp]
-            ):
+            if 0 <= xp < width and 0 <= yp < height and ooz > zbuffer[yp][xp]:
                 zbuffer[yp][xp] = ooz
                 # Map luminance (-1 to 1) to character index
                 lum_idx = int((luminance + 1) * 0.5 * (len(LUMINANCE_CHARS) - 1))
@@ -187,17 +187,13 @@ def render_tree_frame(angle: float, tilt: float = 0.2, use_color: bool = True) -
 
             # Perspective projection
             ooz = 1 / (rz + K2)
-            xp = int(SCREEN_WIDTH / 2 + K1 * ooz * rx)
-            yp = int(SCREEN_HEIGHT / 2 - K1 * ooz * ry)
+            xp = int(width / 2 + projection_scale * ooz * rx)
+            yp = int(height / 2 - projection_scale * ooz * ry)
 
             # Calculate luminance
             luminance = rnx * light_x + rny * light_y + rnz * light_z
 
-            if (
-                0 <= xp < SCREEN_WIDTH
-                and 0 <= yp < SCREEN_HEIGHT
-                and ooz > zbuffer[yp][xp]
-            ):
+            if 0 <= xp < width and 0 <= yp < height and ooz > zbuffer[yp][xp]:
                 zbuffer[yp][xp] = ooz
                 lum_idx = int((luminance + 1) * 0.5 * (len(LUMINANCE_CHARS) - 1))
                 lum_idx = max(0, min(len(LUMINANCE_CHARS) - 1, lum_idx))
@@ -210,10 +206,10 @@ def render_tree_frame(angle: float, tilt: float = 0.2, use_color: bool = True) -
     # Convert buffer to string with optional colors
     if use_color:
         lines = []
-        for y in range(SCREEN_HEIGHT):
+        for y in range(height):
             line_parts = []
             current_color = ""
-            for x in range(SCREEN_WIDTH):
+            for x in range(width):
                 char = output[y][x]
                 color = colors[y][x]
                 if char != " " and color and color != current_color:

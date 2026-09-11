@@ -2,6 +2,9 @@
 
 import math
 
+import pytest
+from rich.text import Text
+
 from mgit.ui.ascii_tree import (
     LUMINANCE_CHARS,
     SCREEN_HEIGHT,
@@ -132,6 +135,18 @@ class TestRenderTreeFrame:
         """Colored frame should contain ANSI escape codes."""
         frame = render_tree_frame(0.0, use_color=True)
         assert "\033[" in frame  # ANSI escape sequence
+
+    @pytest.mark.parametrize("width,height", [(29, 9), (12, 4), (1, 1)])
+    @pytest.mark.parametrize("use_color", [False, True])
+    def test_small_frames_fit_viewport(self, width, height, use_color):
+        """Small terminal viewports retain a scaled tree within their bounds."""
+        frame = Text.from_ansi(
+            render_tree_frame(0.0, use_color=use_color, width=width, height=height)
+        )
+        lines = frame.split("\n")
+        assert len(lines) == height
+        assert all(line.cell_len == width for line in lines)
+        assert frame.plain.strip()
 
 
 class TestStaticTree:

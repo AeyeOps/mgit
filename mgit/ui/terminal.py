@@ -13,7 +13,7 @@ class TerminalCaps(Enum):
 
     PIPE = auto()  # Output is piped, no TTY
     DUMB = auto()  # Dumb terminal, no ANSI support
-    BASIC = auto()  # Basic terminal, limited ANSI
+    BASIC = auto()  # Basic terminal, no ANSI colors
     ANSI = auto()  # Full ANSI support with cursor control
 
 
@@ -37,17 +37,10 @@ def get_terminal_capabilities() -> TerminalCaps:
 
     # Check TERM variable
     term = os.environ.get("TERM", "")
-    if term in ("dumb", ""):
-        # Windows terminals don't set TERM but modern ones support ANSI
-        if _IS_WINDOWS:
-            return TerminalCaps.ANSI
+    if term in ("dumb", "emacs", "M-emacs") or (not term and not _IS_WINDOWS):
         return TerminalCaps.DUMB
 
-    # Check for known non-ANSI terminals
-    if term in ("emacs", "M-emacs"):
-        return TerminalCaps.DUMB
-
-    # Check for NO_COLOR environment variable
+    # Windows terminals often omit TERM but must still honor NO_COLOR.
     if os.environ.get("NO_COLOR"):
         return TerminalCaps.BASIC
 

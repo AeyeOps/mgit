@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Show synchronization in a fixed three-row panel with live Git stage progress,
+  repository completion counts, active/skipped/failed totals, and elapsed time.
+  Local pulls use the same bounded subprocess runner as provider operations.
+- Make the help animation opt-in through `global.help_animation: true`; help is
+  immediate by default. Add automated terminal checks for animation and sync.
+- Connect sync progress to completed repository operations and count task zero in
+  diff progress, so completion percentages advance through skips and failures.
+- Keep progress rows within the terminal, preserve percentages in narrow windows,
+  and coordinate console logging with the live display. Routine logs remain in
+  the log file while progress is active; warnings and errors remain visible.
+- Resize the help animation to its viewport and restore the cursor and terminal
+  cleanly on completion, keypress, and Ctrl+C. Respect `NO_COLOR` on all platforms.
+- Preserve literal Unicode in Git's quoted filenames when `core.quotePath=false`,
+  including change detection and content embedding.
+- Terminate Git and its helpers on timeout or cancellation, with a one-second
+  cleanup limit so inherited output pipes cannot hang synchronization.
+- Keep Git error logging importable on Python 3.10 and 3.11.
+
+### Security
+- Update locked aiohttp, cryptography, pip, and setuptools to patched versions
+  identified by the dependency audit.
+
 ## [0.14.0] - 2026-07-13
 
 ### Fixed

@@ -4,6 +4,7 @@ import os
 import sys
 from unittest.mock import MagicMock
 
+from mgit.ui import terminal
 from mgit.ui.terminal import (
     TerminalCaps,
     get_terminal_capabilities,
@@ -107,6 +108,19 @@ class TestTerminalCapabilities:
 
         caps = get_terminal_capabilities()
         assert caps == TerminalCaps.BASIC
+
+    def test_windows_no_color_without_term(self, monkeypatch):
+        """Windows without TERM must still honor NO_COLOR."""
+        mock_stdout = MagicMock()
+        mock_stdout.isatty.return_value = True
+        monkeypatch.setattr(sys, "stdout", mock_stdout)
+        monkeypatch.setattr(terminal, "_IS_WINDOWS", True)
+        monkeypatch.delenv("TERM", raising=False)
+        monkeypatch.setenv("NO_COLOR", "1")
+        for var in ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "TRAVIS"]:
+            monkeypatch.delenv(var, raising=False)
+
+        assert get_terminal_capabilities() == TerminalCaps.BASIC
 
 
 class TestTerminalSize:
